@@ -7,22 +7,25 @@
 <script>
 /* =====================================================================
    설정 — 설치안내.md 순서대로 채워 넣으세요.
-   clientId / tenantId : Microsoft Entra 앱 등록에서 복사
-   driveId / itemId    : 처음 로그인 후 ‘데이터 파일 만들기’가 알려 주는 값
-   값이 비어 있으면 샘플 데이터로 도는 데모 모드로 열립니다.
+   firebase   : Firebase 콘솔 → 프로젝트 설정 → 내 앱(웹)의 firebaseConfig 값
+   ownerEmail : 관리자(본인) 구글 계정 이메일. 보기·편집 권한을 줄 수 있는 사람
+   firebase.apiKey가 비어 있으면 샘플 데이터로 도는 데모 모드로 열립니다.
    ===================================================================== */
 window.SCHEDULE_CONFIG = {
-  clientId: "",
-  tenantId: "",
-  driveId:  "",
-  itemId:   ""
+  ownerEmail: "leehojoon91@gmail.com",
+  firebase: {
+    apiKey: "AIzaSyBBmXmZ7KcW_KKcvtUWYqj2yCybHzPyJ78",
+    authDomain: "hosana-2ee08.firebaseapp.com",
+    projectId: "hosana-2ee08",
+    storageBucket: "hosana-2ee08.firebasestorage.app",
+    messagingSenderId: "380877570524",
+    appId: "1:380877570524:web:9b641fc18943fef55d8f19"
+  }
 };
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@4.13.0/lib/msal-browser.min.js"
-        integrity="sha384-2tyuzPeCxaOKrTIV8NSLGmYO+bTtK2jGcaIYF75CI8DL6cWgByepO2Rm/0vjizRX" crossorigin="anonymous"></script>
 <style>
 :root{
   color-scheme:light;
@@ -309,7 +312,7 @@ function sampleData(){
     project: { name:"온실 신축공사 (샘플)", startDate:"2026-10-12", targetDate:"2026-12-29", statusDate:"", workSaturday:true,
       offDays:[{date:"2026-10-09",type:"holiday",reason:"한글날"},{date:"2026-12-25",type:"holiday",reason:"성탄절"},{date:"2027-01-01",type:"holiday",reason:"신정"}],
       baseline:null },
-    tasks, editors: [], updatedAt: "", updatedBy: ""
+    tasks, updatedAt: "", updatedBy: ""
   };
 }
 
@@ -317,8 +320,8 @@ function sampleData(){
 const CFG = window.SCHEDULE_CONFIG || {};
 const params = new URLSearchParams(location.search);
 const state = {
-  mode: (!CFG.clientId || params.has("demo")) ? "demo" : "boot",   // demo | boot | login | setup | live | error
-  account: null, data: null, eTag: null, canEdit: false, errMsg: "",
+  mode: (!(CFG.firebase && CFG.firebase.apiKey) || params.has("demo")) ? "demo" : "boot",   // demo | boot | login | denied | setup | live | error
+  account: null, data: null, role: null, members: [], canEdit: false, errMsg: "",
   tab: store.get("tab","gantt"), zoom: Number(store.get("zoom","12")) || 12,
   drawer: null, M: null, draftOff: null, busy: false
 };
@@ -326,80 +329,47 @@ const DEFAULT_PROJECT = { name:"온실 신축공사", startDate: localToday(), t
 const proj = () => ({ ...DEFAULT_PROJECT, ...((state.data && state.data.project) || {}) });
 const tasksOf = () => (state.data && state.data.tasks) || [];
 
-/* ---------- Microsoft sign-in + OneDrive (Graph) ---------- */
-const READ_SCOPES = ["User.Read", "Files.Read.All"];
-const WRITE_SCOPES = ["User.Read", "Files.ReadWrite.All"];
-const GRAPH = "https://graph.microsoft.com/v1.0";
-let pca = null;
-
-async function token(write){
-  const scopes = write ? WRITE_SCOPES : READ_SCOPES;
-  try { return (await pca.acquireTokenSilent({ account: state.account, scopes })).accessToken; }
-  catch(e){
-    if(e instanceof msal.InteractionRequiredAuthError || /interaction_required|consent_required|login_required/.test(e.errorCode||"")){
-      try { return (await pca.acquireTokenPopup({ account: state.account, scopes })).accessToken; }
-      catch(e2){ await pca.acquireTokenRedirect({ account: state.account, scopes }); throw e2; }
-    }
-    throw e;
-  }
-}
-async function graph(path, { method="GET", headers={}, body, write=false } = {}){
-  const t = await token(write);
-  const res = await fetch(GRAPH + path, { method, headers: { Authorization: "Bearer " + t, ...headers }, body, cache: "no-store" });
-  if(!res.ok){ const err = new Error("graph " + res.status); err.status = res.status; try{ err.body = await res.json(); }catch{} throw err; }
-  return res.status === 204 ? null : res.json();
-}
-const itemPath = () => `/drives/${encodeURIComponent(CFG.driveId)}/items/${encodeURIComponent(CFG.itemId)}`;
-async function loadRemote(){
-  const meta = await graph(itemPath());
-  const url = meta["@microsoft.graph.downloadUrl"];
-  const res = await fetch(url, { cache: "no-store" });
-  if(!res.ok){ const e = new Error("download " + res.status); e.status = res.status; throw e; }
-  const data = JSON.parse(await res.text());
-  return { data, eTag: meta.eTag };
-}
-async function putRemote(data, eTag){
-  const t = await token(true);
-  const res = await fetch(GRAPH + itemPath() + "/content", {
-    method: "PUT", cache: "no-store",
-    headers: { Authorization: "Bearer " + t, "Content-Type": "application/json", ...(eTag ? { "If-Match": eTag } : {}) },
-    body: JSON.stringify(data, null, 1)
-  });
-  if(!res.ok){ const e = new Error("save " + res.status); e.status = res.status; throw e; }
-  return (await res.json()).eTag;
-}
-function me(){ return (state.account && (state.account.username || "")).toLowerCase(); }
+/* ---------- Google sign-in + Firestore (Firebase) ---------- */
+const FB_VER = "12.19.0";
+const FB = {};
+let auth = null, db = null, unsubData = null, unsubMembers = null, unsubMe = null;
+const ownerEmail = () => String(CFG.ownerEmail || "").trim().toLowerCase();
+function me(){ return ((state.account && state.account.email) || "").toLowerCase(); }
+const isOwner = () => state.mode !== "demo" && !!me() && me() === ownerEmail();
 function computeCanEdit(){
   if(state.mode === "demo") return true;
-  const eds = ((state.data && state.data.editors) || []).map(s => String(s).toLowerCase());
-  return !!me() && eds.includes(me());
+  return isOwner() || state.role === "editor";
 }
+async function loadFirebase(){
+  const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
+  const mods = await Promise.all(["firebase-app.js","firebase-auth.js","firebase-firestore.js"].map(f => import(base + f)));
+  mods.forEach(m => Object.assign(FB, m));
+  const app = FB.initializeApp(CFG.firebase);
+  auth = FB.getAuth(app);
+  db = FB.getFirestore(app);
+}
+const schedRef = () => FB.doc(db, "schedules", "main");
+const memberRef = email => FB.doc(db, "members", email);
 
-/* commit(mutator): re-reads the latest file, applies the change, saves with If-Match.
-   On a concurrent save by someone else it retries once on the newer version. */
+/* commit(mutator): reads the latest schedule inside a transaction, applies the change and writes it back,
+   so two editors saving at once never overwrite each other. Every open page updates through onSnapshot. */
 async function commit(mutator, okMsg){
   if(state.mode === "demo"){ mutator(state.data); afterData(); toast(okMsg + " (데모: 저장되지 않음)"); return true; }
   state.busy = true;
   try{
-    for(let attempt=0; attempt<2; attempt++){
-      const { data, eTag } = await loadRemote();
+    await FB.runTransaction(db, async tx => {
+      const snap = await tx.get(schedRef());
+      const data = clone(snap.exists() ? snap.data() : state.data);
       mutator(data);
       data.updatedAt = new Date().toISOString(); data.updatedBy = me();
-      try{ state.eTag = await putRemote(data, eTag); state.data = data; afterData(); toast(okMsg); return true; }
-      catch(e){ if(e.status === 412 && attempt === 0) continue; throw e; }
-    }
+      tx.set(schedRef(), clone(data));
+    });
+    toast(okMsg); return true;
   }catch(e){
-    const msg = e.status === 403 || e.status === 401 ? "편집 권한이 없어 저장하지 못했습니다. 원드라이브에서 이 데이터 파일을 ‘편집 가능’으로 공유받아야 합니다."
-      : e.status === 412 ? "다른 사람이 동시에 수정해 저장하지 못했습니다. 최신 내용을 불러왔으니 다시 시도해 주세요."
-      : "저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.";
-    toast(msg, 5000);
-    try{ await refresh(); }catch{}
+    toast(e && e.code === "permission-denied" ? "편집 권한이 없어 저장하지 못했습니다. 관리자에게 편집 권한을 요청해 주세요."
+      : "저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.", 5000);
     return false;
   }finally{ state.busy = false; }
-}
-async function refresh(){
-  const { data, eTag } = await loadRemote();
-  state.data = data; state.eTag = eTag; afterData();
 }
 function afterData(){ state.canEdit = computeCanEdit(); render(); if(state.drawer && !state.canEdit) renderDrawer(); }
 
@@ -502,8 +472,9 @@ function renderWho(){
   const w = $("#who");
   if(state.mode === "demo"){ w.innerHTML = `<span class="role edit">데모 모드</span>`; return; }
   if(!state.account){ w.innerHTML = ""; return; }
-  w.innerHTML = `<span>${esc(state.account.name || state.account.username)}</span>
-    <span class="role ${state.canEdit?"edit":""}">${state.canEdit ? "수정 권한" : "보기 전용"}</span>
+  const roleTxt = isOwner() ? "관리자" : state.role === "editor" ? "수정 권한" : state.role === "viewer" ? "보기 전용" : "";
+  w.innerHTML = `<span>${esc(state.account.displayName || state.account.email)}</span>
+    ${roleTxt ? `<span class="role ${state.canEdit?"edit":""}">${roleTxt}</span>` : ""}
     <button class="linkbtn" id="logout">로그아웃</button>`;
 }
 function showChrome(on){ ["#kpis","#navrow"].forEach(s => $(s).hidden = !on); }
@@ -519,15 +490,24 @@ function render(){
   if(state.mode === "boot"){ showChrome(false); $("#view").innerHTML = `<div class="panel empty">로그인 확인 중…</div>`; return; }
   if(state.mode === "login"){
     showChrome(false); $("#meta").textContent = "";
-    $("#view").innerHTML = `<div class="panel gate"><h2>회사 계정으로 로그인</h2>
-      <p>이 공정표는 공유받은 사람만 볼 수 있습니다. 회사 마이크로소프트 계정으로 로그인해 주세요.</p>
-      <div><button class="btn primary big" id="login">Microsoft 계정으로 로그인</button></div></div>`;
+    $("#view").innerHTML = `<div class="panel gate"><h2>구글 계정으로 로그인</h2>
+      <p>이 공정표는 허용된 사람만 볼 수 있습니다. 권한을 받은 구글 계정으로 로그인해 주세요.</p>
+      <div><button class="btn primary big" id="login">Google 계정으로 로그인</button></div>
+      <div class="err">${esc(state.errMsg)}</div></div>`;
+    return;
+  }
+  if(state.mode === "denied"){
+    showChrome(false); $("#meta").textContent = "";
+    $("#view").innerHTML = `<div class="panel gate"><h2>접근 권한이 없습니다</h2>
+      <p>로그인한 계정: <b>${esc(me())}</b></p>
+      <p>관리자에게 위 이메일 주소로 보기 또는 편집 권한을 요청해 주세요. 권한이 추가되면 이 화면이 자동으로 바뀝니다.</p>
+      <div><button class="btn" id="logout2">다른 계정으로 로그인</button></div></div>`;
     return;
   }
   if(state.mode === "error"){
     showChrome(false);
     $("#view").innerHTML = `<div class="panel gate"><h2>공정표를 열 수 없습니다</h2><p>${esc(state.errMsg)}</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="retry">다시 시도</button><button class="btn" id="logout2">다른 계정으로 로그인</button></div></div>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="retry">다시 시도</button>${state.account?`<button class="btn" id="logout2">다른 계정으로 로그인</button>`:""}</div></div>`;
     return;
   }
   if(state.mode === "setup"){ showChrome(false); renderSetup(); return; }
@@ -559,31 +539,19 @@ function render(){
 
 function renderSetup(){
   $("#meta").textContent = "";
-  const done = state.setupResult;
-  $("#view").innerHTML = done ? `<div class="panel gate"><h2>데이터 파일을 만들었습니다</h2>
-      <p>원드라이브 <b>공정관리</b> 폴더에 <b>온실공정표-데이터.json</b>이 생겼습니다. 아래 두 값을 index.html 맨 위 설정에 붙여 넣고 다시 올려 주세요.</p>
-      <div class="codebox">driveId:  "${esc(done.driveId)}",\nitemId:   "${esc(done.itemId)}"</div>
-      <p>그다음 원드라이브에서 이 파일을 보는 사람은 ‘보기 가능’, 편집자는 ‘편집 가능’으로 공유하고, 공정표 설정 탭의 ‘편집자’ 목록에 편집자 이메일을 추가하세요.</p>
-      <div><button class="btn" id="copyCfg">값 복사</button></div></div>`
-    : `<div class="panel gate"><h2>처음 설정</h2>
-      <p>아직 공정 데이터 파일이 지정되지 않았습니다. 관리자(편집자) 계정으로 로그인한 상태라면, 내 원드라이브에 샘플 공정이 들어 있는 데이터 파일을 만들 수 있습니다.</p>
-      <p class="note">로그인 계정: ${esc(me())}</p>
-      <div><button class="btn primary big" id="createFile">내 원드라이브에 데이터 파일 만들기</button></div>
-      <div class="err" id="setupErr"></div></div>`;
+  $("#view").innerHTML = isOwner() ? `<div class="panel gate"><h2>처음 설정</h2>
+      <p>아직 공정표 데이터가 없습니다. 어떻게 시작할까요?</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary big" id="startSample">샘플 공정으로 시작</button><button class="btn big" id="startEmpty">빈 공정표로 시작</button></div>
+      <p class="note">샘플은 온실 신축공사 32개 작업입니다. 시작한 뒤 자유롭게 고치거나 지울 수 있습니다.</p>
+      <div class="err" id="setupErr"></div></div>`
+    : `<div class="panel gate"><h2>아직 공정표가 준비되지 않았습니다</h2><p>관리자가 공정표를 만들면 이 화면에 자동으로 표시됩니다.</p></div>`;
 }
-async function createDataFile(){
-  const btn = $("#createFile"); btn.disabled = true;
-  try{
-    const data = sampleData(); data.editors = [me()]; data.updatedAt = new Date().toISOString(); data.updatedBy = me();
-    const t = await token(true);
-    const path = "/me/drive/root:/" + ["공정관리","온실공정표-데이터.json"].map(encodeURIComponent).join("/") + ":/content?@microsoft.graph.conflictBehavior=fail";
-    const res = await fetch(GRAPH + path, { method:"PUT", headers:{ Authorization:"Bearer "+t, "Content-Type":"application/json" }, body: JSON.stringify(data, null, 1) });
-    if(res.status === 409) throw new Error("원드라이브 공정관리 폴더에 같은 이름의 파일이 이미 있습니다. 기존 파일을 쓰려면 파일의 driveId·itemId를 설정에 넣거나, 파일 이름을 바꾼 뒤 다시 시도해 주세요.");
-    if(!res.ok) throw new Error("파일을 만들지 못했습니다 (" + res.status + "). 앱 등록의 API 권한(Files.ReadWrite.All)을 확인해 주세요.");
-    const item = await res.json();
-    state.setupResult = { driveId: item.parentReference.driveId, itemId: item.id };
-    render();
-  }catch(e){ $("#setupErr").textContent = e.message; btn.disabled = false; }
+async function startSchedule(sample){
+  const b1 = $("#startSample"), b2 = $("#startEmpty"); b1.disabled = b2.disabled = true;
+  const data = sample ? sampleData() : { format:"greenhouse-schedule/1", project:{ ...DEFAULT_PROJECT }, tasks:[] };
+  data.updatedAt = new Date().toISOString(); data.updatedBy = me();
+  try{ await FB.setDoc(schedRef(), clone(data)); toast("공정표를 만들었습니다"); }
+  catch(e){ $("#setupErr").textContent = "만들지 못했습니다 (" + (e.code||"") + "). Firestore 보안 규칙의 관리자 이메일이 로그인 계정과 같은지 확인해 주세요."; b1.disabled = b2.disabled = false; }
 }
 
 function renderKpis(M){
@@ -603,7 +571,6 @@ function renderKpis(M){
 function renderTools(){
   let h = "";
   if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="확대">${[[5,"월"],[12,"주"],[24,"일"]].map(([z,l])=>`<button data-zoom="${z}" class="${state.zoom===z?"on":""}">${l}</button>`).join("")}</div>`;
-  if(state.mode==="live") h += `<button class="btn" id="reload" title="최신 내용 불러오기">새로고침</button>`;
   if(state.canEdit && state.tab!=="set") h += `<button class="btn primary" id="addTask">작업 추가</button>`;
   $("#tools").innerHTML = h;
 }
@@ -744,7 +711,6 @@ function renderSettings(){
   if(!state.draftOff) state.draftOff = (p.offDays||[]).map(o=>({...o}));
   const offs = [...state.draftOff].sort((a,b)=>a.date<b.date?-1:1);
   const base = p.baseline;
-  const editors = (state.data && state.data.editors) || [];
   return `<div class="panel settings">
     <section>
       <h3>프로젝트</h3>
@@ -771,10 +737,16 @@ function renderSettings(){
       </div>` : ""}
     </section>
     <section>
-      <h3>편집자</h3>
-      <p class="note" style="margin-top:0">이 목록에 있는 계정에만 수정 화면이 보입니다. 실제 저장은 원드라이브에서 데이터 파일을 ‘편집 가능’으로 공유받은 사람만 할 수 있습니다.</p>
-      <div class="off-list">${editors.length ? editors.map(e=>`<div class="off-item" style="grid-template-columns:1fr auto"><span>${esc(e)}</span>${state.canEdit && e.toLowerCase()!==me()?`<button class="x" data-rmed="${esc(e)}" aria-label="삭제">×</button>`:"<span></span>"}</div>`).join("") : `<div class="note">${state.mode==="demo"?"데모 모드에서는 모두 편집할 수 있습니다.":"등록된 편집자가 없습니다."}</div>`}</div>
-      ${state.canEdit ? `<div class="off-add"><input type="email" id="e-mail" class="full" placeholder="name@greenplus.co.kr" aria-label="편집자 이메일"><button class="btn full" id="e-add">편집자 추가</button></div>` : ""}
+      <h3>보기·편집 권한</h3>
+      ${state.mode === "demo" ? `<p class="note" style="margin-top:0">데모 모드에서는 권한 관리를 쓸 수 없습니다. 실제 사이트에서는 관리자가 여기서 이메일별로 ‘보기’ 또는 ‘편집’ 권한을 줍니다.</p>`
+        : isOwner() ? `<p class="note" style="margin-top:0">여기에 등록한 구글 계정만 공정표를 볼 수 있습니다. ‘편집’은 작업과 설정을 고칠 수 있고, ‘보기’는 볼 수만 있습니다.</p>
+      <div class="off-list">${state.members.length ? state.members.map(m=>`<div class="off-item" style="grid-template-columns:1fr auto auto"><span style="overflow:hidden;text-overflow:ellipsis">${esc(m.email)}</span>
+        <select data-role="${esc(m.email)}" aria-label="권한" style="width:auto;padding:3px 6px"><option value="viewer" ${m.role!=="editor"?"selected":""}>보기</option><option value="editor" ${m.role==="editor"?"selected":""}>편집</option></select>
+        <button class="x" data-rmmem="${esc(m.email)}" aria-label="삭제" title="권한 삭제">×</button></div>`).join("") : `<div class="note">아직 권한을 준 사람이 없습니다.</div>`}</div>
+      <div class="off-add"><input type="email" id="m-mail" placeholder="name@gmail.com" aria-label="이메일"><select id="m-role" aria-label="권한"><option value="viewer">보기</option><option value="editor">편집</option></select>
+        <button class="btn full" id="m-add">권한 추가</button></div>
+      <p class="note">관리자: ${esc(ownerEmail())}</p>`
+        : `<p class="note" style="margin-top:0">권한은 관리자(${esc(ownerEmail())})가 관리합니다. 내 권한: <b>${state.role==="editor"?"편집":"보기"}</b></p>`}
       <h3 style="margin-top:24px">백업</h3>
       <p class="note" style="margin-top:0">현재 공정 데이터를 JSON 파일로 내려받습니다.</p>
       <button class="btn" id="backup">백업 파일 내려받기</button>
@@ -920,6 +892,7 @@ function bindSettings(){
     a.download = `온실공정표-백업-${localToday()}.json`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   };
+  bindMembers();
   if(!state.canEdit) return;
   let baseArm = false;
   $("#s-save").onclick = () => saveProject();
@@ -940,13 +913,26 @@ function bindSettings(){
     const items = {}; M.order.forEach(id => { const t = M.by.get(id); items[id] = [t.startDate, t.finishDate]; });
     await saveProject({ baseline: { savedAt: localToday(), finish: M.finish, items } });
   };
-  $("#e-add").onclick = async () => {
-    const e = $("#e-mail").value.trim().toLowerCase();
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){ $("#s-err").textContent = "이메일 주소를 확인해 주세요."; return; }
-    await commit(data => { const l = data.editors || (data.editors = []); if(!l.map(x=>x.toLowerCase()).includes(e)) l.push(e); }, "편집자를 추가했습니다");
+}
+function bindMembers(){
+  if(!isOwner()) return;
+  const err = t => { const e = $("#s-err"); if(e) e.textContent = t; else toast(t); };
+  $("#m-add").onclick = async () => {
+    const e = $("#m-mail").value.trim().toLowerCase();
+    if(!/^[^@\s/]+@[^@\s/]+\.[^@\s/]+$/.test(e)){ err("이메일 주소를 확인해 주세요."); return; }
+    if(e === ownerEmail()){ err("관리자는 따로 추가하지 않아도 됩니다."); return; }
+    try{ await FB.setDoc(memberRef(e), { role: $("#m-role").value, addedAt: new Date().toISOString(), addedBy: me() }); toast("권한을 추가했습니다"); }
+    catch(x){ err("추가하지 못했습니다 (" + (x.code||"") + ")."); }
   };
-  document.querySelectorAll("[data-rmed]").forEach(b => b.onclick = () =>
-    commit(data => { data.editors = (data.editors||[]).filter(x => x.toLowerCase() !== b.dataset.rmed.toLowerCase()); }, "편집자를 뺐습니다"));
+  document.querySelectorAll("[data-role]").forEach(s => s.onchange = async () => {
+    try{ await FB.setDoc(memberRef(s.dataset.role), { role: s.value }, { merge: true }); toast("권한을 바꿨습니다"); }
+    catch(x){ err("바꾸지 못했습니다 (" + (x.code||"") + ")."); }
+  });
+  document.querySelectorAll("[data-rmmem]").forEach(b => b.onclick = async () => {
+    if(!b.dataset.armed){ b.dataset.armed = "1"; b.textContent = "삭제?"; b.style.color = "var(--bad)"; return; }
+    try{ await FB.deleteDoc(memberRef(b.dataset.rmmem)); toast("권한을 삭제했습니다"); }
+    catch(x){ err("삭제하지 못했습니다 (" + (x.code||"") + ")."); }
+  });
 }
 
 /* ---------- events ---------- */
@@ -955,12 +941,11 @@ document.addEventListener("click", e => {
   if(tab){ state.tab = tab.dataset.tab; store.set("tab", state.tab); if(state.tab==="set") state.draftOff=null; render(); return; }
   const z = e.target.closest("[data-zoom]");
   if(z){ state.zoom = Number(z.dataset.zoom); store.set("zoom", String(state.zoom)); render(); return; }
-  if(e.target.closest("#login")){ pca.loginRedirect({ scopes: READ_SCOPES }); return; }
-  if(e.target.closest("#logout") || e.target.closest("#logout2")){ pca.logoutRedirect({ account: state.account }); return; }
-  if(e.target.closest("#retry")){ boot(); return; }
-  if(e.target.closest("#reload")){ refresh().then(()=>toast("최신 내용을 불러왔습니다")).catch(()=>toast("불러오지 못했습니다")); return; }
-  if(e.target.closest("#createFile")){ createDataFile(); return; }
-  if(e.target.closest("#copyCfg")){ const txt = $(".codebox").textContent; navigator.clipboard.writeText(txt).then(()=>toast("복사했습니다")).catch(()=>toast("값을 직접 선택해 복사해 주세요")); return; }
+  if(e.target.closest("#login")){ login(); return; }
+  if(e.target.closest("#logout") || e.target.closest("#logout2")){ if(auth) FB.signOut(auth); return; }
+  if(e.target.closest("#retry")){ location.reload(); return; }
+  if(e.target.closest("#startSample")){ startSchedule(true); return; }
+  if(e.target.closest("#startEmpty")){ startSchedule(false); return; }
   if(e.target.closest("#addTask")){ openTask(null); return; }
   if(e.target.closest("[data-close]") || e.target.id==="scrim"){ closeDrawer(); return; }
   if(e.target.closest("#f-save")){ saveTask(); return; }
@@ -975,42 +960,61 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("keydown", e => { if(e.key==="Escape" && state.drawer) closeDrawer(); });
 
-/* keep viewers current: check for a newer file every minute while the page is visible */
-setInterval(async () => {
-  if(state.mode!=="live" || state.busy || state.drawer || document.visibilityState!=="visible") return;
-  try{ const meta = await graph(itemPath() + "?$select=eTag"); if(meta.eTag !== state.eTag) await refresh(); }catch{}
-}, 60000);
-
 /* ---------- boot ---------- */
+function authMsg(e){
+  const c = (e && e.code) || "";
+  if(c === "auth/unauthorized-domain") return "이 사이트 주소가 Firebase 인증의 승인된 도메인에 등록되지 않았습니다. 설치안내의 Firebase 설정 단계를 확인해 주세요.";
+  if(c === "auth/operation-not-allowed") return "Firebase에서 Google 로그인이 켜져 있지 않습니다. 설치안내의 Firebase 설정 단계를 확인해 주세요.";
+  if(c === "auth/popup-closed-by-user" || c === "auth/cancelled-popup-request") return "";
+  return "로그인하지 못했습니다 (" + c + "). 잠시 후 다시 시도해 주세요.";
+}
+async function login(){
+  const provider = new FB.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  try{ await FB.signInWithPopup(auth, provider); }
+  catch(e){
+    if(e.code === "auth/popup-blocked"){ await FB.signInWithRedirect(auth, provider); return; }
+    state.errMsg = authMsg(e); render();
+  }
+}
+function stopListeners(){ [unsubData, unsubMembers, unsubMe].forEach(u => { if(u) u(); }); unsubData = unsubMembers = unsubMe = null; }
+function watchData(){
+  unsubData = FB.onSnapshot(schedRef(), snap => {
+    if(!snap.exists()){ state.data = null; state.mode = "setup"; afterData(); return; }
+    state.data = snap.data(); state.mode = "live"; afterData();
+  }, err => {
+    unsubData = null;
+    if(err.code === "permission-denied"){ state.mode = "denied"; }
+    else { state.mode = "error"; state.errMsg = "공정 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."; }
+    afterData();
+  });
+}
+function watchMembers(){
+  unsubMembers = FB.onSnapshot(FB.collection(db, "members"), snap => {
+    state.members = snap.docs.map(d => ({ email: d.id, ...d.data() })).sort((a,b) => a.email < b.email ? -1 : 1);
+    if(state.tab === "set" && state.mode === "live" && !state.drawer) render();
+  }, () => {});
+}
+function onUser(user){
+  stopListeners(); state.data = null; state.role = null; state.members = [];
+  if(!user){ state.account = null; state.mode = "login"; afterData(); return; }
+  state.account = user; state.errMsg = ""; state.mode = "boot";
+  if(isOwner()){ state.role = "owner"; watchData(); watchMembers(); return; }
+  unsubMe = FB.onSnapshot(memberRef(me()), snap => {
+    state.role = snap.exists() ? (snap.data().role === "editor" ? "editor" : "viewer") : null;
+    if(!state.role){ if(unsubData){ unsubData(); unsubData = null; } state.data = null; state.mode = "denied"; afterData(); return; }
+    if(!unsubData) watchData(); else afterData();
+  }, () => { state.mode = "denied"; afterData(); });
+}
 async function boot(){
   if(!["gantt","net","list","set"].includes(state.tab)) state.tab = "gantt";
   if(![5,12,24].includes(state.zoom)) state.zoom = 12;
   if(state.mode === "demo"){ state.data = sampleData(); afterData(); return; }
-  state.mode = "boot"; render();
-  try{
-    if(!pca){
-      if(!window.msal){ throw Object.assign(new Error("로그인 모듈을 불러오지 못했습니다. 인터넷 연결 또는 회사 방화벽 설정을 확인해 주세요."), { user:true }); }
-      pca = new msal.PublicClientApplication({
-        auth: { clientId: CFG.clientId, authority: "https://login.microsoftonline.com/" + (CFG.tenantId || "organizations"), redirectUri: location.origin + location.pathname },
-        cache: { cacheLocation: "localStorage" }
-      });
-      await pca.initialize();
-      const res = await pca.handleRedirectPromise();
-      if(res && res.account) pca.setActiveAccount(res.account);
-    }
-    state.account = pca.getActiveAccount() || pca.getAllAccounts()[0] || null;
-    if(!state.account){ state.mode = "login"; render(); return; }
-    pca.setActiveAccount(state.account);
-    if(!CFG.driveId || !CFG.itemId){ state.mode = "setup"; render(); return; }
-    await refresh();
-    state.mode = "live"; afterData();
-  }catch(e){
-    state.mode = "error";
-    state.errMsg = e.user ? e.message
-      : (e.status === 403 || e.status === 404) ? `이 공정표를 볼 권한이 없습니다. 담당자에게 원드라이브 데이터 파일 공유를 요청해 주세요. (로그인 계정: ${me()})`
-      : (e.errorCode ? `로그인 중 문제가 생겼습니다 (${e.errorCode}). 회사 IT 관리자에게 앱 권한 승인을 요청해야 할 수 있습니다.` : "공정 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
-    render();
-  }
+  render();
+  try{ await loadFirebase(); }
+  catch(e){ state.mode = "error"; state.errMsg = "로그인 모듈을 불러오지 못했습니다. 인터넷 연결 또는 회사 방화벽 설정을 확인해 주세요."; render(); return; }
+  try{ await FB.getRedirectResult(auth); }catch(e){ state.errMsg = authMsg(e); }
+  FB.onAuthStateChanged(auth, onUser);
 }
 boot();
 })();
