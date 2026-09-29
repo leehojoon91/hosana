@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>온실 공정표</title>
+<script>
+/* =====================================================================
+   설정 — 설치안내.md 순서대로 채워 넣으세요.
+   clientId / tenantId : Microsoft Entra 앱 등록에서 복사
+   driveId / itemId    : 처음 로그인 후 ‘데이터 파일 만들기’가 알려 주는 값
+   값이 비어 있으면 샘플 데이터로 도는 데모 모드로 열립니다.
+   ===================================================================== */
+window.SCHEDULE_CONFIG = {
+  clientId: "",
+  tenantId: "",
+  driveId:  "",
+  itemId:   ""
+};
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@4.13.0/lib/msal-browser.min.js"
+        integrity="sha384-2tyuzPeCxaOKrTIV8NSLGmYO+bTtK2jGcaIYF75CI8DL6cWgByepO2Rm/0vjizRX" crossorigin="anonymous"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#F1F4F1; --surface:#FFFFFF; --surface-2:#E7ECE8; --ink:#17201C; --ink-2:#48564F; --ink-3:#7A8881;
+  --line:#D3DBD5; --accent:#1D6A51; --accent-ink:#FFFFFF; --accent-soft:#D3E7DD;
+  --crit:#BF4E17; --crit-soft:#F5DCCD; --prog:#2C64A4; --prog-soft:#D8E4F3; --done:#8D9C95; --done-soft:#E3E8E5;
+  --nonwork:#E8ECE9; --weather:#F2E4CC; --warn:#A86A00; --bad:#B3261E; --good:#1D6A51;
+  --shadow:0 12px 40px rgba(20,35,28,.18);
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#0F1512; --surface:#171F1B; --surface-2:#212B26; --ink:#E3EAE6; --ink-2:#A9B6AF; --ink-3:#7A8882;
+    --line:#2D3833; --accent:#5CBD97; --accent-ink:#0C1611; --accent-soft:#1D3A2E;
+    --crit:#F08A4B; --crit-soft:#46291A; --prog:#77A8E3; --prog-soft:#1C2C40; --done:#66756E; --done-soft:#232C28;
+    --nonwork:#1B2420; --weather:#30291A; --warn:#E0A43A; --bad:#F2867E; --good:#5CBD97;
+    --shadow:0 12px 40px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+  padding-inline:20px;padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(60px + env(safe-area-inset-bottom,0px))}
+[hidden]{display:none!important}
+.wrap{max-width:1400px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.08em;color:var(--accent);font-weight:600}
+h1{margin:2px 0 0;font-size:26px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.meta{color:var(--ink-3);font-size:13px}
+.who{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.role{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);font-weight:500}
+.role.edit{background:var(--accent-soft);color:var(--accent)}
+.linkbtn{border:0;background:none;color:var(--ink-3);text-decoration:underline;padding:0;font-size:12.5px}
+.banner{padding:10px 14px;border-radius:8px;background:var(--prog-soft);color:var(--ink);font-size:13px}
+.banner b{color:var(--prog)}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.kpi .k{font-size:12px;color:var(--ink-3)}
+.kpi .v{font-size:20px;font-weight:600;font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.kpi .s{font-size:12px;color:var(--ink-2)}
+.kpi .v.good{color:var(--good)} .kpi .v.warn{color:var(--warn)} .kpi .v.bad{color:var(--bad)}
+.meter{height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;margin-top:4px}
+.meter i{display:block;height:100%;background:var(--accent)}
+
+.bar-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.tabs{display:flex;gap:2px;background:var(--surface-2);padding:3px;border-radius:9px;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;padding:6px 14px;border-radius:7px;color:var(--ink-2);font-weight:500}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:5px 10px;font-size:13px;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.btn{border:1px solid var(--line);background:var(--surface);padding:6px 12px;border-radius:7px;font-weight:500}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad)}
+.btn.danger.armed{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.big{padding:10px 20px;font-size:15px}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:8px;border-radius:2px;display:inline-block;border:1px solid transparent}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.empty{padding:40px 20px;text-align:center;color:var(--ink-2)}
+.empty h2{font-size:17px;margin:0 0 6px;color:var(--ink)}
+.alert{padding:10px 14px;border-radius:8px;background:var(--crit-soft);color:var(--ink);font-size:13px}
+.gate{max-width:520px;margin:10vh auto 0;padding:32px;text-align:left;display:flex;flex-direction:column;gap:14px}
+.gate h2{margin:0;font-size:20px}
+.gate p{margin:0;color:var(--ink-2)}
+.codebox{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-all;user-select:all}
+
+/* Gantt */
+.gantt{display:grid;grid-template-columns:260px minmax(0,1fr);overflow:hidden}
+.g-left{border-right:1px solid var(--line)}
+.g-head{height:48px;border-bottom:1px solid var(--line);display:flex;align-items:flex-end;padding:0 12px 6px;font-size:12px;color:var(--ink-3)}
+.g-row{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;cursor:pointer;white-space:nowrap;overflow:hidden}
+.g-row:hover{background:var(--surface-2)}
+.g-row .code{font-family:var(--mono);font-size:12px;color:var(--ink-3);width:28px;flex:none}
+.g-row .nm{overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.g-row.crit .code{color:var(--crit);font-weight:600}
+.g-row.done .nm{color:var(--ink-3)}
+.g-grp{height:30px;display:flex;align-items:center;padding:0 12px;font-weight:600;font-size:13px;background:var(--surface-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-right{overflow-x:auto}
+.g-right svg{display:block}
+svg text{font-family:var(--sans)}
+.t-month{font-size:12px;font-weight:600;fill:var(--ink)}
+.t-day{font-size:10px;fill:var(--ink-3);font-family:var(--mono)}
+.l-grid{stroke:var(--line);stroke-width:1}
+.r-nonwork{fill:var(--nonwork)}
+.r-weather{fill:var(--weather)}
+.r-grp{fill:var(--surface-2);opacity:.6}
+.b-bg{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1}
+.b-pg{fill:var(--accent)}
+.crit .b-bg{fill:var(--crit-soft);stroke:var(--crit)}
+.crit .b-pg{fill:var(--crit)}
+.done .b-bg{fill:var(--done-soft);stroke:var(--done)}
+.done .b-pg{fill:var(--done)}
+.b-base{fill:var(--ink-3);opacity:.35}
+.b-float{stroke:var(--ink-3);stroke-width:1.5;stroke-dasharray:2 3}
+.b-lbl{font-size:11px;fill:var(--ink-2)}
+.l-today{stroke:var(--crit);stroke-width:1.5}
+.t-today{font-size:10px;fill:var(--crit);font-weight:600}
+.l-target{stroke:var(--prog);stroke-width:1.5;stroke-dasharray:5 3}
+.t-target{font-size:10px;fill:var(--prog);font-weight:600}
+.bar{cursor:pointer}
+.bar:hover .b-bg{stroke-width:2}
+
+/* Network */
+.net{overflow:auto;padding:8px}
+.n-box{fill:var(--surface);stroke:var(--line);stroke-width:1}
+.crit .n-box{stroke:var(--crit);stroke-width:2}
+.done .n-box{fill:var(--done-soft)}
+.prog .n-box{stroke:var(--prog);stroke-width:1.5}
+.n-code{font-size:11px;font-family:var(--mono);font-weight:600;fill:var(--ink-3)}
+.crit .n-code{fill:var(--crit)}
+.n-name{font-size:12px;font-weight:600;fill:var(--ink)}
+.n-sub{font-size:10.5px;font-family:var(--mono);fill:var(--ink-2)}
+.e{fill:none;stroke:var(--ink-3);stroke-width:1.2;opacity:.55}
+.e.crit{stroke:var(--crit);stroke-width:2;opacity:1}
+.node{cursor:pointer}
+.node:hover .n-box{stroke:var(--ink)}
+
+/* Table */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:980px;font-size:13px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;font-weight:500;color:var(--ink-3);background:var(--surface);position:sticky;top:0}
+td.r,th.r{text-align:right}
+tbody tr.t{cursor:pointer}
+tbody tr.t:hover{background:var(--surface-2)}
+tr.grp td{background:var(--surface-2);font-weight:600}
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;font-weight:500}
+.p-done{background:var(--done-soft);color:var(--ink-2)}
+.p-prog{background:var(--prog-soft);color:var(--prog)}
+.p-wait{background:var(--surface-2);color:var(--ink-2)}
+.p-crit{background:var(--crit-soft);color:var(--crit)}
+.late{color:var(--bad);font-weight:600}
+.early{color:var(--good)}
+
+/* Settings */
+.settings{padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:28px}
+.settings h3{font-size:14px;margin:0 0 12px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field label,.flabel{font-size:12px;color:var(--ink-2);font-weight:500}
+.field .hint{font-size:12px;color:var(--ink-3)}
+input[type=text],input[type=email],input[type=date],input[type=number],select,textarea{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:7px 9px;width:100%;min-width:0}
+input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);color:var(--ink-2)}
+textarea{resize:vertical;min-height:60px}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px}
+.off-list{display:flex;flex-direction:column;gap:4px;max-height:320px;overflow:auto;margin-bottom:10px}
+.off-item{display:grid;grid-template-columns:110px 1fr auto;gap:8px;align-items:center;font-size:13px;padding:5px 8px;border-radius:6px;background:var(--surface-2)}
+.off-item.w{background:var(--weather)}
+.off-add{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.off-add .full{grid-column:1/-1}
+.x{border:0;background:transparent;color:var(--ink-3);font-size:16px;line-height:1;padding:2px 6px}
+.x:hover{color:var(--bad)}
+.note{font-size:12.5px;color:var(--ink-2);line-height:1.6}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,20,15,.35);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);z-index:21;box-shadow:var(--shadow);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.d-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.d-head h2{margin:0;font-size:16px}
+.d-body{padding:16px 20px;overflow:auto;flex:1}
+.d-foot{padding:12px 20px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.calc{background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--ink-2);margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.calc b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.err{color:var(--bad);font-size:12.5px;min-height:1em}
+.dl{display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:13px}
+.dl dt{color:var(--ink-3)}
+.dl dd{margin:0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:13px;z-index:30;max-width:calc(100% - 32px)}
+
+@media (max-width:640px){
+  body{padding-inline:16px}
+  h1{font-size:21px}
+  .gantt{grid-template-columns:130px minmax(0,1fr)}
+  .g-row .code{display:none}
+  .kpi .v{font-size:17px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">PERT 공정관리</div>
+      <h1 id="pname">온실 공정표</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="who" id="who"></div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <section class="kpis" id="kpis" aria-label="공정 요약"></section>
+  <div class="bar-row" id="navrow">
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="gantt">간트 차트</button>
+      <button role="tab" data-tab="net">PERT 네트워크</button>
+      <button role="tab" data-tab="list">작업 목록</button>
+      <button role="tab" data-tab="set">설정</button>
+    </div>
+    <div class="tools" id="tools"></div>
+  </div>
+  <main id="view"><div class="panel empty">불러오는 중…</div></main>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="작업 상세"></aside>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+/* ---------- utilities ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const D = s => { const [y,m,d] = s.split("-").map(Number); return new Date(Date.UTC(y, m-1, d)); };
+const S = dt => dt.toISOString().slice(0,10);
+const addDays = (dt,n) => new Date(dt.getTime() + n*864e5);
+const WD = ["일","월","화","수","목","금","토"];
+const fmt = s => { if(!s) return "–"; const d=D(s); return `${d.getUTCMonth()+1}/${d.getUTCDate()} (${WD[d.getUTCDay()]})`; };
+const fmtLong = s => { if(!s) return "–"; const d=D(s); return `${d.getUTCFullYear()}.${String(d.getUTCMonth()+1).padStart(2,"0")}.${String(d.getUTCDate()).padStart(2,"0")}`; };
+const localToday = () => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; };
+const isDate = s => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const uid = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+function ncdf(z){ const t=1/(1+0.2316419*Math.abs(z)); const d=0.3989423*Math.exp(-z*z/2);
+  const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274)))); return z>0?1-p:p; }
+const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch{ return d; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch{} } };
+const clone = o => JSON.parse(JSON.stringify(o));
+
+/* ---------- sample data (demo mode, and seed for a new data file) ---------- */
+function sampleData(){
+  const T = (code, group, name, o, m, p, preds, note="") => ({ id:code, code, group, name, o, m, p, preds, actualStart:"", actualEnd:"", progress:0, note });
+  const tasks = [
+    T("A1","A. 착공 준비","착공신고·인허가 협의",3,5,10,[]),
+    T("A2","A. 착공 준비","측량·규준틀 설치",1,2,3,["A1"]),
+    T("A3","A. 착공 준비","가설공사 (가설전기·용수·사무소)",2,3,5,["A1"]),
+    T("B1","B. 토공사·기초","부지정지·성토 다짐",3,5,9,["A2"]),
+    T("B2","B. 토공사·기초","기초 터파기",2,3,5,["B1"]),
+    T("B3","B. 토공사·기초","기초 철근·거푸집",3,4,6,["B2"]),
+    T("B4","B. 토공사·기초","기초 콘크리트 타설",1,1,2,["B3","A3"]),
+    T("B5","B. 토공사·기초","양생·기초 검측",5,7,8,["B4"],"동절기 보온양생 검토"),
+    T("C1","C. 철골 골조","철골 자재 제작·반입",10,14,20,["A1"],"공장 제작, 현장과 병행"),
+    T("C2","C. 철골 골조","기둥 세우기·레벨 조정",3,5,7,["B5","C1"]),
+    T("C3","C. 철골 골조","트러스·거터 설치",4,6,9,["C2"]),
+    T("C4","C. 철골 골조","골조 볼트 체결·검측",1,2,3,["C3"]),
+    T("D1","D. 피복","지붕 피복 (유리·PO필름)",5,7,12,["C4"],"강풍 시 작업 중지"),
+    T("D2","D. 피복","측벽·방풍벽 피복",3,4,7,["D1"]),
+    T("E1","E. 개폐·커튼","천창 개폐장치 설치",3,4,6,["C4"]),
+    T("E2","E. 개폐·커튼","측창 개폐장치 설치",2,3,4,["E1"]),
+    T("E3","E. 개폐·커튼","차광·보온 커튼 설치",4,5,8,["D1","E1"]),
+    T("F1","F. 기계설비","보일러·축열조 설치",3,4,6,["B5"]),
+    T("F2","F. 기계설비","난방 배관 (온수 파이프레일)",4,6,9,["C4","F1"]),
+    T("F3","F. 기계설비","관수·양액 설비",3,4,6,["F2"]),
+    T("F4","F. 기계설비","환기팬·유동팬 설치",1,2,3,["D2"]),
+    T("G1","G. 전기·환경제어","전기 인입·분전반",2,3,5,["A3"],"한전 인입 일정 확인"),
+    T("G2","G. 전기·환경제어","동력·조명 배선",3,4,6,["C4","G1"]),
+    T("G3","G. 전기·환경제어","환경제어 시스템·센서",3,4,7,["G2","E2","E3"]),
+    T("H1","H. 바닥·재배시설","바닥 배수·통로 콘크리트",3,4,6,["F2"]),
+    T("H2","H. 바닥·재배시설","재배 베드·행잉거터 설치",3,5,7,["H1"]),
+    T("I1","I. 부대토목","외부 배수로",3,4,6,["B1"]),
+    T("I2","I. 부대토목","진입로·작업장 포장",3,4,6,["I1"]),
+    T("I3","I. 부대토목","울타리·출입문",1,2,3,["I2"]),
+    T("J1","J. 시운전·준공","통합 시운전",2,3,5,["F3","F4","G3","H2","D2"]),
+    T("J2","J. 시운전·준공","준공검사",1,2,4,["J1","I3"]),
+    T("J3","J. 시운전·준공","인수인계·운영 교육",1,1,2,["J2"]),
+  ];
+  tasks.forEach((t,i) => t.order = (i+1)*10);
+  return {
+    format: "greenhouse-schedule/1",
+    project: { name:"온실 신축공사 (샘플)", startDate:"2026-10-12", targetDate:"2026-12-29", statusDate:"", workSaturday:true,
+      offDays:[{date:"2026-10-09",type:"holiday",reason:"한글날"},{date:"2026-12-25",type:"holiday",reason:"성탄절"},{date:"2027-01-01",type:"holiday",reason:"신정"}],
+      baseline:null },
+    tasks, editors: [], updatedAt: "", updatedBy: ""
+  };
+}
+
+/* ---------- state ---------- */
+const CFG = window.SCHEDULE_CONFIG || {};
+const params = new URLSearchParams(location.search);
+const state = {
+  mode: (!CFG.clientId || params.has("demo")) ? "demo" : "boot",   // demo | boot | login | setup | live | error
+  account: null, data: null, eTag: null, canEdit: false, errMsg: "",
+  tab: store.get("tab","gantt"), zoom: Number(store.get("zoom","12")) || 12,
+  drawer: null, M: null, draftOff: null, busy: false
+};
+const DEFAULT_PROJECT = { name:"온실 신축공사", startDate: localToday(), targetDate:"", workSaturday:true, offDays:[], statusDate:"", baseline:null };
+const proj = () => ({ ...DEFAULT_PROJECT, ...((state.data && state.data.project) || {}) });
+const tasksOf = () => (state.data && state.data.tasks) || [];
+
+/* ---------- Microsoft sign-in + OneDrive (Graph) ---------- */
+const READ_SCOPES = ["User.Read", "Files.Read.All"];
+const WRITE_SCOPES = ["User.Read", "Files.ReadWrite.All"];
+const GRAPH = "https://graph.microsoft.com/v1.0";
+let pca = null;
+
+async function token(write){
+  const scopes = write ? WRITE_SCOPES : READ_SCOPES;
+  try { return (await pca.acquireTokenSilent({ account: state.account, scopes })).accessToken; }
+  catch(e){
+    if(e instanceof msal.InteractionRequiredAuthError || /interaction_required|consent_required|login_required/.test(e.errorCode||"")){
+      try { return (await pca.acquireTokenPopup({ account: state.account, scopes })).accessToken; }
+      catch(e2){ await pca.acquireTokenRedirect({ account: state.account, scopes }); throw e2; }
+    }
+    throw e;
+  }
+}
+async function graph(path, { method="GET", headers={}, body, write=false } = {}){
+  const t = await token(write);
+  const res = await fetch(GRAPH + path, { method, headers: { Authorization: "Bearer " + t, ...headers }, body, cache: "no-store" });
+  if(!res.ok){ const err = new Error("graph " + res.status); err.status = res.status; try{ err.body = await res.json(); }catch{} throw err; }
+  return res.status === 204 ? null : res.json();
+}
+const itemPath = () => `/drives/${encodeURIComponent(CFG.driveId)}/items/${encodeURIComponent(CFG.itemId)}`;
+async function loadRemote(){
+  const meta = await graph(itemPath());
+  const url = meta["@microsoft.graph.downloadUrl"];
+  const res = await fetch(url, { cache: "no-store" });
+  if(!res.ok){ const e = new Error("download " + res.status); e.status = res.status; throw e; }
+  const data = JSON.parse(await res.text());
+  return { data, eTag: meta.eTag };
+}
+async function putRemote(data, eTag){
+  const t = await token(true);
+  const res = await fetch(GRAPH + itemPath() + "/content", {
+    method: "PUT", cache: "no-store",
+    headers: { Authorization: "Bearer " + t, "Content-Type": "application/json", ...(eTag ? { "If-Match": eTag } : {}) },
+    body: JSON.stringify(data, null, 1)
+  });
+  if(!res.ok){ const e = new Error("save " + res.status); e.status = res.status; throw e; }
+  return (await res.json()).eTag;
+}
+function me(){ return (state.account && (state.account.username || "")).toLowerCase(); }
+function computeCanEdit(){
+  if(state.mode === "demo") return true;
+  const eds = ((state.data && state.data.editors) || []).map(s => String(s).toLowerCase());
+  return !!me() && eds.includes(me());
+}
+
+/* commit(mutator): re-reads the latest file, applies the change, saves with If-Match.
+   On a concurrent save by someone else it retries once on the newer version. */
+async function commit(mutator, okMsg){
+  if(state.mode === "demo"){ mutator(state.data); afterData(); toast(okMsg + " (데모: 저장되지 않음)"); return true; }
+  state.busy = true;
+  try{
+    for(let attempt=0; attempt<2; attempt++){
+      const { data, eTag } = await loadRemote();
+      mutator(data);
+      data.updatedAt = new Date().toISOString(); data.updatedBy = me();
+      try{ state.eTag = await putRemote(data, eTag); state.data = data; afterData(); toast(okMsg); return true; }
+      catch(e){ if(e.status === 412 && attempt === 0) continue; throw e; }
+    }
+  }catch(e){
+    const msg = e.status === 403 || e.status === 401 ? "편집 권한이 없어 저장하지 못했습니다. 원드라이브에서 이 데이터 파일을 ‘편집 가능’으로 공유받아야 합니다."
+      : e.status === 412 ? "다른 사람이 동시에 수정해 저장하지 못했습니다. 최신 내용을 불러왔으니 다시 시도해 주세요."
+      : "저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.";
+    toast(msg, 5000);
+    try{ await refresh(); }catch{}
+    return false;
+  }finally{ state.busy = false; }
+}
+async function refresh(){
+  const { data, eTag } = await loadRemote();
+  state.data = data; state.eTag = eTag; afterData();
+}
+function afterData(){ state.canEdit = computeCanEdit(); render(); if(state.drawer && !state.canEdit) renderDrawer(); }
+
+/* ---------- PERT engine ---------- */
+function buildCal(p){
+  const off = new Set((p.offDays||[]).map(o => o.date));
+  const days = []; let d = D(p.startDate);
+  for(let g=0; days.length<1500 && g<4000; g++){
+    const w = d.getUTCDay(); const s = S(d);
+    if(w!==0 && (w!==6 || p.workSaturday) && !off.has(s)) days.push(s);
+    d = addDays(d,1);
+  }
+  return days;
+}
+function idxOf(cal, s){ let lo=0, hi=cal.length; while(lo<hi){ const mid=(lo+hi)>>1; if(cal[mid] < s) lo=mid+1; else hi=mid; } return lo; }
+function pert(t){
+  const o=num(t.o), m=num(t.m), p=num(t.p);
+  const te=(o+4*m+p)/6, v=((p-o)/6)**2;
+  return { te, v, dur: te>0 ? Math.max(1, Math.round(te)) : 0 };
+}
+function topo(tasks){
+  const ids = new Set(tasks.map(t=>t.id));
+  const indeg = new Map(), succ = new Map();
+  tasks.forEach(t => succ.set(t.id, []));
+  tasks.forEach(t => { const ps=[...new Set((t.preds||[]).filter(id => ids.has(id) && id!==t.id))]; t._preds=ps; indeg.set(t.id, ps.length); });
+  tasks.forEach(t => t._preds.forEach(p => succ.get(p).push(t.id)));
+  const q = [...tasks].sort((a,b)=>num(a.order)-num(b.order)).filter(t=>indeg.get(t.id)===0).map(t=>t.id), out=[];
+  while(q.length){ const id=q.shift(); out.push(id); for(const s of succ.get(id)){ indeg.set(s, indeg.get(s)-1); if(indeg.get(s)===0) q.push(s); } }
+  return { order: out, succ, cyc: tasks.filter(t=>!out.includes(t.id)).map(t=>t.id) };
+}
+function compute(){
+  const p = proj();
+  if(!isDate(p.startDate)) return null;
+  const tasks = tasksOf().map(t => ({ ...t }));
+  const cal = buildCal(p);
+  const by = new Map(tasks.map(t=>[t.id,t]));
+  const { order, succ, cyc } = topo(tasks);
+  const statusDate = isDate(p.statusDate) ? p.statusDate : localToday();
+  const sIdx = statusDate > p.startDate ? idxOf(cal, statusDate) : 0;
+  for(const id of order){
+    const t = by.get(id); Object.assign(t, pert(t));
+    const prog = t.actualEnd ? 100 : Math.min(100, Math.max(0, num(t.progress)));
+    t.prog = prog;
+    t.status = t.actualEnd ? "done" : (t.actualStart ? "prog" : "wait");
+    let es = 0; for(const pid of t._preds) es = Math.max(es, by.get(pid).ef);
+    if(isDate(t.actualStart)) es = idxOf(cal, t.actualStart);
+    else if(es < sIdx) es = sIdx;
+    let ef;
+    if(isDate(t.actualEnd)) ef = Math.max(es + (t.dur?1:0), idxOf(cal, t.actualEnd)+1);
+    else if(t.status==="prog") ef = Math.max(es + t.dur, sIdx + Math.ceil(t.dur*(1-prog/100)));
+    else ef = es + t.dur;
+    t.es=es; t.ef=ef;
+  }
+  const valid = order.map(id=>by.get(id));
+  const projEF = valid.reduce((m,t)=>Math.max(m,t.ef), 0);
+  for(let i=order.length-1;i>=0;i--){
+    const t = by.get(order[i]); const ss = succ.get(t.id).map(s=>by.get(s)).filter(s=>s.es!=null);
+    const lf = ss.length ? Math.min(...ss.map(s=>s.ls)) : projEF;
+    t.lf = lf; t.ls = lf - (t.ef - t.es); t.float = t.ls - t.es;
+    t.crit = t.status!=="done" && t.float <= 0;
+  }
+  let variance = 0;
+  let cur = valid.filter(t=>t.status!=="done").sort((a,b)=>b.ef-a.ef)[0];
+  while(cur){
+    variance += cur.v * (1-cur.prog/100);
+    cur = cur._preds.map(id=>by.get(id)).filter(x=>x.ef===cur.es && x.status!=="done").sort((a,b)=>a.float-b.float)[0];
+  }
+  const sigma = Math.sqrt(variance);
+  const dateAt = i => cal[Math.max(0, Math.min(cal.length-1, i))];
+  valid.forEach(t => {
+    t.startDate = dateAt(t.es);
+    t.finishDate = t.ef>t.es ? dateAt(t.ef-1) : dateAt(t.es);
+    t.lateFinish = t.lf>t.ls ? dateAt(t.lf-1) : dateAt(t.lf);
+    const b = p.baseline && p.baseline.items && p.baseline.items[t.id];
+    t.delay = b ? (idxOf(cal, t.finishDate) - idxOf(cal, b[1])) : null;
+    t.base = b || null;
+  });
+  const finish = projEF ? dateAt(projEF-1) : p.startDate;
+  let prob = null;
+  if(isDate(p.targetDate)){
+    const tIdx = idxOf(cal, p.targetDate) + (cal.includes(p.targetDate) ? 1 : 0);
+    prob = sigma>0 ? ncdf((tIdx - projEF)/sigma) : (projEF<=tIdx ? 1 : 0);
+  }
+  const p85 = dateAt(Math.ceil(projEF + 1.036*sigma) - 1);
+  const sumTe = valid.reduce((s,t)=>s+t.te,0);
+  const progress = sumTe ? valid.reduce((s,t)=>s+t.te*t.prog,0)/sumTe : 0;
+  const baseFinish = p.baseline && p.baseline.finish;
+  return { p, cal, tasks, by, order, cyc, projEF, finish, sigma, prob, p85, progress, sIdx, statusDate, groups: groupTasks(tasks),
+    remaining: Math.max(0, projEF - sIdx), critCount: valid.filter(t=>t.crit).length, baseFinish,
+    projDelay: baseFinish ? idxOf(cal, finish) - idxOf(cal, baseFinish) : null };
+}
+function groupTasks(tasks){
+  const m = new Map();
+  [...tasks].sort((a,b)=>num(a.order)-num(b.order)).forEach(t => { const g = t.group || "미분류"; if(!m.has(g)) m.set(g, []); m.get(g).push(t); });
+  return [...m.entries()].map(([name, items]) => ({ name, items }));
+}
+
+/* ---------- render ---------- */
+function renderWho(){
+  const w = $("#who");
+  if(state.mode === "demo"){ w.innerHTML = `<span class="role edit">데모 모드</span>`; return; }
+  if(!state.account){ w.innerHTML = ""; return; }
+  w.innerHTML = `<span>${esc(state.account.name || state.account.username)}</span>
+    <span class="role ${state.canEdit?"edit":""}">${state.canEdit ? "수정 권한" : "보기 전용"}</span>
+    <button class="linkbtn" id="logout">로그아웃</button>`;
+}
+function showChrome(on){ ["#kpis","#navrow"].forEach(s => $(s).hidden = !on); }
+
+function render(){
+  renderWho();
+  const banner = $("#banner");
+  if(state.mode === "demo"){
+    banner.hidden = false;
+    banner.innerHTML = `<b>데모 모드</b> · 샘플 데이터로 동작하며 수정 내용은 저장되지 않습니다. 실제로 쓰려면 설치안내.md를 따라 로그인 설정을 채워 주세요.`;
+  } else banner.hidden = true;
+
+  if(state.mode === "boot"){ showChrome(false); $("#view").innerHTML = `<div class="panel empty">로그인 확인 중…</div>`; return; }
+  if(state.mode === "login"){
+    showChrome(false); $("#meta").textContent = "";
+    $("#view").innerHTML = `<div class="panel gate"><h2>회사 계정으로 로그인</h2>
+      <p>이 공정표는 공유받은 사람만 볼 수 있습니다. 회사 마이크로소프트 계정으로 로그인해 주세요.</p>
+      <div><button class="btn primary big" id="login">Microsoft 계정으로 로그인</button></div></div>`;
+    return;
+  }
+  if(state.mode === "error"){
+    showChrome(false);
+    $("#view").innerHTML = `<div class="panel gate"><h2>공정표를 열 수 없습니다</h2><p>${esc(state.errMsg)}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="retry">다시 시도</button><button class="btn" id="logout2">다른 계정으로 로그인</button></div></div>`;
+    return;
+  }
+  if(state.mode === "setup"){ showChrome(false); renderSetup(); return; }
+
+  showChrome(true);
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab===state.tab)));
+  const M = compute(); state.M = M;
+  const p = proj();
+  $("#pname").textContent = p.name || "온실 공정표";
+  document.title = (p.name ? p.name + " · " : "") + "온실 공정표";
+  const up = state.data && state.data.updatedAt;
+  $("#meta").textContent = `착공 ${fmtLong(p.startDate)} · 기준일 ${fmtLong(M ? M.statusDate : localToday())}` + (up ? ` · 최종 수정 ${fmtLong(up.slice(0,10))}${state.data.updatedBy ? " ("+state.data.updatedBy.split("@")[0]+")" : ""}` : "");
+  renderKpis(M); renderTools();
+  const v = $("#view");
+  v.innerHTML = "";
+  if(M && M.cyc.length){
+    const codes = M.cyc.map(id => (tasksOf().find(t=>t.id===id)||{}).code || id).join(", ");
+    v.innerHTML = `<div class="alert">선행작업이 순환하고 있어 일정을 계산할 수 없는 작업이 있습니다: <b>${esc(codes)}</b>. 선행작업을 고쳐 주세요.</div>`;
+  }
+  if(state.tab==="set"){ v.insertAdjacentHTML("beforeend", renderSettings()); bindSettings(); return; }
+  if(!tasksOf().length){
+    v.insertAdjacentHTML("beforeend", `<div class="panel empty"><h2>등록된 작업이 없습니다</h2><p>${state.canEdit ? "‘작업 추가’로 첫 공정을 등록하세요." : "담당자가 공정을 등록하면 여기에 표시됩니다."}</p></div>`);
+    return;
+  }
+  if(state.tab==="gantt") v.insertAdjacentHTML("beforeend", renderGantt(M));
+  else if(state.tab==="net") v.insertAdjacentHTML("beforeend", renderNet(M));
+  else v.insertAdjacentHTML("beforeend", renderList(M));
+}
+
+function renderSetup(){
+  $("#meta").textContent = "";
+  const done = state.setupResult;
+  $("#view").innerHTML = done ? `<div class="panel gate"><h2>데이터 파일을 만들었습니다</h2>
+      <p>원드라이브 <b>공정관리</b> 폴더에 <b>온실공정표-데이터.json</b>이 생겼습니다. 아래 두 값을 index.html 맨 위 설정에 붙여 넣고 다시 올려 주세요.</p>
+      <div class="codebox">driveId:  "${esc(done.driveId)}",\nitemId:   "${esc(done.itemId)}"</div>
+      <p>그다음 원드라이브에서 이 파일을 보는 사람은 ‘보기 가능’, 편집자는 ‘편집 가능’으로 공유하고, 공정표 설정 탭의 ‘편집자’ 목록에 편집자 이메일을 추가하세요.</p>
+      <div><button class="btn" id="copyCfg">값 복사</button></div></div>`
+    : `<div class="panel gate"><h2>처음 설정</h2>
+      <p>아직 공정 데이터 파일이 지정되지 않았습니다. 관리자(편집자) 계정으로 로그인한 상태라면, 내 원드라이브에 샘플 공정이 들어 있는 데이터 파일을 만들 수 있습니다.</p>
+      <p class="note">로그인 계정: ${esc(me())}</p>
+      <div><button class="btn primary big" id="createFile">내 원드라이브에 데이터 파일 만들기</button></div>
+      <div class="err" id="setupErr"></div></div>`;
+}
+async function createDataFile(){
+  const btn = $("#createFile"); btn.disabled = true;
+  try{
+    const data = sampleData(); data.editors = [me()]; data.updatedAt = new Date().toISOString(); data.updatedBy = me();
+    const t = await token(true);
+    const path = "/me/drive/root:/" + ["공정관리","온실공정표-데이터.json"].map(encodeURIComponent).join("/") + ":/content?@microsoft.graph.conflictBehavior=fail";
+    const res = await fetch(GRAPH + path, { method:"PUT", headers:{ Authorization:"Bearer "+t, "Content-Type":"application/json" }, body: JSON.stringify(data, null, 1) });
+    if(res.status === 409) throw new Error("원드라이브 공정관리 폴더에 같은 이름의 파일이 이미 있습니다. 기존 파일을 쓰려면 파일의 driveId·itemId를 설정에 넣거나, 파일 이름을 바꾼 뒤 다시 시도해 주세요.");
+    if(!res.ok) throw new Error("파일을 만들지 못했습니다 (" + res.status + "). 앱 등록의 API 권한(Files.ReadWrite.All)을 확인해 주세요.");
+    const item = await res.json();
+    state.setupResult = { driveId: item.parentReference.driveId, itemId: item.id };
+    render();
+  }catch(e){ $("#setupErr").textContent = e.message; btn.disabled = false; }
+}
+
+function renderKpis(M){
+  if(!M){ $("#kpis").innerHTML=""; return; }
+  const probTxt = M.prob==null ? "–" : Math.round(M.prob*100) + "%";
+  const probCls = M.prob==null ? "" : M.prob>=.8 ? "good" : M.prob>=.5 ? "warn" : "bad";
+  const d = M.projDelay;
+  const delayTxt = d==null ? "기준 공정 미설정" : d>0 ? `기준 대비 ${d}일 지연` : d<0 ? `기준 대비 ${-d}일 단축` : "기준 공정과 동일";
+  $("#kpis").innerHTML = `
+    <div class="kpi"><span class="k">예상 준공일</span><span class="v">${esc(fmt(M.finish))}</span><span class="s">${esc(delayTxt)}</span></div>
+    <div class="kpi"><span class="k">목표 준공일</span><span class="v">${esc(fmt(M.p.targetDate))}</span><span class="s">${M.p.targetDate ? fmtLong(M.p.targetDate) : "설정에서 지정"}</span></div>
+    <div class="kpi"><span class="k">목표 내 준공 확률</span><span class="v ${probCls}">${probTxt}</span><span class="s">σ = ${M.sigma.toFixed(1)} 작업일</span></div>
+    <div class="kpi"><span class="k">85% 신뢰 준공일</span><span class="v">${esc(fmt(M.p85))}</span><span class="s">여유 있게 잡을 때</span></div>
+    <div class="kpi"><span class="k">남은 작업일</span><span class="v">${M.remaining}<small style="font-size:13px;font-weight:400"> 일</small></span><span class="s">주공정 작업 ${M.critCount}개</span></div>
+    <div class="kpi"><span class="k">전체 진척률</span><span class="v">${M.progress.toFixed(0)}%</span><div class="meter"><i style="width:${M.progress.toFixed(1)}%"></i></div></div>`;
+}
+function renderTools(){
+  let h = "";
+  if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="확대">${[[5,"월"],[12,"주"],[24,"일"]].map(([z,l])=>`<button data-zoom="${z}" class="${state.zoom===z?"on":""}">${l}</button>`).join("")}</div>`;
+  if(state.mode==="live") h += `<button class="btn" id="reload" title="최신 내용 불러오기">새로고침</button>`;
+  if(state.canEdit && state.tab!=="set") h += `<button class="btn primary" id="addTask">작업 추가</button>`;
+  $("#tools").innerHTML = h;
+}
+
+const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border-top:1px solid var(--line)">
+  <span><i class="sw" style="background:var(--crit-soft);border-color:var(--crit)"></i>주공정 (여유 0일)</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i>여유 있는 작업</span>
+  <span><i class="sw" style="background:var(--done-soft);border-color:var(--done)"></i>완료</span>
+  ${net ? `<span><i class="sw" style="background:var(--surface);border-color:var(--prog)"></i>진행 중</span>` : `
+  <span><i class="sw" style="height:2px;border:0;border-top:2px dotted var(--ink-3)"></i>여유일</span>
+  <span><i class="sw" style="background:var(--ink-3);opacity:.35;height:4px"></i>기준 공정</span>
+  <span><i class="sw" style="background:var(--nonwork)"></i>휴무</span>
+  <span><i class="sw" style="background:var(--weather)"></i>작업불가(기상 등)</span>
+  <span><i class="sw" style="width:2px;height:12px;background:var(--crit)"></i>기준일</span>`}
+</div>`;
+
+function renderGantt(M){
+  const px = state.zoom, RH = 30, HH = 48;
+  const rows = []; M.groups.forEach(g => { rows.push({ g:g.name }); g.items.forEach(t => rows.push({ t: M.by.get(t.id) })); });
+  let end = M.finish; if(isDate(M.p.targetDate) && M.p.targetDate > end) end = M.p.targetDate;
+  rows.forEach(r => { if(r.t && r.t.base && r.t.base[1] > end) end = r.t.base[1]; });
+  const a0 = addDays(D(M.p.startDate), -3), a1 = addDays(D(end), 10);
+  const nDays = Math.round((a1-a0)/864e5);
+  const W = nDays*px, H = HH + rows.length*RH;
+  const X = s => Math.round((D(s)-a0)/864e5)*px;
+  const off = new Map((M.p.offDays||[]).map(o=>[o.date,o]));
+  let bg = "", hdr = "";
+  for(let i=0;i<nDays;i++){
+    const d = addDays(a0,i), s = S(d), w = d.getUTCDay(), x = i*px, o = off.get(s);
+    if(o) bg += `<rect class="${o.type==="weather"?"r-weather":"r-nonwork"}" x="${x}" y="${HH}" width="${px}" height="${H-HH}"><title>${esc(fmt(s))} ${esc(o.reason||"작업불가")}</title></rect>`;
+    else if(w===0 || (w===6 && !M.p.workSaturday)) bg += `<rect class="r-nonwork" x="${x}" y="${HH}" width="${px}" height="${H-HH}"/>`;
+    if(d.getUTCDate()===1 || i===0) hdr += `<line class="l-grid" x1="${x}" y1="0" x2="${x}" y2="${H}"/><text class="t-month" x="${x+4}" y="16">${d.getUTCFullYear()}.${d.getUTCMonth()+1}</text>`;
+    if(px>=16) hdr += `<text class="t-day" x="${x+px/2}" y="40" text-anchor="middle">${d.getUTCDate()}</text>`;
+    else if(w===1) hdr += `<line class="l-grid" x1="${x}" y1="28" x2="${x}" y2="${HH}"/><text class="t-day" x="${x+3}" y="42">${d.getUTCDate()}</text>`;
+  }
+  let grp = "", bars = "";
+  rows.forEach((r,i) => {
+    const y = HH + i*RH;
+    if(r.g!=null){ grp += `<rect class="r-grp" x="0" y="${y}" width="${W}" height="${RH}"/>`; return; }
+    const t = r.t; if(t.es==null) return;
+    const cls = t.status==="done" ? "done" : t.crit ? "crit" : "";
+    let g = "";
+    if(t.base){ const bx=X(t.base[0]), bw=Math.max(px, X(t.base[1])+px-bx); g += `<rect class="b-base" x="${bx}" y="${y+RH-8}" width="${bw}" height="4" rx="1"/>`; }
+    if(t.dur===0 && t.ef===t.es){
+      const cx = X(t.startDate)+px/2, cy=y+RH/2-2;
+      g += `<path class="b-bg" d="M${cx} ${cy-7} L${cx+7} ${cy} L${cx} ${cy+7} L${cx-7} ${cy} Z"/>`;
+    } else {
+      const x = X(t.startDate), w = Math.max(px, X(t.finishDate)+px-x);
+      g += `<rect class="b-bg" x="${x}" y="${y+6}" width="${w}" height="${RH-16}" rx="3"/>`;
+      if(t.prog>0) g += `<rect class="b-pg" x="${x}" y="${y+6}" width="${Math.max(2,w*t.prog/100)}" height="${RH-16}" rx="3"/>`;
+      let lx = x + w + 6;
+      if(t.status!=="done" && t.float>0){ const fx = X(t.lateFinish)+px; g += `<line class="b-float" x1="${x+w+2}" y1="${y+RH/2-2}" x2="${fx}" y2="${y+RH/2-2}"/>`; lx = fx + 6; }
+      g += `<text class="b-lbl" x="${lx}" y="${y+RH/2+2}">${t.dur}일${t.prog>0&&t.prog<100?" · "+Math.round(t.prog)+"%":""}</text>`;
+    }
+    const tip = `${t.code} ${t.name}\n${fmt(t.startDate)} → ${fmt(t.finishDate)} (${t.dur}작업일)\n기대값 ${t.te.toFixed(1)}일 · 여유 ${t.float}일${t.delay?`\n기준 대비 ${t.delay>0?"+":""}${t.delay}일`:""}`;
+    bars += `<g class="bar ${cls}" data-id="${esc(t.id)}"><title>${esc(tip)}</title>${g}</g>`;
+  });
+  let marks = "";
+  if(M.statusDate >= S(a0) && M.statusDate <= S(a1)){ const x = X(M.statusDate); marks += `<line class="l-today" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-today" x="${x+3}" y="${HH-8}">기준일</text>`; }
+  if(isDate(M.p.targetDate)){ const x = X(M.p.targetDate)+px; marks += `<line class="l-target" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-target" x="${x+3}" y="${HH-8}">목표</text>`; }
+  const left = rows.map(r => r.g!=null
+    ? `<div class="g-grp" title="${esc(r.g)}">${esc(r.g)}</div>`
+    : `<div class="g-row ${r.t.status==="done"?"done":""} ${r.t.crit?"crit":""}" data-id="${esc(r.t.id)}" title="${esc(r.t.code+" "+r.t.name)}"><span class="code">${esc(r.t.code)}</span><span class="nm">${esc(r.t.name)}</span></div>`).join("");
+  return `<div class="panel"><div class="gantt">
+    <div class="g-left"><div class="g-head">작업</div>${left}</div>
+    <div class="g-right"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="간트 차트">
+      ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${bars}${marks}</svg></div>
+  </div>${legendHTML(false)}</div>`;
+}
+
+function renderNet(M){
+  const NW=168, NH=62, GX=56, GY=18, PAD=16;
+  const valid = M.order.map(id=>M.by.get(id));
+  const rank = new Map();
+  valid.forEach(t => rank.set(t.id, t._preds.length ? Math.max(...t._preds.map(p=>rank.get(p)))+1 : 0));
+  const gIndex = new Map(); M.groups.forEach((g,i)=>g.items.forEach((t,j)=>gIndex.set(t.id, i*1000+j)));
+  const cols = [];
+  valid.forEach(t => { const r=rank.get(t.id); (cols[r] ||= []).push(t); });
+  cols.forEach(c => c.sort((a,b)=>gIndex.get(a.id)-gIndex.get(b.id)));
+  const pos = new Map(); let maxRows = 0;
+  cols.forEach((c,ci) => { maxRows=Math.max(maxRows,c.length); c.forEach((t,ri)=>pos.set(t.id,{x:PAD+ci*(NW+GX), y:PAD+ri*(NH+GY)})); });
+  const W = PAD*2 + cols.length*(NW+GX) - GX, H = PAD*2 + maxRows*(NH+GY) - GY;
+  let edges = "", nodes = "";
+  valid.forEach(t => t._preds.forEach(pid => {
+    const a = pos.get(pid), b = pos.get(t.id), pt = M.by.get(pid);
+    const crit = pt.crit && t.crit && pt.ef===t.es;
+    const x1=a.x+NW, y1=a.y+NH/2, x2=b.x, y2=b.y+NH/2, mx=(x1+x2)/2;
+    edges += `<path class="e ${crit?"crit":""}" d="M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2-4} ${y2}" marker-end="url(#${crit?"ac":"an"})"/>`;
+  }));
+  valid.forEach(t => {
+    const {x,y} = pos.get(t.id);
+    const cls = t.status==="done" ? "done" : (t.crit ? "crit" : "") + (t.status==="prog" ? " prog" : "");
+    const name = t.name.length>11 ? t.name.slice(0,11)+"…" : t.name;
+    nodes += `<g class="node ${cls}" data-id="${esc(t.id)}"><title>${esc(t.code+" "+t.name)}</title>
+      <rect class="n-box" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="6"/>
+      <text class="n-code" x="${x+10}" y="${y+16}">${esc(t.code)}</text>
+      <text class="n-sub" x="${x+NW-10}" y="${y+16}" text-anchor="end">te ${t.te.toFixed(1)}</text>
+      <text class="n-name" x="${x+10}" y="${y+34}">${esc(name)}</text>
+      <text class="n-sub" x="${x+10}" y="${y+52}">${esc(fmt(t.startDate).split(" ")[0])}–${esc(fmt(t.finishDate).split(" ")[0])}</text>
+      <text class="n-sub" x="${x+NW-10}" y="${y+52}" text-anchor="end">${t.status==="done"?"완료":"여유 "+t.float}</text></g>`;
+  });
+  return `<div class="panel"><div class="net"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="PERT 네트워크">
+    <defs><marker id="an" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--ink-3)"/></marker>
+    <marker id="ac" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--crit)"/></marker></defs>
+    ${edges}${nodes}</svg></div>${legendHTML(true)}</div>`;
+}
+
+function renderList(M){
+  const hasBase = !!(M.p.baseline && M.p.baseline.items);
+  const codeOf = id => (M.by.get(id)||{}).code || "?";
+  let body = "";
+  M.groups.forEach(g => {
+    body += `<tr class="grp"><td colspan="${hasBase?15:14}">${esc(g.name)}</td></tr>`;
+    g.items.forEach(x => {
+      const t = M.by.get(x.id); if(t.es==null) return;
+      const st = t.status==="done" ? `<span class="pill p-done">완료</span>` : t.status==="prog" ? `<span class="pill p-prog">진행 ${Math.round(t.prog)}%</span>` : `<span class="pill p-wait">대기</span>`;
+      body += `<tr class="t" data-id="${esc(t.id)}">
+        <td class="mono">${esc(t.code)}</td><td>${esc(t.name)} ${t.crit?`<span class="pill p-crit">주공정</span>`:""}</td>
+        <td class="r num">${num(t.o)}</td><td class="r num">${num(t.m)}</td><td class="r num">${num(t.p)}</td>
+        <td class="r num"><b>${t.te.toFixed(1)}</b></td><td class="r num">${Math.sqrt(t.v).toFixed(2)}</td>
+        <td class="mono">${esc(t._preds.map(codeOf).join(", ")||"–")}</td>
+        <td class="num">${esc(fmt(t.startDate))}</td><td class="num">${esc(fmt(t.finishDate))}</td>
+        <td class="r num">${t.dur}</td><td class="r num">${t.status==="done"?"–":t.float}</td>
+        ${hasBase?`<td class="r num ${t.delay>0?"late":t.delay<0?"early":""}">${t.delay==null?"–":(t.delay>0?"+":"")+t.delay}</td>`:""}
+        <td>${st}</td><td>${esc(t.note||"")}</td></tr>`;
+    });
+  });
+  return `<div class="panel tbl-wrap"><table>
+    <thead><tr><th>코드</th><th>작업명</th><th class="r" title="낙관 기간">낙관 a</th><th class="r" title="최빈 기간">최빈 m</th><th class="r" title="비관 기간">비관 b</th>
+    <th class="r" title="(a+4m+b)/6">기대 te</th><th class="r" title="(b−a)/6">σ</th><th>선행작업</th><th>시작</th><th>완료</th><th class="r">공기</th><th class="r">여유</th>
+    ${hasBase?`<th class="r" title="기준 공정 대비 완료일 변동(작업일)">지연</th>`:""}<th>상태</th><th>메모</th></tr></thead>
+    <tbody>${body}</tbody></table></div>
+    <p class="note">기간 단위는 작업일입니다. 기대 공기 te = (a + 4m + b) / 6, 표준편차 σ = (b − a) / 6. 여유가 0인 작업이 주공정이며, 주공정 작업이 하루 늦어지면 준공일도 하루 늦어집니다.</p>`;
+}
+
+function renderSettings(){
+  const p = proj(); const dis = state.canEdit ? "" : "disabled";
+  if(!state.draftOff) state.draftOff = (p.offDays||[]).map(o=>({...o}));
+  const offs = [...state.draftOff].sort((a,b)=>a.date<b.date?-1:1);
+  const base = p.baseline;
+  const editors = (state.data && state.data.editors) || [];
+  return `<div class="panel settings">
+    <section>
+      <h3>프로젝트</h3>
+      <div class="field"><label for="s-name">공사명</label><input type="text" id="s-name" value="${esc(p.name)}" ${dis}></div>
+      <div class="g2">
+        <div class="field"><label for="s-start">착공일</label><input type="date" id="s-start" value="${esc(p.startDate)}" ${dis}></div>
+        <div class="field"><label for="s-target">목표 준공일</label><input type="date" id="s-target" value="${esc(p.targetDate||"")}" ${dis}></div>
+      </div>
+      <div class="field"><label for="s-status">기준일</label><input type="date" id="s-status" value="${esc(p.statusDate||"")}" ${dis}><span class="hint">비워 두면 오늘 날짜로 계산합니다. 아직 시작하지 않은 작업은 기준일 이전으로 잡히지 않고 뒤로 밀립니다.</span></div>
+      <label class="chk"><input type="checkbox" id="s-sat" ${p.workSaturday?"checked":""} ${dis}> 토요일 작업</label>
+      <h3 style="margin-top:24px">기준 공정</h3>
+      <p class="note">${base ? `${fmtLong(base.savedAt)}에 저장한 기준 공정과 비교하고 있습니다 (당시 예상 준공 ${fmtLong(base.finish)}).` : "아직 기준 공정이 없습니다. 계획이 확정되면 저장해 두세요. 이후 간트 차트에 계획선이 표시되고 작업별 지연일이 계산됩니다."}</p>
+      ${state.canEdit ? `<button class="btn" id="s-base">${base ? "현재 일정으로 기준 공정 다시 저장" : "현재 일정을 기준 공정으로 저장"}</button>` : ""}
+    </section>
+    <section>
+      <h3>작업불가일</h3>
+      <p class="note" style="margin-top:0">공휴일, 우천·강풍·한파 등으로 작업하지 못한 날을 추가하면 이후 일정이 자동으로 밀립니다.</p>
+      <div class="off-list">${offs.length ? offs.map(o=>`<div class="off-item ${o.type==="weather"?"w":""}"><span class="num">${esc(fmt(o.date))}</span><span>${esc(o.reason||"")} <span style="color:var(--ink-3)">· ${o.type==="weather"?"기상":o.type==="etc"?"기타":"공휴일"}</span></span>${state.canEdit?`<button class="x" data-rmoff="${esc(o.date)}" aria-label="삭제">×</button>`:"<span></span>"}</div>`).join("") : `<div class="note">등록된 작업불가일이 없습니다.</div>`}</div>
+      ${state.canEdit ? `<div class="off-add">
+        <input type="date" id="o-date" aria-label="날짜">
+        <select id="o-type" aria-label="구분"><option value="weather">우천·기상</option><option value="holiday">공휴일</option><option value="etc">기타</option></select>
+        <input type="text" id="o-reason" class="full" placeholder="사유 (예: 우천, 강풍 경보)">
+        <button class="btn full" id="o-add">작업불가일 추가</button>
+      </div>` : ""}
+    </section>
+    <section>
+      <h3>편집자</h3>
+      <p class="note" style="margin-top:0">이 목록에 있는 계정에만 수정 화면이 보입니다. 실제 저장은 원드라이브에서 데이터 파일을 ‘편집 가능’으로 공유받은 사람만 할 수 있습니다.</p>
+      <div class="off-list">${editors.length ? editors.map(e=>`<div class="off-item" style="grid-template-columns:1fr auto"><span>${esc(e)}</span>${state.canEdit && e.toLowerCase()!==me()?`<button class="x" data-rmed="${esc(e)}" aria-label="삭제">×</button>`:"<span></span>"}</div>`).join("") : `<div class="note">${state.mode==="demo"?"데모 모드에서는 모두 편집할 수 있습니다.":"등록된 편집자가 없습니다."}</div>`}</div>
+      ${state.canEdit ? `<div class="off-add"><input type="email" id="e-mail" class="full" placeholder="name@greenplus.co.kr" aria-label="편집자 이메일"><button class="btn full" id="e-add">편집자 추가</button></div>` : ""}
+      <h3 style="margin-top:24px">백업</h3>
+      <p class="note" style="margin-top:0">현재 공정 데이터를 JSON 파일로 내려받습니다.</p>
+      <button class="btn" id="backup">백업 파일 내려받기</button>
+    </section>
+    ${state.canEdit ? `<div style="grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="s-save">설정 저장</button><span class="err" id="s-err"></span></div>` : ""}
+  </div>`;
+}
+
+/* ---------- drawer ---------- */
+function openTask(id){
+  state.drawer = { id: id||null, arm:false };
+  renderDrawer();
+  $("#drawer").hidden = false; $("#scrim").hidden = false;
+  const f = $("#drawer input, #drawer button"); if(f) f.focus();
+}
+function closeDrawer(){ state.drawer=null; $("#drawer").hidden = true; $("#scrim").hidden = true; }
+function renderDrawer(){
+  const dr = state.drawer; if(!dr) return;
+  const M = state.M; const raw = dr.id ? tasksOf().find(t=>t.id===dr.id) : null;
+  const t = dr.id && M ? M.by.get(dr.id) : null;
+  const codeOf = id => (tasksOf().find(x=>x.id===id)||{}).code;
+  const el = $("#drawer");
+  if(!state.canEdit){
+    if(!t || t.es==null){ closeDrawer(); return; }
+    const succs = tasksOf().filter(x => (x.preds||[]).includes(t.id)).map(x=>x.code);
+    el.innerHTML = `<div class="d-head"><h2><span class="mono" style="color:var(--ink-3)">${esc(t.code)}</span> ${esc(t.name)}</h2><button class="x" data-close aria-label="닫기">×</button></div>
+      <div class="d-body"><dl class="dl">
+        <dt>공종</dt><dd>${esc(t.group||"–")}</dd>
+        <dt>상태</dt><dd>${t.status==="done"?"완료":t.status==="prog"?`진행 중 ${Math.round(t.prog)}%`:"대기"}${t.crit?` · <span class="pill p-crit">주공정</span>`:""}</dd>
+        <dt>일정</dt><dd class="num">${esc(fmt(t.startDate))} → ${esc(fmt(t.finishDate))}</dd>
+        <dt>공기</dt><dd class="num">${t.dur}작업일 (기대 ${t.te.toFixed(1)}일)</dd>
+        <dt>3점 추정</dt><dd class="num">낙관 ${num(t.o)} · 최빈 ${num(t.m)} · 비관 ${num(t.p)}</dd>
+        <dt>여유</dt><dd class="num">${t.status==="done"?"–":t.float+"일"}</dd>
+        <dt>선행</dt><dd class="mono">${esc(t._preds.map(codeOf).join(", ")||"–")}</dd>
+        <dt>후속</dt><dd class="mono">${esc(succs.join(", ")||"–")}</dd>
+        <dt>실제 시작</dt><dd class="num">${esc(fmt(t.actualStart))}</dd>
+        <dt>실제 완료</dt><dd class="num">${esc(fmt(t.actualEnd))}</dd>
+        ${t.delay!=null?`<dt>기준 대비</dt><dd class="num ${t.delay>0?"late":""}">${t.delay>0?"+":""}${t.delay}일</dd>`:""}
+        <dt>메모</dt><dd>${esc(t.note||"–")}</dd></dl></div>`;
+    return;
+  }
+  const v = raw || { code:"", name:"", group:"", o:"", m:"", p:"", preds:[], actualStart:"", actualEnd:"", progress:0, note:"" };
+  const groups = [...new Set(tasksOf().map(x=>x.group).filter(Boolean))];
+  el.innerHTML = `<div class="d-head"><h2>${raw ? "작업 수정" : "작업 추가"}</h2><button class="x" data-close aria-label="닫기">×</button></div>
+    <div class="d-body">
+      ${t && t.es!=null ? `<div class="calc"><span>예정 시작 <b>${esc(fmt(t.startDate))}</b></span><span>예정 완료 <b>${esc(fmt(t.finishDate))}</b></span><span>여유 <b>${t.status==="done"?"–":t.float+"일"}</b></span><span>${t.crit?`<span class="pill p-crit">주공정</span>`:"비주공정"}</span></div>` : ""}
+      <div class="g2">
+        <div class="field"><label for="f-code">코드</label><input type="text" id="f-code" value="${esc(v.code)}" placeholder="예: C5"></div>
+        <div class="field"><label for="f-group">공종</label><input type="text" id="f-group" list="f-groups" value="${esc(v.group)}" placeholder="예: C. 철골 골조"><datalist id="f-groups">${groups.map(g=>`<option value="${esc(g)}">`).join("")}</datalist></div>
+      </div>
+      <div class="field"><label for="f-name">작업명</label><input type="text" id="f-name" value="${esc(v.name)}"></div>
+      <span class="flabel">기간 3점 추정 (작업일)</span>
+      <div class="g3" style="margin:4px 0">
+        <div class="field"><label for="f-o">낙관 a</label><input type="number" min="0" step="0.5" id="f-o" value="${esc(v.o)}"></div>
+        <div class="field"><label for="f-m">최빈 m</label><input type="number" min="0" step="0.5" id="f-m" value="${esc(v.m)}"></div>
+        <div class="field"><label for="f-p">비관 b</label><input type="number" min="0" step="0.5" id="f-p" value="${esc(v.p)}"></div>
+      </div>
+      <p class="note" id="f-te" style="margin:-4px 0 12px"></p>
+      <div class="field"><label for="f-preds">선행작업 코드</label><input type="text" id="f-preds" value="${esc((v.preds||[]).map(codeOf).filter(Boolean).join(", "))}" placeholder="예: B5, C1"><span class="hint">쉼표로 구분합니다. 이 작업들이 모두 끝나야 시작할 수 있습니다.</span></div>
+      <div class="g2">
+        <div class="field"><label for="f-as">실제 시작일</label><input type="date" id="f-as" value="${esc(v.actualStart||"")}"></div>
+        <div class="field"><label for="f-ae">실제 완료일</label><input type="date" id="f-ae" value="${esc(v.actualEnd||"")}"></div>
+      </div>
+      <div class="field"><label for="f-prog">진척률 <span id="f-progv" class="num">${num(v.progress)}%</span></label><input type="range" min="0" max="100" step="5" id="f-prog" value="${num(v.progress)}"><span class="hint">진행 중인 작업의 남은 기간을 계산하는 데 씁니다.</span></div>
+      <div class="field"><label for="f-note">메모</label><textarea id="f-note">${esc(v.note||"")}</textarea></div>
+      <div class="err" id="f-err"></div>
+    </div>
+    <div class="d-foot">
+      <div>${raw ? `<button class="btn danger ${dr.arm?"armed":""}" id="f-del">${dr.arm?"한 번 더 누르면 삭제":"삭제"}</button>` : ""}</div>
+      <div style="display:flex;gap:8px"><button class="btn" data-close>취소</button><button class="btn primary" id="f-save">저장</button></div>
+    </div>`;
+  updateTe();
+}
+function updateTe(){
+  const box = $("#f-te"); if(!box) return;
+  const r = pert({ o:num($("#f-o").value), m:num($("#f-m").value), p:num($("#f-p").value) });
+  box.textContent = r.te>0 ? `기대 공기 ${r.te.toFixed(2)}일 → 일정에 ${r.dur}작업일 반영 · σ ${Math.sqrt(r.v).toFixed(2)}일` : "세 값을 입력하면 기대 공기를 계산합니다.";
+}
+
+/* ---------- writes ---------- */
+let toastT;
+function toast(msg, ms=2600){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, ms); }
+
+async function saveTask(){
+  const err = $("#f-err"); err.textContent = "";
+  const dr = state.drawer; const all = tasksOf();
+  const code = $("#f-code").value.trim(), name = $("#f-name").value.trim(), group = $("#f-group").value.trim();
+  const o = num($("#f-o").value), m = num($("#f-m").value), p = num($("#f-p").value);
+  const as = $("#f-as").value, ae = $("#f-ae").value;
+  let progress = num($("#f-prog").value);
+  if(!code || !name){ err.textContent = "코드와 작업명을 입력해 주세요."; return; }
+  if(all.some(t => t.code===code && t.id!==dr.id)){ err.textContent = `코드 ${code}는 이미 쓰고 있습니다.`; return; }
+  if(o<0 || !(o<=m && m<=p)){ err.textContent = "기간은 낙관 ≤ 최빈 ≤ 비관 순서로 입력해 주세요."; return; }
+  if(ae && !as){ err.textContent = "실제 완료일을 넣으려면 실제 시작일도 입력해 주세요."; return; }
+  if(ae && as && ae < as){ err.textContent = "실제 완료일이 시작일보다 빠릅니다."; return; }
+  const codes = $("#f-preds").value.split(/[,\s]+/).map(s=>s.trim()).filter(Boolean);
+  const preds = [];
+  for(const c of codes){ const f = all.find(t=>t.code===c); if(!f){ err.textContent = `선행작업 코드 ${c}를 찾을 수 없습니다.`; return; } if(f.id===dr.id){ err.textContent = "자기 자신을 선행작업으로 지정할 수 없습니다."; return; } preds.push(f.id); }
+  const id = dr.id || uid();
+  if(topo(all.filter(t=>t.id!==id).map(t=>({...t})).concat([{ id, preds, order:0 }])).cyc.length){ err.textContent = "선행작업이 순환합니다. 후속작업을 선행으로 지정했는지 확인해 주세요."; return; }
+  if(ae) progress = 100;
+  const fields = { code, name, group, o, m, p, preds, actualStart: as, actualEnd: ae, progress, note: $("#f-note").value.trim() };
+  const btn = $("#f-save"); btn.disabled = true;
+  const ok = await commit(data => {
+    const list = data.tasks || (data.tasks = []);
+    const old = list.find(t=>t.id===id);
+    let order;
+    if(old && old.group===group) order = num(old.order);
+    else { const same = list.filter(t=>t.group===group && t.id!==id);
+      order = same.length ? Math.max(...same.map(t=>num(t.order))) + 1 : (list.length ? Math.max(...list.map(t=>num(t.order))) : 0) + 100; }
+    const rec = { ...(old||{}), id, ...fields, order };
+    if(old) Object.assign(old, rec); else list.push(rec);
+  }, "저장했습니다");
+  if(ok) closeDrawer(); else if($("#f-save")) $("#f-save").disabled = false;
+}
+async function deleteTask(){
+  const dr = state.drawer;
+  if(!dr.arm){ dr.arm = true; renderDrawer(); return; }
+  const id = dr.id;
+  const ok = await commit(data => {
+    data.tasks = (data.tasks||[]).filter(t=>t.id!==id);
+    data.tasks.forEach(t => { if((t.preds||[]).includes(id)) t.preds = t.preds.filter(x=>x!==id); });
+  }, "삭제했습니다");
+  if(ok) closeDrawer();
+}
+function readSettingsForm(){
+  return { name:$("#s-name").value, start:$("#s-start").value, target:$("#s-target").value, status:$("#s-status").value, sat:$("#s-sat").checked };
+}
+function restoreSettingsForm(k){ $("#s-name").value=k.name; $("#s-start").value=k.start; $("#s-target").value=k.target; $("#s-status").value=k.status; $("#s-sat").checked=k.sat; }
+async function saveProject(extra){
+  const f = readSettingsForm(); const p = proj();
+  const upd = { name: f.name.trim() || "온실 신축공사", startDate: f.start || p.startDate, targetDate: f.target || "", statusDate: f.status || "",
+    workSaturday: f.sat, offDays: state.draftOff || p.offDays || [], ...(extra||{}) };
+  if(upd.targetDate && upd.targetDate < upd.startDate){ $("#s-err").textContent = "목표 준공일이 착공일보다 빠릅니다."; return false; }
+  const ok = await commit(data => { data.project = { ...DEFAULT_PROJECT, ...(data.project||{}), ...upd }; }, "설정을 저장했습니다");
+  if(ok) state.draftOff = null;
+  return ok;
+}
+function bindSettings(){
+  $("#backup").onclick = () => {
+    const blob = new Blob([JSON.stringify(state.data, null, 1)], { type:"application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `온실공정표-백업-${localToday()}.json`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  };
+  if(!state.canEdit) return;
+  let baseArm = false;
+  $("#s-save").onclick = () => saveProject();
+  $("#o-add").onclick = () => {
+    const date = $("#o-date").value; if(!date){ $("#s-err").textContent = "작업불가일 날짜를 선택해 주세요."; return; }
+    const k = readSettingsForm();
+    state.draftOff = state.draftOff.filter(o=>o.date!==date).concat([{ date, type:$("#o-type").value, reason:$("#o-reason").value.trim() }]);
+    render(); restoreSettingsForm(k); $("#s-err").textContent = "추가했습니다. ‘설정 저장’을 눌러야 일정에 반영됩니다.";
+  };
+  document.querySelectorAll("[data-rmoff]").forEach(b => b.onclick = () => {
+    const k = readSettingsForm();
+    state.draftOff = state.draftOff.filter(o=>o.date!==b.dataset.rmoff);
+    render(); restoreSettingsForm(k); $("#s-err").textContent = "삭제했습니다. ‘설정 저장’을 눌러야 일정에 반영됩니다.";
+  });
+  $("#s-base").onclick = async () => {
+    const M = state.M; if(!M) return;
+    if(M.p.baseline && !baseArm){ baseArm = true; $("#s-base").textContent = "한 번 더 누르면 기존 기준 공정을 덮어씁니다"; $("#s-base").classList.add("danger"); return; }
+    const items = {}; M.order.forEach(id => { const t = M.by.get(id); items[id] = [t.startDate, t.finishDate]; });
+    await saveProject({ baseline: { savedAt: localToday(), finish: M.finish, items } });
+  };
+  $("#e-add").onclick = async () => {
+    const e = $("#e-mail").value.trim().toLowerCase();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){ $("#s-err").textContent = "이메일 주소를 확인해 주세요."; return; }
+    await commit(data => { const l = data.editors || (data.editors = []); if(!l.map(x=>x.toLowerCase()).includes(e)) l.push(e); }, "편집자를 추가했습니다");
+  };
+  document.querySelectorAll("[data-rmed]").forEach(b => b.onclick = () =>
+    commit(data => { data.editors = (data.editors||[]).filter(x => x.toLowerCase() !== b.dataset.rmed.toLowerCase()); }, "편집자를 뺐습니다"));
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", e => {
+  const tab = e.target.closest("#tabs button");
+  if(tab){ state.tab = tab.dataset.tab; store.set("tab", state.tab); if(state.tab==="set") state.draftOff=null; render(); return; }
+  const z = e.target.closest("[data-zoom]");
+  if(z){ state.zoom = Number(z.dataset.zoom); store.set("zoom", String(state.zoom)); render(); return; }
+  if(e.target.closest("#login")){ pca.loginRedirect({ scopes: READ_SCOPES }); return; }
+  if(e.target.closest("#logout") || e.target.closest("#logout2")){ pca.logoutRedirect({ account: state.account }); return; }
+  if(e.target.closest("#retry")){ boot(); return; }
+  if(e.target.closest("#reload")){ refresh().then(()=>toast("최신 내용을 불러왔습니다")).catch(()=>toast("불러오지 못했습니다")); return; }
+  if(e.target.closest("#createFile")){ createDataFile(); return; }
+  if(e.target.closest("#copyCfg")){ const txt = $(".codebox").textContent; navigator.clipboard.writeText(txt).then(()=>toast("복사했습니다")).catch(()=>toast("값을 직접 선택해 복사해 주세요")); return; }
+  if(e.target.closest("#addTask")){ openTask(null); return; }
+  if(e.target.closest("[data-close]") || e.target.id==="scrim"){ closeDrawer(); return; }
+  if(e.target.closest("#f-save")){ saveTask(); return; }
+  if(e.target.closest("#f-del")){ deleteTask(); return; }
+  const row = e.target.closest("#view [data-id]");
+  if(row) openTask(row.dataset.id);
+});
+document.addEventListener("input", e => {
+  if(["f-o","f-m","f-p"].includes(e.target.id)) updateTe();
+  if(e.target.id==="f-prog") $("#f-progv").textContent = e.target.value + "%";
+  if(state.drawer && state.drawer.arm && e.target.closest("#drawer")){ state.drawer.arm=false; const b=$("#f-del"); if(b){ b.classList.remove("armed"); b.textContent="삭제"; } }
+});
+document.addEventListener("keydown", e => { if(e.key==="Escape" && state.drawer) closeDrawer(); });
+
+/* keep viewers current: check for a newer file every minute while the page is visible */
+setInterval(async () => {
+  if(state.mode!=="live" || state.busy || state.drawer || document.visibilityState!=="visible") return;
+  try{ const meta = await graph(itemPath() + "?$select=eTag"); if(meta.eTag !== state.eTag) await refresh(); }catch{}
+}, 60000);
+
+/* ---------- boot ---------- */
+async function boot(){
+  if(!["gantt","net","list","set"].includes(state.tab)) state.tab = "gantt";
+  if(![5,12,24].includes(state.zoom)) state.zoom = 12;
+  if(state.mode === "demo"){ state.data = sampleData(); afterData(); return; }
+  state.mode = "boot"; render();
+  try{
+    if(!pca){
+      if(!window.msal){ throw Object.assign(new Error("로그인 모듈을 불러오지 못했습니다. 인터넷 연결 또는 회사 방화벽 설정을 확인해 주세요."), { user:true }); }
+      pca = new msal.PublicClientApplication({
+        auth: { clientId: CFG.clientId, authority: "https://login.microsoftonline.com/" + (CFG.tenantId || "organizations"), redirectUri: location.origin + location.pathname },
+        cache: { cacheLocation: "localStorage" }
+      });
+      await pca.initialize();
+      const res = await pca.handleRedirectPromise();
+      if(res && res.account) pca.setActiveAccount(res.account);
+    }
+    state.account = pca.getActiveAccount() || pca.getAllAccounts()[0] || null;
+    if(!state.account){ state.mode = "login"; render(); return; }
+    pca.setActiveAccount(state.account);
+    if(!CFG.driveId || !CFG.itemId){ state.mode = "setup"; render(); return; }
+    await refresh();
+    state.mode = "live"; afterData();
+  }catch(e){
+    state.mode = "error";
+    state.errMsg = e.user ? e.message
+      : (e.status === 403 || e.status === 404) ? `이 공정표를 볼 권한이 없습니다. 담당자에게 원드라이브 데이터 파일 공유를 요청해 주세요. (로그인 계정: ${me()})`
+      : (e.errorCode ? `로그인 중 문제가 생겼습니다 (${e.errorCode}). 회사 IT 관리자에게 앱 권한 승인을 요청해야 할 수 있습니다.` : "공정 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    render();
+  }
+}
+boot();
+})();
+</script>
+</body>
+</html>
