@@ -64,11 +64,13 @@ h1{margin:2px 0 0;font-size:26px;font-weight:700;letter-spacing:-.01em;text-wrap
 .meta{color:var(--ink-3);font-size:13px}
 .who{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
 .top-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:100%}
-.ptabs{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:100%}
-.ptabs button{border:1px solid var(--line);background:var(--surface);padding:5px 12px;border-radius:999px;font-size:13px;color:var(--ink-2);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ptabs button:hover{border-color:var(--ink-3)}
-.ptabs button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
-.ptabs button.add{border-style:dashed;color:var(--accent)}
+.ptabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:100%}
+.ptabs label{font-size:12px;color:var(--ink-3);font-weight:500}
+.ptabs select{width:min(340px,70vw);padding:7px 34px 7px 11px;border:1px solid var(--accent);border-radius:8px;font-weight:600;font-size:14px;color:var(--ink);
+  background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231D6A51' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center;
+  -webkit-appearance:none;appearance:none;cursor:pointer;text-overflow:ellipsis}
+.ptabs select:hover{background-color:var(--accent-soft)}
+.ptabs .btn.add{border-style:dashed;color:var(--accent);white-space:nowrap}
 table.perm{min-width:0;width:auto}
 .perm th.cur{color:var(--accent);font-weight:600}
 .perm select{width:auto;padding:3px 6px}
@@ -573,8 +575,9 @@ function renderProjTabs(){
   const ids = (state.mode === "live" || state.mode === "demo") ? projectIds() : [];
   if(!ids.length){ nav.innerHTML = ""; return; }
   const canAdd = state.mode === "demo" || isOwner();
-  nav.innerHTML = ids.map(id => `<button data-pid="${esc(id)}" class="${id===state.pid?"on":""}" title="${esc(projName(id))}" aria-pressed="${id===state.pid}">${esc(projName(id))}</button>`).join("")
-    + (canAdd ? `<button class="add" id="newProj">+ 새 프로젝트</button>` : "");
+  nav.innerHTML = `<label for="projSel">프로젝트 ${ids.length}개</label>
+    <select id="projSel" title="${esc(projName(state.pid))}">${ids.map(id => `<option value="${esc(id)}" ${id===state.pid?"selected":""}>${esc(projName(id))}</option>`).join("")}</select>`
+    + (canAdd ? `<button class="btn add" id="newProj">+ 새 프로젝트</button>` : "");
 }
 function showChrome(on){ ["#kpis","#navrow"].forEach(s => $(s).hidden = !on); }
 
@@ -1266,8 +1269,6 @@ document.addEventListener("click", e => {
   if(e.target.closest("#login")){ login(); return; }
   if(e.target.closest("#logout") || e.target.closest("#logout2")){ if(auth) FB.signOut(auth); return; }
   if(e.target.closest("#retry")){ location.reload(); return; }
-  const pt = e.target.closest("#ptabs [data-pid]");
-  if(pt){ selectProject(pt.dataset.pid); return; }
   if(e.target.closest("#newProj")){ openNewProject(); return; }
   if(e.target.closest("#np-create")){ createFromForm(); return; }
   const st = e.target.closest("[data-start]");
@@ -1279,6 +1280,7 @@ document.addEventListener("click", e => {
   const row = e.target.closest("#view [data-id]");
   if(row) openTask(row.dataset.id);
 });
+document.addEventListener("change", e => { if(e.target.id === "projSel") selectProject(e.target.value); });
 document.addEventListener("input", e => {
   if(["f-o","f-m","f-p"].includes(e.target.id)) updateTe();
   if(e.target.id==="f-prog") $("#f-progv").textContent = e.target.value + "%";
