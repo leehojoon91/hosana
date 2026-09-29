@@ -143,6 +143,13 @@ svg text{font-family:var(--sans)}
 .t-target{font-size:10px;fill:var(--prog);font-weight:600}
 .bar{cursor:pointer}
 .bar:hover .b-bg{stroke-width:2}
+.bar.edit{cursor:grab;touch-action:none}
+.bar.drag .b-bg{stroke-width:2;stroke-dasharray:4 2}
+.bar.drag .b-float,.bar.drag .b-lbl,.bar.drag .b-pin{opacity:0}
+.b-pin{fill:var(--prog)}
+.drag-tip{position:fixed;z-index:25;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 9px;border-radius:6px;pointer-events:none;white-space:nowrap;font-family:var(--mono);box-shadow:var(--shadow)}
+.drag-tip small{display:block;font-family:var(--sans);opacity:.8}
+.toast button{margin-left:12px;border:0;background:none;color:inherit;font-weight:700;text-decoration:underline;padding:0;cursor:pointer}
 
 /* Network */
 .net{overflow:auto;padding:8px}
@@ -248,6 +255,7 @@ textarea{resize:vertical;min-height:60px}
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden aria-label="작업 상세"></aside>
 <div class="toast" id="toast" hidden></div>
+<div class="drag-tip" id="dragTip" hidden></div>
 
 <script>
 (() => {
@@ -354,7 +362,7 @@ const memberRef = email => FB.doc(db, "members", email);
 /* commit(mutator): reads the latest schedule inside a transaction, applies the change and writes it back,
    so two editors saving at once never overwrite each other. Every open page updates through onSnapshot. */
 async function commit(mutator, okMsg){
-  if(state.mode === "demo"){ mutator(state.data); afterData(); toast(okMsg + " (데모: 저장되지 않음)"); return true; }
+  if(state.mode === "demo"){ mutator(state.data); afterData(); if(okMsg) toast(okMsg + " (데모: 저장되지 않음)"); return true; }
   state.busy = true;
   try{
     await FB.runTransaction(db, async tx => {
@@ -364,7 +372,7 @@ async function commit(mutator, okMsg){
       data.updatedAt = new Date().toISOString(); data.updatedBy = me();
       tx.set(schedRef(), clone(data));
     });
-    toast(okMsg); return true;
+    if(okMsg) toast(okMsg); return true;
   }catch(e){
     toast(e && e.code === "permission-denied" ? "편집 권한이 없어 저장하지 못했습니다. 관리자에게 편집 권한을 요청해 주세요."
       : "저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.", 5000);
@@ -415,6 +423,8 @@ function compute(){
     t.prog = prog;
     t.status = t.actualEnd ? "done" : (t.actualStart ? "prog" : "wait");
     let es = 0; for(const pid of t._preds) es = Math.max(es, by.get(pid).ef);
+    t.predEs = es;
+    if(isDate(t.notBefore)) es = Math.max(es, idxOf(cal, t.notBefore));
     if(isDate(t.actualStart)) es = idxOf(cal, t.actualStart);
     else if(es < sIdx) es = sIdx;
     let ef;
@@ -480,6 +490,8 @@ function renderWho(){
 function showChrome(on){ ["#kpis","#navrow"].forEach(s => $(s).hidden = !on); }
 
 function render(){
+  if(state.dragging){ state.pendingRender = true; return; }
+  state.pendingRender = false;
   renderWho();
   const banner = $("#banner");
   if(state.mode === "demo"){
@@ -522,6 +534,7 @@ function render(){
   $("#meta").textContent = `착공 ${fmtLong(p.startDate)} · 기준일 ${fmtLong(M ? M.statusDate : localToday())}` + (up ? ` · 최종 수정 ${fmtLong(up.slice(0,10))}${state.data.updatedBy ? " ("+state.data.updatedBy.split("@")[0]+")" : ""}` : "");
   renderKpis(M); renderTools();
   const v = $("#view");
+  const keepScroll = ($(".g-right") || {}).scrollLeft || 0;
   v.innerHTML = "";
   if(M && M.cyc.length){
     const codes = M.cyc.map(id => (tasksOf().find(t=>t.id===id)||{}).code || id).join(", ");
@@ -532,7 +545,7 @@ function render(){
     v.insertAdjacentHTML("beforeend", `<div class="panel empty"><h2>등록된 작업이 없습니다</h2><p>${state.canEdit ? "‘작업 추가’로 첫 공정을 등록하세요." : "담당자가 공정을 등록하면 여기에 표시됩니다."}</p></div>`);
     return;
   }
-  if(state.tab==="gantt") v.insertAdjacentHTML("beforeend", renderGantt(M));
+  if(state.tab==="gantt"){ v.insertAdjacentHTML("beforeend", renderGantt(M)); const gr = $(".g-right"); if(gr) gr.scrollLeft = keepScroll; }
   else if(state.tab==="net") v.insertAdjacentHTML("beforeend", renderNet(M));
   else v.insertAdjacentHTML("beforeend", renderList(M));
 }
@@ -584,11 +597,14 @@ const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border
   <span><i class="sw" style="background:var(--ink-3);opacity:.35;height:4px"></i>기준 공정</span>
   <span><i class="sw" style="background:var(--nonwork)"></i>휴무</span>
   <span><i class="sw" style="background:var(--weather)"></i>작업불가(기상 등)</span>
-  <span><i class="sw" style="width:2px;height:12px;background:var(--crit)"></i>기준일</span>`}
+  <span><i class="sw" style="width:2px;height:12px;background:var(--crit)"></i>기준일</span>
+  <span><i class="sw" style="width:8px;height:8px;background:var(--prog);clip-path:polygon(0 0,100% 0,0 100%)"></i>착수 제한일</span>
+  ${state.canEdit ? `<span style="color:var(--ink-3)">· 막대를 끌어 이동, 양 끝(↔)을 끌어 기간 조정</span>` : ""}`}
 </div>`;
 
 function renderGantt(M){
   const px = state.zoom, RH = 30, HH = 48;
+  state.gantt = { px };
   const rows = []; M.groups.forEach(g => { rows.push({ g:g.name }); g.items.forEach(t => rows.push({ t: M.by.get(t.id) })); });
   let end = M.finish; if(isDate(M.p.targetDate) && M.p.targetDate > end) end = M.p.targetDate;
   rows.forEach(r => { if(r.t && r.t.base && r.t.base[1] > end) end = r.t.base[1]; });
@@ -612,6 +628,7 @@ function renderGantt(M){
     if(r.g!=null){ grp += `<rect class="r-grp" x="0" y="${y}" width="${W}" height="${RH}"/>`; return; }
     const t = r.t; if(t.es==null) return;
     const cls = t.status==="done" ? "done" : t.crit ? "crit" : "";
+    const editable = state.canEdit && t.status !== "done";
     let g = "";
     if(t.base){ const bx=X(t.base[0]), bw=Math.max(px, X(t.base[1])+px-bx); g += `<rect class="b-base" x="${bx}" y="${y+RH-8}" width="${bw}" height="4" rx="1"/>`; }
     if(t.dur===0 && t.ef===t.es){
@@ -620,13 +637,14 @@ function renderGantt(M){
     } else {
       const x = X(t.startDate), w = Math.max(px, X(t.finishDate)+px-x);
       g += `<rect class="b-bg" x="${x}" y="${y+6}" width="${w}" height="${RH-16}" rx="3"/>`;
+      if(isDate(t.notBefore) && t.status==="wait") g += `<path class="b-pin" d="M${x} ${y+1} h6 l-6 6 z"/>`;
       if(t.prog>0) g += `<rect class="b-pg" x="${x}" y="${y+6}" width="${Math.max(2,w*t.prog/100)}" height="${RH-16}" rx="3"/>`;
       let lx = x + w + 6;
       if(t.status!=="done" && t.float>0){ const fx = X(t.lateFinish)+px; g += `<line class="b-float" x1="${x+w+2}" y1="${y+RH/2-2}" x2="${fx}" y2="${y+RH/2-2}"/>`; lx = fx + 6; }
       g += `<text class="b-lbl" x="${lx}" y="${y+RH/2+2}">${t.dur}일${t.prog>0&&t.prog<100?" · "+Math.round(t.prog)+"%":""}</text>`;
     }
-    const tip = `${t.code} ${t.name}\n${fmt(t.startDate)} → ${fmt(t.finishDate)} (${t.dur}작업일)\n기대값 ${t.te.toFixed(1)}일 · 여유 ${t.float}일${t.delay?`\n기준 대비 ${t.delay>0?"+":""}${t.delay}일`:""}`;
-    bars += `<g class="bar ${cls}" data-id="${esc(t.id)}"><title>${esc(tip)}</title>${g}</g>`;
+    const tip = `${t.code} ${t.name}\n${fmt(t.startDate)} → ${fmt(t.finishDate)} (${t.dur}작업일)\n기대값 ${t.te.toFixed(1)}일 · 여유 ${t.float}일${isDate(t.notBefore)&&t.status==="wait"?`\n착수 제한 ${fmt(t.notBefore)} 이후`:""}${t.delay?`\n기준 대비 ${t.delay>0?"+":""}${t.delay}일`:""}${editable?(t.status==="prog"?"\n오른쪽 끝을 끌어 공기 조정":"\n끌어서 이동 · 양 끝을 끌어 기간 조정"):""}`;
+    bars += `<g class="bar ${cls} ${editable?"edit":""}" data-id="${esc(t.id)}" data-st="${t.status}"><title>${esc(tip)}</title>${g}</g>`;
   });
   let marks = "";
   if(M.statusDate >= S(a0) && M.statusDate <= S(a1)){ const x = X(M.statusDate); marks += `<line class="l-today" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-today" x="${x+3}" y="${HH-8}">기준일</text>`; }
@@ -782,6 +800,7 @@ function renderDrawer(){
         <dt>여유</dt><dd class="num">${t.status==="done"?"–":t.float+"일"}</dd>
         <dt>선행</dt><dd class="mono">${esc(t._preds.map(codeOf).join(", ")||"–")}</dd>
         <dt>후속</dt><dd class="mono">${esc(succs.join(", ")||"–")}</dd>
+        ${isDate(t.notBefore)?`<dt>착수 제한</dt><dd class="num">${esc(fmt(t.notBefore))} 이후</dd>`:""}
         <dt>실제 시작</dt><dd class="num">${esc(fmt(t.actualStart))}</dd>
         <dt>실제 완료</dt><dd class="num">${esc(fmt(t.actualEnd))}</dd>
         ${t.delay!=null?`<dt>기준 대비</dt><dd class="num ${t.delay>0?"late":""}">${t.delay>0?"+":""}${t.delay}일</dd>`:""}
@@ -806,6 +825,7 @@ function renderDrawer(){
       </div>
       <p class="note" id="f-te" style="margin:-4px 0 12px"></p>
       <div class="field"><label for="f-preds">선행작업 코드</label><input type="text" id="f-preds" value="${esc((v.preds||[]).map(codeOf).filter(Boolean).join(", "))}" placeholder="예: B5, C1"><span class="hint">쉼표로 구분합니다. 이 작업들이 모두 끝나야 시작할 수 있습니다.</span></div>
+      <div class="field"><label for="f-nb">착수 제한일</label><input type="date" id="f-nb" value="${esc(v.notBefore||"")}"><span class="hint">이 날짜 전에는 시작하지 않습니다. 간트에서 막대를 끌면 자동으로 채워지고, 비우면 선행작업이 끝나는 대로 시작합니다.</span></div>
       <div class="g2">
         <div class="field"><label for="f-as">실제 시작일</label><input type="date" id="f-as" value="${esc(v.actualStart||"")}"></div>
         <div class="field"><label for="f-ae">실제 완료일</label><input type="date" id="f-ae" value="${esc(v.actualEnd||"")}"></div>
@@ -828,7 +848,11 @@ function updateTe(){
 
 /* ---------- writes ---------- */
 let toastT;
-function toast(msg, ms=2600){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, ms); }
+function toast(msg, ms=2600, action){
+  const t=$("#toast"); t.textContent=msg;
+  if(action){ const b=document.createElement("button"); b.textContent=action.label; b.onclick=()=>{ t.hidden=true; action.fn(); }; t.appendChild(b); }
+  t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, ms);
+}
 
 async function saveTask(){
   const err = $("#f-err"); err.textContent = "";
@@ -848,7 +872,7 @@ async function saveTask(){
   const id = dr.id || uid();
   if(topo(all.filter(t=>t.id!==id).map(t=>({...t})).concat([{ id, preds, order:0 }])).cyc.length){ err.textContent = "선행작업이 순환합니다. 후속작업을 선행으로 지정했는지 확인해 주세요."; return; }
   if(ae) progress = 100;
-  const fields = { code, name, group, o, m, p, preds, actualStart: as, actualEnd: ae, progress, note: $("#f-note").value.trim() };
+  const fields = { code, name, group, o, m, p, preds, actualStart: as, actualEnd: ae, progress, notBefore: $("#f-nb").value, note: $("#f-note").value.trim() };
   const btn = $("#f-save"); btn.disabled = true;
   const ok = await commit(data => {
     const list = data.tasks || (data.tasks = []);
@@ -935,8 +959,135 @@ function bindMembers(){
   });
 }
 
+/* ---------- gantt drag: move a bar, or drag its ends to change the duration ---------- */
+const EDGE = 7;
+let drag = null;
+const shiftDate = (s, n) => S(addDays(D(s), n));
+function lastWorkIdx(cal, s){ let i = idxOf(cal, s); if(cal[i] !== s) i -= 1; return Math.max(0, i); }
+function barRect(g){ const r = g.querySelector(".b-bg"); return r && r.tagName.toLowerCase() === "rect" ? r : null; }
+function hitMode(g, clientX){
+  const r = barRect(g); if(!r) return "m";
+  const svg = g.ownerSVGElement, box = svg.getBoundingClientRect();
+  const lx = (clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
+  const x = +r.getAttribute("x"), w = +r.getAttribute("width");
+  if(w >= EDGE * 3){ if(lx - x <= EDGE) return "l"; if(x + w - lx <= EDGE) return "r"; }
+  return "m";
+}
+function scaleEstimates(t, d){
+  const r5 = v => Math.max(0, Math.round(v * 2) / 2);
+  const cur = pert(t);
+  let o, m, p;
+  if(cur.te > 0){ const f = d / cur.te; o = r5(num(t.o) * f); m = r5(num(t.m) * f); p = r5(num(t.p) * f); }
+  else { o = m = p = d; }
+  if(pert({o,m,p}).dur !== d) m = Math.min(p, Math.max(o, r5((6*d - o - p) / 4)));
+  if(pert({o,m,p}).dur !== d) o = m = p = d;
+  return { o, m, p };
+}
+/* Turn a drag of `days` calendar days into schedule changes, snapped to working days and to the predecessors. */
+function planGanttEdit(id, mode, days){
+  const M = state.M, t = M.by.get(id), cal = M.cal;
+  const earliest = Math.max(t.predEs || 0, M.sIdx);
+  let es = t.es, dur = t.dur, notBefore = t.notBefore || "", clamped = false;
+  if(mode === "m" || mode === "l"){
+    let want = idxOf(cal, shiftDate(t.startDate, days));
+    if(want < earliest){ want = earliest; clamped = true; }
+    if(mode === "l"){ const fin = t.ef - 1; want = Math.min(want, fin); dur = Math.max(1, fin - want + 1); }
+    es = want;
+    notBefore = want > earliest ? cal[want] : "";
+  } else if(mode === "r"){
+    const fin = Math.max(t.es, lastWorkIdx(cal, shiftDate(t.finishDate, days)));
+    dur = Math.max(1, fin - t.es + 1);
+  }
+  return { id, mode, dur, notBefore, clamped,
+    startDate: cal[es], finishDate: cal[es + Math.max(dur, 1) - 1],
+    changedDur: dur !== t.dur, changedNB: notBefore !== (t.notBefore || "") };
+}
+function showTip(e, res, t){
+  const tip = $("#dragTip");
+  const note = res.clamped ? "선행작업이 끝난 뒤로 맞춰집니다" : res.mode === "m" ? (res.notBefore ? "착수 제한일로 저장됩니다" : "선행작업이 끝나는 대로 시작") : `공기 ${t.dur}일 → ${res.dur}일`;
+  tip.innerHTML = `${esc(fmt(res.startDate))} → ${esc(fmt(res.finishDate))} · ${res.dur}일<small>${esc(note)}</small>`;
+  tip.style.left = Math.min(window.innerWidth - 220, e.clientX + 14) + "px";
+  tip.style.top = Math.max(8, e.clientY - 48) + "px";
+  tip.hidden = false;
+}
+function previewBar(d, days){
+  const px = state.gantt.px, r = barRect(d.g), pg = d.g.querySelector(".b-pg");
+  if(!r){ const ms = d.g.querySelector(".b-bg"); if(ms) ms.setAttribute("transform", `translate(${days*px},0)`); return; }
+  let x = d.x, w = d.w;
+  if(d.mode === "m") x = d.x + days*px;
+  else if(d.mode === "r") w = Math.max(px, d.w + days*px);
+  else { x = Math.min(d.x + days*px, d.x + d.w - px); w = d.w - (x - d.x); }
+  r.setAttribute("x", x); r.setAttribute("width", w);
+  if(pg){ pg.setAttribute("x", x); pg.setAttribute("width", Math.max(2, w * d.prog)); }
+}
+document.addEventListener("pointermove", e => {
+  if(drag){
+    const dx = e.clientX - drag.x0;
+    if(!drag.moved && Math.abs(dx) < 4) return;
+    if(!drag.moved){ drag.moved = true; state.dragging = true; drag.g.classList.add("drag"); }
+    const days = Math.round(dx / state.gantt.px);
+    const t = state.M.by.get(drag.id);
+    if(days !== drag.days){ drag.days = days; previewBar(drag, days); drag.res = planGanttEdit(drag.id, drag.mode, days); }
+    showTip(e, drag.res || planGanttEdit(drag.id, drag.mode, 0), t);
+    return;
+  }
+  const g = e.target.closest && e.target.closest("#view .bar.edit");
+  if(!g) return;
+  const mode = hitMode(g, e.clientX);
+  g.style.cursor = mode !== "m" ? "ew-resize" : (g.dataset.st === "prog" ? "pointer" : "grab");
+});
+document.addEventListener("pointerdown", e => {
+  if(!e.isPrimary || e.button !== 0 || !state.canEdit || !state.M) return;
+  const g = e.target.closest && e.target.closest("#view .bar.edit");
+  if(!g) return;
+  const mode = hitMode(g, e.clientX);
+  if(g.dataset.st === "prog" && mode !== "r") return;           // started tasks: only the finish can change
+  const r = barRect(g), t = state.M.by.get(g.dataset.id);
+  drag = { g, id: g.dataset.id, mode, x0: e.clientX, days: 0, moved: false, res: null,
+           x: r ? +r.getAttribute("x") : 0, w: r ? +r.getAttribute("width") : 0, prog: (t.prog || 0) / 100 };
+  try{ g.ownerSVGElement.setPointerCapture(e.pointerId); }catch{}
+  e.preventDefault();
+});
+function endDrag(e, cancel){
+  if(!drag) return;
+  const d = drag; drag = null;
+  try{ d.g.ownerSVGElement.releasePointerCapture(e.pointerId); }catch{}
+  $("#dragTip").hidden = true;
+  if(!d.moved) return;                                          // plain click: the click handler opens the task
+  state.dragging = false;
+  state.suppressClick = true; setTimeout(() => { state.suppressClick = false; }, 60);
+  const res = d.res;
+  if(cancel || !res || (!res.changedDur && !res.changedNB)){
+    render();
+    if(res && res.clamped && !cancel) toast("선행작업이 끝나기 전으로는 옮길 수 없습니다.");
+    return;
+  }
+  applyGanttEdit(res);
+}
+document.addEventListener("pointerup", e => endDrag(e, false));
+document.addEventListener("pointercancel", e => endDrag(e, true));
+document.addEventListener("keydown", e => { if(e.key === "Escape" && drag){ const d = drag; d.moved = true; d.res = null; endDrag(e, true); } });
+
+async function applyGanttEdit(res){
+  const cur = tasksOf().find(x => x.id === res.id); if(!cur){ render(); return; }
+  const t = state.M.by.get(res.id);
+  const before = { o: cur.o, m: cur.m, p: cur.p, notBefore: cur.notBefore || "" };
+  const upd = {};
+  if(res.changedNB) upd.notBefore = res.notBefore;
+  if(res.changedDur) Object.assign(upd, scaleEstimates(cur, res.dur));
+  const parts = [];
+  if(res.mode !== "r") parts.push(`시작 ${fmt(res.startDate)}`);
+  if(res.changedDur) parts.push(`공기 ${t.dur}일 → ${res.dur}일`);
+  const msg = `${cur.code}: ${parts.join(" · ")}${res.clamped ? " (선행작업 완료 후로 맞춤)" : ""}`;
+  const apply = vals => data => { const x = (data.tasks || []).find(k => k.id === res.id); if(x) Object.assign(x, vals); };
+  const ok = await commit(apply(upd), null);
+  if(!ok){ render(); return; }
+  toast(msg, 7000, { label: "되돌리기", fn: () => commit(apply(before), "되돌렸습니다") });
+}
+
 /* ---------- events ---------- */
 document.addEventListener("click", e => {
+  if(state.suppressClick){ state.suppressClick = false; return; }
   const tab = e.target.closest("#tabs button");
   if(tab){ state.tab = tab.dataset.tab; store.set("tab", state.tab); if(state.tab==="set") state.draftOff=null; render(); return; }
   const z = e.target.closest("[data-zoom]");
