@@ -63,6 +63,20 @@ button{cursor:pointer}
 h1{margin:2px 0 0;font-size:26px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .meta{color:var(--ink-3);font-size:13px}
 .who{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.top-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:100%}
+.ptabs{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:100%}
+.ptabs button{border:1px solid var(--line);background:var(--surface);padding:5px 12px;border-radius:999px;font-size:13px;color:var(--ink-2);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ptabs button:hover{border-color:var(--ink-3)}
+.ptabs button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.ptabs button.add{border-style:dashed;color:var(--accent)}
+table.perm{min-width:0;width:auto}
+.perm th.cur{color:var(--accent);font-weight:600}
+.perm select{width:auto;padding:3px 6px}
+.choice{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.choice label{display:flex;gap:8px;align-items:flex-start;padding:9px 11px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:13px}
+.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.choice small{display:block;color:var(--ink-3)}
+@media (max-width:640px){ .top-right{align-items:flex-start} .ptabs{justify-content:flex-start} }
 .role{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);font-weight:500}
 .role.edit{background:var(--accent-soft);color:var(--accent)}
 .linkbtn{border:0;background:none;color:var(--ink-3);text-decoration:underline;padding:0;font-size:12.5px}
@@ -237,7 +251,7 @@ textarea{resize:vertical;min-height:60px}
       <h1 id="pname">온실 공정표</h1>
       <div class="meta" id="meta"></div>
     </div>
-    <div class="who" id="who"></div>
+    <div class="top-right"><nav class="ptabs" id="ptabs" aria-label="프로젝트"></nav><div class="who" id="who"></div></div>
   </header>
   <div class="banner" id="banner" hidden></div>
   <section class="kpis" id="kpis" aria-label="공정 요약"></section>
@@ -324,12 +338,50 @@ function sampleData(){
   };
 }
 
+function sampleVinyl(){
+  const T = (code, group, name, o, m, p, preds, note="") => ({ id:code, code, group, name, o, m, p, preds, actualStart:"", actualEnd:"", progress:0, note });
+  const tasks = [
+    T("A1","A. 착공 준비","인허가·착공신고",3,4,7,[]),
+    T("A2","A. 착공 준비","측량·부지 경계 확인",1,2,3,["A1"]),
+    T("B1","B. 토목·기초","부지정지·배수 정비",3,4,7,["A2"]),
+    T("B2","B. 토목·기초","기둥 기초 파이프 박기",3,5,8,["B1"]),
+    T("B3","B. 토목·기초","측면 줄기초 콘크리트",2,3,5,["B1"]),
+    T("C1","C. 파이프 골조","골조 파이프·자재 반입",5,7,12,["A1"],"자재 발주 후 제작·운송"),
+    T("C2","C. 파이프 골조","기둥·아치 파이프 조립",5,7,10,["B2","C1"]),
+    T("C3","C. 파이프 골조","서까래·중방 체결",3,4,6,["C2"]),
+    T("C4","C. 파이프 골조","연동 거터·물받이 설치",2,3,5,["C3"]),
+    T("D1","D. 피복","PO필름 지붕 피복",2,3,6,["C4"],"풍속 4m/s 이상이면 작업 중지"),
+    T("D2","D. 피복","측면 필름·방충망 설치",2,3,5,["D1","B3"]),
+    T("E1","E. 개폐·보온","측창 권취기 설치",2,3,4,["D2"]),
+    T("E2","E. 개폐·보온","천창 개폐기 설치",2,3,5,["D1"]),
+    T("E3","E. 개폐·보온","2중 보온커튼 설치",3,4,7,["E2"]),
+    T("F1","F. 설비","온풍난방기 설치",2,3,4,["C4"]),
+    T("F2","F. 설비","유동팬 설치",1,2,3,["D1"]),
+    T("G1","G. 전기·제어","전기 인입·분전반",2,3,5,["A2"]),
+    T("G2","G. 전기·제어","복합환경제어기·센서",2,3,5,["E1","E3","F1","G1"]),
+    T("H1","H. 바닥·재배시설","바닥 부직포·통로 정리",2,3,4,["D2"]),
+    T("H2","H. 바닥·재배시설","관수·점적 라인 설치",3,4,6,["H1"]),
+    T("H3","H. 바닥·재배시설","재배 베드 설치",3,4,6,["H1"]),
+    T("J1","J. 시운전·준공","시운전",2,2,4,["G2","F2","H2","H3"]),
+    T("J2","J. 시운전·준공","준공검사·인수인계",1,2,3,["J1"]),
+  ];
+  tasks.forEach((t,i) => t.order = (i+1)*10);
+  return {
+    format: "greenhouse-schedule/1", createdAt: "2000-01-01T00:00:00.000Z",
+    project: { name:"연동 비닐온실 신축공사 (샘플 2)", startDate:"2026-11-02", targetDate:"2027-01-15", statusDate:"", workSaturday:true,
+      offDays:[{date:"2026-12-25",type:"holiday",reason:"성탄절"},{date:"2027-01-01",type:"holiday",reason:"신정"}],
+      baseline:null },
+    tasks, updatedAt: "", updatedBy: ""
+  };
+}
+
 /* ---------- state ---------- */
 const CFG = window.SCHEDULE_CONFIG || {};
 const params = new URLSearchParams(location.search);
 const state = {
   mode: (!(CFG.firebase && CFG.firebase.apiKey) || params.has("demo")) ? "demo" : "boot",   // demo | boot | login | denied | setup | live | error
   account: null, data: null, role: null, members: [], canEdit: false, errMsg: "",
+  projects: {}, pid: store.get("pid", ""), roles: {},
   tab: store.get("tab","gantt"), zoom: Number(store.get("zoom","12")) || 12,
   drawer: null, M: null, draftOff: null, busy: false
 };
@@ -340,7 +392,8 @@ const tasksOf = () => (state.data && state.data.tasks) || [];
 /* ---------- Google sign-in + Firestore (Firebase) ---------- */
 const FB_VER = "12.19.0";
 const FB = {};
-let auth = null, db = null, unsubData = null, unsubMembers = null, unsubMe = null;
+let auth = null, db = null, unsubProjects = null, unsubMembers = null, unsubMe = null;
+const projSubs = new Map(), projLoaded = new Set();
 const ownerEmail = () => String(CFG.ownerEmail || "").trim().toLowerCase();
 function me(){ return ((state.account && state.account.email) || "").toLowerCase(); }
 const isOwner = () => state.mode !== "demo" && !!me() && me() === ownerEmail();
@@ -356,7 +409,33 @@ async function loadFirebase(){
   auth = FB.getAuth(app);
   db = FB.getFirestore(app);
 }
-const schedRef = () => FB.doc(db, "schedules", "main");
+const schedRef = (id = state.pid) => FB.doc(db, "schedules", id);
+/* member docs: { roles: { <projectId>: "viewer" | "editor" } }. Older docs { role } apply to the first project "main". */
+function normRoles(d){
+  const r = {};
+  if(!d) return r;
+  Object.entries(d.roles || {}).forEach(([k,v]) => { if(v === "viewer" || v === "editor") r[k] = v; });
+  if(!d.roles && (d.role === "viewer" || d.role === "editor")) r.main = d.role;
+  return r;
+}
+const projName = id => (((state.projects[id] || {}).project) || {}).name || "이름 없는 프로젝트";
+function projectIds(){
+  return Object.keys(state.projects).sort((a,b) => {
+    const ca = state.projects[a].createdAt || "", cb = state.projects[b].createdAt || "";
+    return ca < cb ? -1 : ca > cb ? 1 : (a < b ? -1 : 1);
+  });
+}
+function setCurrent(){
+  const ids = projectIds();
+  if(!ids.includes(state.pid)){ const saved = store.get("pid", ""); state.pid = ids.includes(saved) ? saved : (ids[0] || ""); }
+  state.data = state.projects[state.pid] || null;
+  state.role = state.mode === "demo" ? "editor" : isOwner() ? "owner" : (state.roles[state.pid] || null);
+}
+function selectProject(id){
+  if(id === state.pid) return;
+  state.pid = id; store.set("pid", id); state.draftOff = null; closeDrawer();
+  setCurrent(); afterData();
+}
 const memberRef = email => FB.doc(db, "members", email);
 
 /* commit(mutator): reads the latest schedule inside a transaction, applies the change and writes it back,
@@ -364,13 +443,15 @@ const memberRef = email => FB.doc(db, "members", email);
 async function commit(mutator, okMsg){
   if(state.mode === "demo"){ mutator(state.data); afterData(); if(okMsg) toast(okMsg + " (데모: 저장되지 않음)"); return true; }
   state.busy = true;
+  const pid = state.pid;
   try{
     await FB.runTransaction(db, async tx => {
-      const snap = await tx.get(schedRef());
-      const data = clone(snap.exists() ? snap.data() : state.data);
+      const snap = await tx.get(schedRef(pid));
+      if(!snap.exists()) throw Object.assign(new Error("gone"), { code: "not-found" });
+      const data = clone(snap.data());
       mutator(data);
       data.updatedAt = new Date().toISOString(); data.updatedBy = me();
-      tx.set(schedRef(), clone(data));
+      tx.set(schedRef(pid), clone(data));
     });
     if(okMsg) toast(okMsg); return true;
   }catch(e){
@@ -482,17 +563,25 @@ function renderWho(){
   const w = $("#who");
   if(state.mode === "demo"){ w.innerHTML = `<span class="role edit">데모 모드</span>`; return; }
   if(!state.account){ w.innerHTML = ""; return; }
-  const roleTxt = isOwner() ? "관리자" : state.role === "editor" ? "수정 권한" : state.role === "viewer" ? "보기 전용" : "";
+  const roleTxt = isOwner() ? "관리자" : state.mode !== "live" ? "" : state.role === "editor" ? "이 프로젝트 편집" : state.role === "viewer" ? "이 프로젝트 보기 전용" : "";
   w.innerHTML = `<span>${esc(state.account.displayName || state.account.email)}</span>
     ${roleTxt ? `<span class="role ${state.canEdit?"edit":""}">${roleTxt}</span>` : ""}
     <button class="linkbtn" id="logout">로그아웃</button>`;
+}
+function renderProjTabs(){
+  const nav = $("#ptabs");
+  const ids = (state.mode === "live" || state.mode === "demo") ? projectIds() : [];
+  if(!ids.length){ nav.innerHTML = ""; return; }
+  const canAdd = state.mode === "demo" || isOwner();
+  nav.innerHTML = ids.map(id => `<button data-pid="${esc(id)}" class="${id===state.pid?"on":""}" title="${esc(projName(id))}" aria-pressed="${id===state.pid}">${esc(projName(id))}</button>`).join("")
+    + (canAdd ? `<button class="add" id="newProj">+ 새 프로젝트</button>` : "");
 }
 function showChrome(on){ ["#kpis","#navrow"].forEach(s => $(s).hidden = !on); }
 
 function render(){
   if(state.dragging){ state.pendingRender = true; return; }
   state.pendingRender = false;
-  renderWho();
+  renderWho(); renderProjTabs();
   const banner = $("#banner");
   if(state.mode === "demo"){
     banner.hidden = false;
@@ -512,7 +601,7 @@ function render(){
     showChrome(false); $("#meta").textContent = "";
     $("#view").innerHTML = `<div class="panel gate"><h2>접근 권한이 없습니다</h2>
       <p>로그인한 계정: <b>${esc(me())}</b></p>
-      <p>관리자에게 위 이메일 주소로 보기 또는 편집 권한을 요청해 주세요. 권한이 추가되면 이 화면이 자동으로 바뀝니다.</p>
+      <p>관리자에게 위 이메일 주소로 프로젝트 보기 또는 편집 권한을 요청해 주세요. 권한이 추가되면 이 화면이 자동으로 바뀝니다.</p>
       <div><button class="btn" id="logout2">다른 계정으로 로그인</button></div></div>`;
     return;
   }
@@ -552,19 +641,66 @@ function render(){
 
 function renderSetup(){
   $("#meta").textContent = "";
-  $("#view").innerHTML = isOwner() ? `<div class="panel gate"><h2>처음 설정</h2>
-      <p>아직 공정표 데이터가 없습니다. 어떻게 시작할까요?</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary big" id="startSample">샘플 공정으로 시작</button><button class="btn big" id="startEmpty">빈 공정표로 시작</button></div>
-      <p class="note">샘플은 온실 신축공사 32개 작업입니다. 시작한 뒤 자유롭게 고치거나 지울 수 있습니다.</p>
+  $("#view").innerHTML = isOwner() ? `<div class="panel gate"><h2>첫 프로젝트 만들기</h2>
+      <p>아직 공정표가 없습니다. 어떻게 시작할까요?</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-start="glass">샘플 1 · 유리온실</button><button class="btn primary" data-start="vinyl">샘플 2 · 연동 비닐온실</button><button class="btn" data-start="empty">빈 공정표</button></div>
+      <p class="note">샘플은 시작한 뒤 자유롭게 고치거나 지울 수 있습니다. 프로젝트는 나중에 오른쪽 위 ‘+ 새 프로젝트’로 더 만들 수 있습니다.</p>
       <div class="err" id="setupErr"></div></div>`
     : `<div class="panel gate"><h2>아직 공정표가 준비되지 않았습니다</h2><p>관리자가 공정표를 만들면 이 화면에 자동으로 표시됩니다.</p></div>`;
 }
-async function startSchedule(sample){
-  const b1 = $("#startSample"), b2 = $("#startEmpty"); b1.disabled = b2.disabled = true;
-  const data = sample ? sampleData() : { format:"greenhouse-schedule/1", project:{ ...DEFAULT_PROJECT }, tasks:[] };
-  data.updatedAt = new Date().toISOString(); data.updatedBy = me();
-  try{ await FB.setDoc(schedRef(), clone(data)); toast("공정표를 만들었습니다"); }
-  catch(e){ $("#setupErr").textContent = "만들지 못했습니다 (" + (e.code||"") + "). Firestore 보안 규칙의 관리자 이메일이 로그인 계정과 같은지 확인해 주세요."; b1.disabled = b2.disabled = false; }
+function newProjectData(kind, name, startDate){
+  const data = kind === "glass" ? sampleData() : kind === "vinyl" ? sampleVinyl()
+    : { format:"greenhouse-schedule/1", project:{ ...DEFAULT_PROJECT }, tasks:[] };
+  if(name) data.project.name = name;
+  if(isDate(startDate) && startDate !== data.project.startDate){
+    const delta = Math.round((D(startDate) - D(data.project.startDate)) / 864e5);
+    if(isDate(data.project.targetDate)) data.project.targetDate = shiftDate(data.project.targetDate, delta);
+    data.project.startDate = startDate;
+  }
+  data.createdAt = new Date().toISOString(); data.updatedAt = data.createdAt; data.updatedBy = me();
+  return data;
+}
+async function createProject(kind, name, startDate){
+  const id = projectIds().length ? "p" + Date.now().toString(36) : "main";
+  const data = newProjectData(kind, name, startDate);
+  if(state.mode === "demo"){ state.projects[id] = data; selectProject(id); return true; }
+  try{
+    await FB.setDoc(schedRef(id), clone(data));
+    state.pid = id; store.set("pid", id);
+    if(state.projects[id]){ setCurrent(); afterData(); }
+    toast("프로젝트를 만들었습니다");
+    return true;
+  }catch(e){ toast("만들지 못했습니다 (" + (e.code||"") + "). Firestore 보안 규칙을 최신 내용으로 게시했는지 확인해 주세요.", 6000); return false; }
+}
+function openNewProject(){
+  state.drawer = { kind: "project" };
+  renderDrawer();
+  $("#drawer").hidden = false; $("#scrim").hidden = false;
+  const f = $("#np-name"); if(f) f.focus();
+}
+function renderNewProject(){
+  $("#drawer").innerHTML = `<div class="d-head"><h2>새 프로젝트</h2><button class="x" data-close aria-label="닫기">×</button></div>
+    <div class="d-body">
+      <div class="field"><label for="np-name">공사명</label><input type="text" id="np-name" placeholder="예: ○○농장 연동 비닐온실 신축공사"></div>
+      <div class="field"><label for="np-start">착공일</label><input type="date" id="np-start" value="${esc(localToday())}"></div>
+      <span class="flabel">시작 방식</span>
+      <div class="choice" style="margin-top:4px">
+        <label><input type="radio" name="np-kind" value="vinyl" checked><span>샘플 2 · 연동 비닐온실<small>23개 작업. 파이프 골조, PO필름 피복, 보온커튼, 환경제어</small></span></label>
+        <label><input type="radio" name="np-kind" value="glass"><span>샘플 1 · 유리온실<small>32개 작업. 철골 골조, 온수난방, 양액, 부대토목</small></span></label>
+        <label><input type="radio" name="np-kind" value="empty"><span>빈 공정표<small>작업을 처음부터 직접 입력</small></span></label>
+      </div>
+      <p class="note">샘플을 고르면 착공일에 맞춰 목표 준공일도 함께 옮겨집니다. 권한은 만든 뒤 설정 탭에서 줍니다.</p>
+      <div class="err" id="np-err"></div>
+    </div>
+    <div class="d-foot"><span></span><div style="display:flex;gap:8px"><button class="btn" data-close>취소</button><button class="btn primary" id="np-create">만들기</button></div></div>`;
+}
+async function createFromForm(){
+  const kind = (document.querySelector('input[name="np-kind"]:checked') || {}).value || "empty";
+  const name = $("#np-name").value.trim(), start = $("#np-start").value;
+  if(!name && kind === "empty"){ $("#np-err").textContent = "공사명을 입력해 주세요."; return; }
+  const btn = $("#np-create"); btn.disabled = true;
+  const ok = await createProject(kind, name, start);
+  if(ok) closeDrawer(); else btn.disabled = false;
 }
 
 function renderKpis(M){
@@ -755,22 +891,30 @@ function renderSettings(){
       </div>` : ""}
     </section>
     <section>
-      <h3>보기·편집 권한</h3>
-      ${state.mode === "demo" ? `<p class="note" style="margin-top:0">데모 모드에서는 권한 관리를 쓸 수 없습니다. 실제 사이트에서는 관리자가 여기서 이메일별로 ‘보기’ 또는 ‘편집’ 권한을 줍니다.</p>`
-        : isOwner() ? `<p class="note" style="margin-top:0">여기에 등록한 구글 계정만 공정표를 볼 수 있습니다. ‘편집’은 작업과 설정을 고칠 수 있고, ‘보기’는 볼 수만 있습니다.</p>
-      <div class="off-list">${state.members.length ? state.members.map(m=>`<div class="off-item" style="grid-template-columns:1fr auto auto"><span style="overflow:hidden;text-overflow:ellipsis">${esc(m.email)}</span>
-        <select data-role="${esc(m.email)}" aria-label="권한" style="width:auto;padding:3px 6px"><option value="viewer" ${m.role!=="editor"?"selected":""}>보기</option><option value="editor" ${m.role==="editor"?"selected":""}>편집</option></select>
-        <button class="x" data-rmmem="${esc(m.email)}" aria-label="삭제" title="권한 삭제">×</button></div>`).join("") : `<div class="note">아직 권한을 준 사람이 없습니다.</div>`}</div>
-      <div class="off-add"><input type="email" id="m-mail" placeholder="name@gmail.com" aria-label="이메일"><select id="m-role" aria-label="권한"><option value="viewer">보기</option><option value="editor">편집</option></select>
-        <button class="btn full" id="m-add">권한 추가</button></div>
-      <p class="note">관리자: ${esc(ownerEmail())}</p>`
-        : `<p class="note" style="margin-top:0">권한은 관리자(${esc(ownerEmail())})가 관리합니다. 내 권한: <b>${state.role==="editor"?"편집":"보기"}</b></p>`}
+      <h3>이 프로젝트</h3>
+      ${state.mode === "demo" || isOwner()
+        ? `<p class="note" style="margin-top:0">프로젝트 이름은 왼쪽 ‘공사명’에서 바꿉니다. 삭제하면 이 프로젝트의 공정 데이터가 영구히 지워집니다.</p><button class="btn danger" id="p-del">이 프로젝트 삭제</button>`
+        : `<p class="note" style="margin-top:0">내 권한: <b>${state.role==="editor"?"편집":"보기"}</b>. 권한은 관리자가 관리합니다.</p>`}
       <h3 style="margin-top:24px">백업</h3>
       <p class="note" style="margin-top:0">현재 공정 데이터를 JSON 파일로 내려받습니다.</p>
       <button class="btn" id="backup">백업 파일 내려받기</button>
     </section>
     ${state.canEdit ? `<div style="grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="s-save">설정 저장</button><span class="err" id="s-err"></span></div>` : ""}
+    ${permSection()}
   </div>`;
+}
+function permSection(){
+  if(state.mode === "demo") return `<section style="grid-column:1/-1"><h3>프로젝트별 권한</h3><p class="note" style="margin-top:0">데모 모드에서는 권한 관리를 쓸 수 없습니다. 실제 사이트에서는 관리자가 여기서 사람마다 프로젝트별로 ‘보기’ 또는 ‘편집’을 고릅니다.</p></section>`;
+  if(!isOwner()) return "";
+  const ids = projectIds();
+  const label = v => v === "viewer" ? "보기" : v === "editor" ? "편집" : "–";
+  const rows = state.members.map(m => { const r = normRoles(m); return `<tr><td>${esc(m.email)}</td>${ids.map(id => `<td><select data-cell="${esc(m.email)}" data-p="${esc(id)}" aria-label="${esc(m.email)} · ${esc(projName(id))}">${["","viewer","editor"].map(v => `<option value="${v}" ${(r[id]||"")===v?"selected":""}>${label(v)}</option>`).join("")}</select></td>`).join("")}<td><button class="x" data-rmmem="${esc(m.email)}" title="이 사람의 모든 권한 삭제" aria-label="모든 권한 삭제">×</button></td></tr>`; }).join("");
+  return `<section style="grid-column:1/-1"><h3>프로젝트별 권한</h3>
+    <p class="note" style="margin-top:0">칸마다 ‘보기’ 또는 ‘편집’을 고르면 바로 적용됩니다. ‘–’는 그 프로젝트를 볼 수 없다는 뜻이며, 각자 권한이 있는 프로젝트의 탭만 보입니다.</p>
+    <div class="tbl-wrap"><table class="perm"><thead><tr><th>이메일</th>${ids.map(id => `<th class="${id===state.pid?"cur":""}">${esc(projName(id))}</th>`).join("")}<th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="${ids.length+2}" class="note">아직 권한을 준 사람이 없습니다.</td></tr>`}</tbody></table></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;max-width:640px"><input type="email" id="m-mail" placeholder="name@gmail.com" aria-label="이메일" style="flex:2 1 200px"><select id="m-role" aria-label="권한" style="flex:0 0 auto;width:auto"><option value="viewer">보기</option><option value="editor">편집</option></select><button class="btn" id="m-add">‘${esc(projName(state.pid))}’에 추가</button></div>
+    <p class="note">관리자 ${esc(ownerEmail())}는 모든 프로젝트를 보고 고칠 수 있습니다.</p></section>`;
 }
 
 /* ---------- drawer ---------- */
@@ -783,6 +927,7 @@ function openTask(id){
 function closeDrawer(){ state.drawer=null; $("#drawer").hidden = true; $("#scrim").hidden = true; }
 function renderDrawer(){
   const dr = state.drawer; if(!dr) return;
+  if(dr.kind === "project"){ renderNewProject(); return; }
   const M = state.M; const raw = dr.id ? tasksOf().find(t=>t.id===dr.id) : null;
   const t = dr.id && M ? M.by.get(dr.id) : null;
   const codeOf = id => (tasksOf().find(x=>x.id===id)||{}).code;
@@ -939,22 +1084,48 @@ function bindSettings(){
   };
 }
 function bindMembers(){
+  const pdel = $("#p-del");
+  if(pdel) pdel.onclick = async () => {
+    if(!pdel.dataset.armed){ pdel.dataset.armed = "1"; pdel.textContent = `한 번 더 누르면 ‘${projName(state.pid)}’이(가) 영구 삭제됩니다`; pdel.classList.add("armed"); return; }
+    const id = state.pid;
+    if(state.mode === "demo"){ delete state.projects[id]; state.pid = ""; setCurrent(); afterData(); toast("삭제했습니다 (데모: 저장되지 않음)"); return; }
+    try{
+      await FB.deleteDoc(schedRef(id));
+      for(const m of state.members){
+        const r = normRoles(m); if(!(id in r)) continue;
+        delete r[id];
+        if(Object.keys(r).length) await FB.setDoc(memberRef(m.email), { roles: r, updatedAt: new Date().toISOString(), updatedBy: me() });
+        else await FB.deleteDoc(memberRef(m.email));
+      }
+      toast("프로젝트를 삭제했습니다");
+    }catch(x){ toast("삭제하지 못했습니다 (" + (x.code||"") + ").", 5000); }
+  };
   if(!isOwner()) return;
   const err = t => { const e = $("#s-err"); if(e) e.textContent = t; else toast(t); };
+  const saveRoles = async (email, roles, msg) => {
+    try{
+      if(!Object.keys(roles).length) await FB.deleteDoc(memberRef(email));
+      else await FB.setDoc(memberRef(email), { roles, updatedAt: new Date().toISOString(), updatedBy: me() });
+      toast(msg);
+    }catch(x){ err("저장하지 못했습니다 (" + (x.code||"") + "). Firestore 보안 규칙을 최신 내용으로 게시했는지 확인해 주세요."); }
+  };
   $("#m-add").onclick = async () => {
     const e = $("#m-mail").value.trim().toLowerCase();
     if(!/^[^@\s/]+@[^@\s/]+\.[^@\s/]+$/.test(e)){ err("이메일 주소를 확인해 주세요."); return; }
-    if(e === ownerEmail()){ err("관리자는 따로 추가하지 않아도 됩니다."); return; }
-    try{ await FB.setDoc(memberRef(e), { role: $("#m-role").value, addedAt: new Date().toISOString(), addedBy: me() }); toast("권한을 추가했습니다"); }
-    catch(x){ err("추가하지 못했습니다 (" + (x.code||"") + ")."); }
+    if(e === ownerEmail()){ err("관리자는 모든 프로젝트 권한이 있어 따로 추가하지 않아도 됩니다."); return; }
+    const cur = state.members.find(m => m.email === e);
+    const roles = normRoles(cur); roles[state.pid] = $("#m-role").value;
+    await saveRoles(e, roles, `‘${projName(state.pid)}’에 권한을 추가했습니다`);
   };
-  document.querySelectorAll("[data-role]").forEach(s => s.onchange = async () => {
-    try{ await FB.setDoc(memberRef(s.dataset.role), { role: s.value }, { merge: true }); toast("권한을 바꿨습니다"); }
-    catch(x){ err("바꾸지 못했습니다 (" + (x.code||"") + ")."); }
+  document.querySelectorAll("[data-cell]").forEach(sel => sel.onchange = async () => {
+    const m = state.members.find(x => x.email === sel.dataset.cell);
+    const roles = normRoles(m);
+    if(sel.value) roles[sel.dataset.p] = sel.value; else delete roles[sel.dataset.p];
+    await saveRoles(sel.dataset.cell, roles, sel.value ? "권한을 바꿨습니다" : "권한을 뺐습니다");
   });
   document.querySelectorAll("[data-rmmem]").forEach(b => b.onclick = async () => {
     if(!b.dataset.armed){ b.dataset.armed = "1"; b.textContent = "삭제?"; b.style.color = "var(--bad)"; return; }
-    try{ await FB.deleteDoc(memberRef(b.dataset.rmmem)); toast("권한을 삭제했습니다"); }
+    try{ await FB.deleteDoc(memberRef(b.dataset.rmmem)); toast("모든 권한을 삭제했습니다"); }
     catch(x){ err("삭제하지 못했습니다 (" + (x.code||"") + ")."); }
   });
 }
@@ -1095,8 +1266,12 @@ document.addEventListener("click", e => {
   if(e.target.closest("#login")){ login(); return; }
   if(e.target.closest("#logout") || e.target.closest("#logout2")){ if(auth) FB.signOut(auth); return; }
   if(e.target.closest("#retry")){ location.reload(); return; }
-  if(e.target.closest("#startSample")){ startSchedule(true); return; }
-  if(e.target.closest("#startEmpty")){ startSchedule(false); return; }
+  const pt = e.target.closest("#ptabs [data-pid]");
+  if(pt){ selectProject(pt.dataset.pid); return; }
+  if(e.target.closest("#newProj")){ openNewProject(); return; }
+  if(e.target.closest("#np-create")){ createFromForm(); return; }
+  const st = e.target.closest("[data-start]");
+  if(st){ st.disabled = true; createProject(st.dataset.start, "", "").then(ok => { if(!ok) st.disabled = false; }); return; }
   if(e.target.closest("#addTask")){ openTask(null); return; }
   if(e.target.closest("[data-close]") || e.target.id==="scrim"){ closeDrawer(); return; }
   if(e.target.closest("#f-save")){ saveTask(); return; }
@@ -1128,17 +1303,37 @@ async function login(){
     state.errMsg = authMsg(e); render();
   }
 }
-function stopListeners(){ [unsubData, unsubMembers, unsubMe].forEach(u => { if(u) u(); }); unsubData = unsubMembers = unsubMe = null; }
-function watchData(){
-  unsubData = FB.onSnapshot(schedRef(), snap => {
-    if(!snap.exists()){ state.data = null; state.mode = "setup"; afterData(); return; }
-    state.data = snap.data(); state.mode = "live"; afterData();
-  }, err => {
-    unsubData = null;
-    if(err.code === "permission-denied"){ state.mode = "denied"; }
-    else { state.mode = "error"; state.errMsg = "공정 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."; }
-    afterData();
-  });
+function stopListeners(){
+  [unsubProjects, unsubMembers, unsubMe].forEach(u => { if(u) u(); }); unsubProjects = unsubMembers = unsubMe = null;
+  projSubs.forEach(u => u()); projSubs.clear(); projLoaded.clear();
+}
+function projectsChanged(){
+  const ids = projectIds();
+  if(isOwner()){
+    if(!ids.length){ state.data = null; state.mode = "setup"; afterData(); return; }
+  } else {
+    if(!Object.keys(state.roles).length){ state.data = null; state.mode = "denied"; afterData(); return; }
+    if(!ids.length){ state.data = null; state.mode = [...projSubs.keys()].every(id => projLoaded.has(id)) ? "denied" : "boot"; afterData(); return; }
+  }
+  state.mode = "live"; setCurrent(); afterData();
+}
+function watchAllProjects(){
+  unsubProjects = FB.onSnapshot(FB.collection(db, "schedules"), snap => {
+    state.projects = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
+    projectsChanged();
+  }, () => { state.mode = "error"; state.errMsg = "공정 데이터를 불러오지 못했습니다. Firestore 보안 규칙을 최신 내용으로 게시했는지 확인해 주세요."; afterData(); });
+}
+/* a viewer/editor listens only to the projects their member doc lists */
+function syncMemberSubs(){
+  const want = new Set(Object.keys(state.roles));
+  for(const [id, u] of projSubs) if(!want.has(id)){ u(); projSubs.delete(id); projLoaded.delete(id); delete state.projects[id]; }
+  for(const id of want) if(!projSubs.has(id)){
+    projSubs.set(id, FB.onSnapshot(schedRef(id), snap => {
+      projLoaded.add(id);
+      if(snap.exists()) state.projects[id] = snap.data(); else delete state.projects[id];
+      projectsChanged();
+    }, () => { projLoaded.add(id); delete state.projects[id]; projectsChanged(); }));
+  }
 }
 function watchMembers(){
   unsubMembers = FB.onSnapshot(FB.collection(db, "members"), snap => {
@@ -1147,20 +1342,19 @@ function watchMembers(){
   }, () => {});
 }
 function onUser(user){
-  stopListeners(); state.data = null; state.role = null; state.members = [];
+  stopListeners(); state.projects = {}; state.roles = {}; state.data = null; state.role = null; state.members = [];
   if(!user){ state.account = null; state.mode = "login"; afterData(); return; }
   state.account = user; state.errMsg = ""; state.mode = "boot";
-  if(isOwner()){ state.role = "owner"; watchData(); watchMembers(); return; }
+  if(isOwner()){ watchAllProjects(); watchMembers(); return; }
   unsubMe = FB.onSnapshot(memberRef(me()), snap => {
-    state.role = snap.exists() ? (snap.data().role === "editor" ? "editor" : "viewer") : null;
-    if(!state.role){ if(unsubData){ unsubData(); unsubData = null; } state.data = null; state.mode = "denied"; afterData(); return; }
-    if(!unsubData) watchData(); else afterData();
+    state.roles = normRoles(snap.exists() ? snap.data() : null);
+    syncMemberSubs(); projectsChanged();
   }, () => { state.mode = "denied"; afterData(); });
 }
 async function boot(){
   if(!["gantt","net","list","set"].includes(state.tab)) state.tab = "gantt";
   if(![5,12,24].includes(state.zoom)) state.zoom = 12;
-  if(state.mode === "demo"){ state.data = sampleData(); afterData(); return; }
+  if(state.mode === "demo"){ state.projects = { main: sampleData(), vinyl: sampleVinyl() }; setCurrent(); afterData(); return; }
   render();
   try{ await loadFirebase(); }
   catch(e){ state.mode = "error"; state.errMsg = "로그인 모듈을 불러오지 못했습니다. 인터넷 연결 또는 회사 방화벽 설정을 확인해 주세요."; render(); return; }
