@@ -72,6 +72,22 @@ h1{margin:2px 0 0;font-size:26px;font-weight:700;letter-spacing:-.01em;text-wrap
 .ptabs select:hover{background-color:var(--accent-soft)}
 .ptabs .btn.add{border-style:dashed;color:var(--accent);white-space:nowrap}
 table.perm{min-width:0;width:auto}
+.b-po{fill:#7B4FB8;cursor:pointer}
+.b-po.late{fill:var(--bad)}
+.b-po.done{fill:var(--done)}
+.buy-sum{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:baseline;gap:6px;padding:6px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-size:13px;color:var(--ink-2)}
+.chip b{font-family:var(--mono);font-size:16px;color:var(--ink)}
+.chip.bad{border-color:var(--bad)} .chip.bad b{color:var(--bad)}
+.chip.warn{border-color:var(--warn)} .chip.warn b{color:var(--warn)}
+.p-late{background:var(--crit-soft);color:var(--bad)}
+.p-soon{background:#FBEFD5;color:#8A5A00}
+.p-po{background:#EDE5F7;color:#5B3A91}
+@media (prefers-color-scheme: dark){ .p-soon{background:#3A2E14;color:#E8B85A} .p-po{background:#2C2340;color:#C7B0EC} .b-po{fill:#B08BE8} }
+.dday{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dday.bad{color:var(--bad);font-weight:600} .dday.warn{color:var(--warn);font-weight:600}
+tbody tr.b{cursor:pointer} tbody tr.b:hover{background:var(--surface-2)}
+tr.b.recv td{color:var(--ink-3)}
 .perm th.cur{color:var(--accent);font-weight:600}
 .perm select{width:auto;padding:3px 6px}
 .choice{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
@@ -262,6 +278,7 @@ textarea{resize:vertical;min-height:60px}
       <button role="tab" data-tab="gantt">간트 차트</button>
       <button role="tab" data-tab="net">PERT 네트워크</button>
       <button role="tab" data-tab="list">작업 목록</button>
+      <button role="tab" data-tab="buy">구매 일정</button>
       <button role="tab" data-tab="set">설정</button>
     </div>
     <div class="tools" id="tools"></div>
@@ -332,7 +349,7 @@ function sampleData(){
   ];
   tasks.forEach((t,i) => t.order = (i+1)*10);
   return {
-    format: "greenhouse-schedule/1",
+    format: "greenhouse-schedule/1", purchases: linkPurchases(samplePurchases("glass"), tasks),
     project: { name:"온실 신축공사 (샘플)", startDate:"2026-10-12", targetDate:"2026-12-29", statusDate:"", workSaturday:true,
       offDays:[{date:"2026-10-09",type:"holiday",reason:"한글날"},{date:"2026-12-25",type:"holiday",reason:"성탄절"},{date:"2027-01-01",type:"holiday",reason:"신정"}],
       baseline:null },
@@ -369,12 +386,52 @@ function sampleVinyl(){
   ];
   tasks.forEach((t,i) => t.order = (i+1)*10);
   return {
-    format: "greenhouse-schedule/1", createdAt: "2000-01-01T00:00:00.000Z",
+    format: "greenhouse-schedule/1", createdAt: "2000-01-01T00:00:00.000Z", purchases: linkPurchases(samplePurchases("vinyl"), tasks),
     project: { name:"연동 비닐온실 신축공사 (샘플 2)", startDate:"2026-11-02", targetDate:"2027-01-15", statusDate:"", workSaturday:true,
       offDays:[{date:"2026-12-25",type:"holiday",reason:"성탄절"},{date:"2027-01-01",type:"holiday",reason:"신정"}],
       baseline:null },
     tasks, updatedAt: "", updatedBy: ""
   };
+}
+
+/* sample purchase lists. lead = 조달기간(발주→현장 도착, 달력일), buffer = 현장 여유일(작업 시작 며칠 전 도착) */
+function samplePurchases(kind){
+  const P = (task, name, spec, qty, unit, lead, buffer, vendor, note="") => ({ id: "b" + task + name.length + Math.random().toString(36).slice(2,6),
+    taskCode: task, name, spec, qty, unit, lead, buffer, alertDays: 7, vendor, owner: "", ownerEmail: "", orderedDate: "", receivedDate: "", note });
+  if(kind === "vinyl") return [
+    P("B3","레미콘","25-24-150","18","㎥",3,1,"○○레미콘","타설 전날 물량 확정"),
+    P("C2","아연도 강관 파이프","Ø48.1×2.1t / Ø25.4×1.5t","1","식",14,3,"○○강관"),
+    P("C4","연동 거터","아연도 강판 1.6t","120","m",14,3,"○○하우스"),
+    P("D1","PO필름","0.15mm 장기성","1,450","㎡",10,3,"○○필름","폭·길이 재단 요청"),
+    P("D2","방충망","32메쉬","380","㎡",7,2,"○○필름"),
+    P("E1","측창 권취기","전동 24V","8","대",10,3,"○○농기계"),
+    P("E2","천창 개폐기","전동 랙식","6","세트",14,3,"○○농기계"),
+    P("E3","다겹 보온커튼","7겹 부직포","1,300","㎡",21,3,"○○보온","주문 제작"),
+    P("F1","온풍난방기","등유 15만 kcal","2","대",14,3,"○○난방"),
+    P("F2","유동팬","Ø400 저소음","12","대",7,2,"○○농기계"),
+    P("G2","복합환경제어기","온습도·CO₂·일사 센서 포함","1","세트",21,5,"○○스마트팜"),
+    P("H2","점적 관수 자재","점적호스·필터·밸브","1","식",7,2,"○○관수"),
+    P("H3","재배 베드","고설 베드 1.2m","60","조",14,3,"○○하우스"),
+  ];
+  return [
+    P("B3","철근","SD400 D13·D16","6","톤",7,2,"○○철강"),
+    P("B4","레미콘","25-24-150","45","㎥",3,1,"○○레미콘","타설 전날 물량 확정"),
+    P("C2","철골 구조재","H형강·각관(기둥·트러스)","1","식",25,3,"○○스틸","제작도 승인 후 제작"),
+    P("D1","강화유리","4mm 확산형","1,200","㎡",30,5,"○○글라스","수입품, 선적 일정 확인"),
+    P("E1","천창 개폐 모터·랙","랙앤피니언 세트","24","세트",21,3,"○○농기계"),
+    P("E3","차광·보온 커튼","알루미늄 차광 55%","1,150","㎡",28,3,"○○보온","주문 제작"),
+    P("F1","온수 보일러","50만 kcal/h","1","대",35,5,"○○보일러","설치 전 기초 필요"),
+    P("F2","파이프레일 난방관","Ø51 아연도","1,800","m",14,3,"○○난방"),
+    P("F3","양액기·관수 자재","양액기 1대 + 배관","1","식",21,3,"○○관수"),
+    P("F4","환기팬·유동팬","Ø500 / Ø400","16","대",14,3,"○○농기계"),
+    P("G2","분전반·전선류","동력반 1면 + 케이블","1","식",10,3,"○○전기"),
+    P("G3","복합환경제어기·센서","제어반 + 센서 12종","1","세트",30,5,"○○스마트팜"),
+    P("H2","재배 베드·행잉거터","고설 베드 1.2m","80","조",21,3,"○○하우스"),
+  ];
+}
+function linkPurchases(list, tasks){
+  const byCode = new Map(tasks.map(t => [t.code, t.id]));
+  return list.map(p => { const q = { ...p, taskId: byCode.get(p.taskCode) || "" }; delete q.taskCode; return q; });
 }
 
 /* ---------- state ---------- */
@@ -560,6 +617,183 @@ function groupTasks(tasks){
   return [...m.entries()].map(([name, items]) => ({ name, items }));
 }
 
+/* ---------- purchase schedule ---------- */
+const purchasesOf = () => (state.data && state.data.purchases) || [];
+const BUY_ST = {
+  late:    ["발주 지연", "p-late"], soon: ["발주 임박", "p-soon"], plan: ["발주 예정", "p-wait"],
+  etaLate: ["입고 늦음 예상", "p-late"], overdue: ["입고 지연", "p-late"], ordered: ["발주 완료", "p-po"],
+  recv:    ["입고 완료", "p-done"], nolink: ["공정 미연결", "p-wait"]
+};
+const BUY_ORDER = { late:0, overdue:1, etaLate:2, soon:3, plan:4, nolink:5, ordered:6, recv:7 };
+function computePurchases(M){
+  const today = M.statusDate;
+  return purchasesOf().map(p => {
+    const t = p.taskId ? M.by.get(p.taskId) : null;
+    const needBy = t && t.startDate ? shiftDate(t.startDate, -num(p.buffer)) : "";
+    const orderBy = needBy ? shiftDate(needBy, -num(p.lead)) : "";
+    const eta = isDate(p.orderedDate) ? shiftDate(p.orderedDate, num(p.lead)) : "";
+    const alertDays = p.alertDays === "" || p.alertDays == null ? 7 : num(p.alertDays);
+    let st;
+    if(isDate(p.receivedDate)) st = "recv";
+    else if(eta) st = today > eta ? "overdue" : (needBy && eta > needBy) ? "etaLate" : "ordered";
+    else if(!orderBy) st = "nolink";
+    else if(today > orderBy) st = "late";
+    else if(dayCount(today, orderBy) <= alertDays) st = "soon";
+    else st = "plan";
+    return { ...p, t, needBy, orderBy, eta, st, alertDays, dleft: orderBy ? dayCount(today, orderBy) : null };
+  }).sort((a,b) => (BUY_ORDER[a.st] - BUY_ORDER[b.st]) || String(a.orderBy||"9").localeCompare(String(b.orderBy||"9")));
+}
+const dayCount = (a, b) => Math.round((D(b) - D(a)) / 864e5);
+const ddayTxt = n => n == null ? "–" : n === 0 ? "D-day" : n > 0 ? `D-${n}` : `D+${-n}`;
+
+function renderPurchases(M){
+  const L = computePurchases(M);
+  const cnt = k => L.filter(x => k.includes(x.st)).length;
+  const late = cnt(["late"]), soon = cnt(["soon"]), wait = cnt(["ordered","etaLate","overdue"]), recv = cnt(["recv"]);
+  if(!L.length) return `<div class="panel empty"><h2>등록된 구매 항목이 없습니다</h2>
+    <p>자재마다 쓰일 공정과 조달기간을 넣으면, 공정 일정에 맞춰 발주 기한이 자동으로 계산됩니다.</p>
+    ${state.canEdit ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px"><button class="btn primary" id="buySample">샘플 구매 목록 넣기</button><button class="btn" id="addBuy2">구매 항목 추가</button></div>` : ""}</div>`;
+  const rows = L.map(x => {
+    const [lab, cls] = BUY_ST[x.st];
+    const dcls = x.st === "late" ? "bad" : x.st === "soon" ? "warn" : "";
+    const task = x.t ? `<span class="mono" style="color:var(--ink-3)">${esc(x.t.code)}</span> ${esc(x.t.name)}` : `<span style="color:var(--ink-3)">–</span>`;
+    return `<tr class="b ${x.st==="recv"?"recv":""}" data-buy="${esc(x.id)}">
+      <td><span class="pill ${cls}">${lab}</span></td>
+      <td><b style="font-weight:600">${esc(x.name)}</b>${x.spec?`<div style="font-size:12px;color:var(--ink-3)">${esc(x.spec)}</div>`:""}</td>
+      <td class="r num">${esc(x.qty||"")} ${esc(x.unit||"")}</td>
+      <td>${task}</td>
+      <td class="num">${esc(fmt(x.orderBy))}</td>
+      <td class="dday ${dcls}">${x.st==="recv"||x.eta ? "–" : ddayTxt(x.dleft)}</td>
+      <td class="r num">${num(x.lead)}일</td>
+      <td class="num">${esc(fmt(x.needBy))}</td>
+      <td class="num">${x.eta ? esc(fmt(x.eta)) : "–"}</td>
+      <td>${esc(x.vendor||"")}</td>
+      <td>${esc(x.owner||"")}</td></tr>`;
+  }).join("");
+  return `<div class="buy-sum" style="margin-bottom:12px">
+      <span class="chip ${late?"bad":""}">발주 지연 <b>${late}</b></span>
+      <span class="chip ${soon?"warn":""}">발주 임박 <b>${soon}</b></span>
+      <span class="chip">입고 대기 <b>${wait}</b></span>
+      <span class="chip">입고 완료 <b>${recv}</b></span>
+    </div>
+    <div class="panel tbl-wrap"><table>
+    <thead><tr><th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th>업체</th><th>담당자</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <p class="note">발주 기한 = 현장 필요일 − 조달기간, 현장 필요일 = 사용 공정 시작일 − 현장 여유일(달력일 기준). 공정 일정이 바뀌면 발주 기한도 자동으로 바뀝니다. ‘발주 임박’은 기한까지 알림 기준일(기본 7일) 이내인 항목입니다. 발주 임박·지연·입고 지연 항목은 평일 오전 8시에 담당자 이메일로 자동 알림이 갑니다.</p>`;
+}
+function openBuy(id){
+  state.drawer = { kind: "buy", id: id || null, arm: false };
+  renderDrawer();
+  $("#drawer").hidden = false; $("#scrim").hidden = false;
+}
+function renderBuyDrawer(){
+  const dr = state.drawer, M = state.M, el = $("#drawer");
+  const raw = dr.id ? purchasesOf().find(p => p.id === dr.id) : null;
+  if(dr.id && !raw){ closeDrawer(); return; }
+  const x = raw && M ? computePurchases(M).find(p => p.id === dr.id) : null;
+  const taskLabel = t => `${t.code} ${t.name}`;
+  if(!state.canEdit){
+    el.innerHTML = `<div class="d-head"><h2>${esc(raw.name)}</h2><button class="x" data-close aria-label="닫기">×</button></div>
+      <div class="d-body"><dl class="dl">
+        <dt>상태</dt><dd><span class="pill ${BUY_ST[x.st][1]}">${BUY_ST[x.st][0]}</span></dd>
+        <dt>규격</dt><dd>${esc(raw.spec||"–")}</dd>
+        <dt>수량</dt><dd>${esc(raw.qty||"–")} ${esc(raw.unit||"")}</dd>
+        <dt>사용 공정</dt><dd>${x.t ? esc(taskLabel(x.t)) : "–"}</dd>
+        <dt>발주 기한</dt><dd class="num">${esc(fmt(x.orderBy))} ${x.dleft!=null && !x.eta && x.st!=="recv" ? `(${ddayTxt(x.dleft)})` : ""}</dd>
+        <dt>현장 필요일</dt><dd class="num">${esc(fmt(x.needBy))}</dd>
+        <dt>조달기간</dt><dd class="num">${num(raw.lead)}일 · 여유 ${num(raw.buffer)}일</dd>
+        <dt>발주일</dt><dd class="num">${esc(fmt(raw.orderedDate))}</dd>
+        <dt>입고 예정</dt><dd class="num">${esc(fmt(x.eta))}</dd>
+        <dt>입고일</dt><dd class="num">${esc(fmt(raw.receivedDate))}</dd>
+        <dt>업체</dt><dd>${esc(raw.vendor||"–")}</dd>
+        <dt>담당자</dt><dd>${esc(raw.owner||"–")}${raw.ownerEmail?` · ${esc(raw.ownerEmail)}`:""}${raw.ownerPhone?` · ${esc(raw.ownerPhone)}`:""}</dd>
+        <dt>메모</dt><dd>${esc(raw.note||"–")}</dd></dl></div>`;
+    return;
+  }
+  const v = raw || { name:"", spec:"", qty:"", unit:"", taskId:"", lead:14, buffer:3, alertDays:7, vendor:"", owner:"", ownerEmail:"", orderedDate:"", receivedDate:"", note:"" };
+  const opts = M ? M.groups.map(g => `<optgroup label="${esc(g.name)}">${g.items.map(t => `<option value="${esc(t.id)}" ${v.taskId===t.id?"selected":""}>${esc(taskLabel(t))}</option>`).join("")}</optgroup>`).join("") : "";
+  el.innerHTML = `<div class="d-head"><h2>${raw ? "구매 항목 수정" : "구매 항목 추가"}</h2><button class="x" data-close aria-label="닫기">×</button></div>
+    <div class="d-body">
+      <div class="calc" id="b-calc"></div>
+      <div class="field"><label for="b-name">자재명</label><input type="text" id="b-name" value="${esc(v.name)}" placeholder="예: PO필름"></div>
+      <div class="field"><label for="b-spec">규격</label><input type="text" id="b-spec" value="${esc(v.spec||"")}" placeholder="예: 0.15mm 장기성"></div>
+      <div class="g2">
+        <div class="field"><label for="b-qty">수량</label><input type="text" id="b-qty" value="${esc(v.qty||"")}"></div>
+        <div class="field"><label for="b-unit">단위</label><input type="text" id="b-unit" value="${esc(v.unit||"")}" placeholder="㎡, 대, 식…"></div>
+      </div>
+      <div class="field"><label for="b-task">사용 공정</label><select id="b-task"><option value="">– 공정을 고르세요 –</option>${opts}</select><span class="hint">이 공정이 시작되기 전에 현장에 도착해야 합니다.</span></div>
+      <div class="g3">
+        <div class="field"><label for="b-lead">조달기간(일)</label><input type="number" min="0" id="b-lead" value="${esc(v.lead)}"></div>
+        <div class="field"><label for="b-buf">현장 여유(일)</label><input type="number" min="0" id="b-buf" value="${esc(v.buffer)}"></div>
+        <div class="field"><label for="b-alert">알림(일 전)</label><input type="number" min="0" id="b-alert" value="${esc(v.alertDays ?? 7)}"></div>
+      </div>
+      <p class="note" style="margin:-4px 0 12px">조달기간은 발주부터 현장 도착까지 걸리는 달력일입니다. 알림은 발주 기한 며칠 전부터 ‘발주 임박’으로 표시할지 정합니다.</p>
+      <div class="field"><label for="b-vendor">업체</label><input type="text" id="b-vendor" value="${esc(v.vendor||"")}"></div>
+      <div class="g2">
+        <div class="field"><label for="b-owner">담당자</label><input type="text" id="b-owner" value="${esc(v.owner||"")}"></div>
+        <div class="field"><label for="b-mail">담당자 이메일</label><input type="email" id="b-mail" value="${esc(v.ownerEmail||"")}" placeholder="메일 알림용"></div>
+      </div>
+      <div class="field"><label for="b-phone">담당자 휴대폰</label><input type="tel" id="b-phone" value="${esc(v.ownerPhone||"")}" placeholder="010-0000-0000 (카카오톡 알림용, 선택)"><span class="hint">발주 임박·지연이면 평일 오전 8시에 담당자에게 메일(카카오톡 설정 시 알림톡)이 갑니다. 이메일이 없으면 관리자에게 갑니다.</span></div>
+      <div class="g2">
+        <div class="field"><label for="b-ord">발주일</label><input type="date" id="b-ord" value="${esc(v.orderedDate||"")}"></div>
+        <div class="field"><label for="b-rcv">입고일</label><input type="date" id="b-rcv" value="${esc(v.receivedDate||"")}"></div>
+      </div>
+      <div class="field"><label for="b-note">메모</label><textarea id="b-note">${esc(v.note||"")}</textarea></div>
+      <div class="err" id="b-err"></div>
+    </div>
+    <div class="d-foot">
+      <div>${raw ? `<button class="btn danger ${dr.arm?"armed":""}" id="b-del">${dr.arm?"한 번 더 누르면 삭제":"삭제"}</button>` : ""}</div>
+      <div style="display:flex;gap:8px"><button class="btn" data-close>취소</button><button class="btn primary" id="b-save">저장</button></div>
+    </div>`;
+  updateBuyCalc();
+}
+function updateBuyCalc(){
+  const box = $("#b-calc"); if(!box || !state.M) return;
+  const t = state.M.by.get($("#b-task").value);
+  if(!t || !t.startDate){ box.innerHTML = `<span style="grid-column:1/-1">사용 공정을 고르면 발주 기한이 계산됩니다.</span>`; return; }
+  const need = shiftDate(t.startDate, -num($("#b-buf").value)), ob = shiftDate(need, -num($("#b-lead").value));
+  const d = dayCount(state.M.statusDate, ob);
+  box.innerHTML = `<span>공정 시작 <b>${esc(fmt(t.startDate))}</b></span><span>현장 필요일 <b>${esc(fmt(need))}</b></span>
+    <span>발주 기한 <b>${esc(fmt(ob))}</b></span><span>남은 날 <b style="color:${d<0?"var(--bad)":d<=7?"var(--warn)":"inherit"}">${ddayTxt(d)}</b></span>`;
+}
+async function saveBuy(){
+  const err = $("#b-err"); err.textContent = "";
+  const dr = state.drawer;
+  const name = $("#b-name").value.trim();
+  if(!name){ err.textContent = "자재명을 입력해 주세요."; return; }
+  const mail = $("#b-mail").value.trim();
+  const phone = $("#b-phone").value.trim();
+  if(phone && phone.replace(/\D/g,"").length < 10){ err.textContent = "휴대폰 번호를 확인해 주세요 (예: 010-1234-5678)."; return; }
+  if(mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ err.textContent = "담당자 이메일 주소를 확인해 주세요."; return; }
+  const ord = $("#b-ord").value, rcv = $("#b-rcv").value;
+  if(rcv && ord && rcv < ord){ err.textContent = "입고일이 발주일보다 빠릅니다."; return; }
+  const id = dr.id || ("b" + Date.now().toString(36) + Math.random().toString(36).slice(2,5));
+  const fields = { id, name, spec: $("#b-spec").value.trim(), qty: $("#b-qty").value.trim(), unit: $("#b-unit").value.trim(),
+    taskId: $("#b-task").value, lead: num($("#b-lead").value), buffer: num($("#b-buf").value), alertDays: num($("#b-alert").value),
+    vendor: $("#b-vendor").value.trim(), owner: $("#b-owner").value.trim(), ownerEmail: mail, ownerPhone: $("#b-phone").value.trim(),
+    orderedDate: ord, receivedDate: rcv, note: $("#b-note").value.trim() };
+  const btn = $("#b-save"); btn.disabled = true;
+  const ok = await commit(data => {
+    const list = data.purchases || (data.purchases = []);
+    const old = list.find(p => p.id === id);
+    if(old) Object.assign(old, fields); else list.push(fields);
+  }, "저장했습니다");
+  if(ok) closeDrawer(); else if($("#b-save")) $("#b-save").disabled = false;
+}
+async function deleteBuy(){
+  const dr = state.drawer;
+  if(!dr.arm){ dr.arm = true; renderDrawer(); return; }
+  const ok = await commit(data => { data.purchases = (data.purchases || []).filter(p => p.id !== dr.id); }, "삭제했습니다");
+  if(ok) closeDrawer();
+}
+async function insertSamplePurchases(){
+  const kind = /비닐/.test(proj().name) ? "vinyl" : "glass";
+  const list = linkPurchases(samplePurchases(kind), tasksOf());
+  const linked = list.filter(p => p.taskId).length;
+  await commit(data => { data.purchases = (data.purchases || []).concat(list); },
+    `샘플 구매 항목 ${list.length}개를 넣었습니다` + (linked < list.length ? ` (공정 연결 ${linked}개)` : ""));
+}
+
 /* ---------- render ---------- */
 function renderWho(){
   const w = $("#who");
@@ -639,6 +873,7 @@ function render(){
   }
   if(state.tab==="gantt"){ v.insertAdjacentHTML("beforeend", renderGantt(M)); const gr = $(".g-right"); if(gr) gr.scrollLeft = keepScroll; }
   else if(state.tab==="net") v.insertAdjacentHTML("beforeend", renderNet(M));
+  else if(state.tab==="buy") v.insertAdjacentHTML("beforeend", renderPurchases(M));
   else v.insertAdjacentHTML("beforeend", renderList(M));
 }
 
@@ -723,7 +958,8 @@ function renderKpis(M){
 function renderTools(){
   let h = "";
   if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="확대">${[[5,"월"],[12,"주"],[24,"일"]].map(([z,l])=>`<button data-zoom="${z}" class="${state.zoom===z?"on":""}">${l}</button>`).join("")}</div>`;
-  if(state.canEdit && state.tab!=="set") h += `<button class="btn primary" id="addTask">작업 추가</button>`;
+  if(state.canEdit && state.tab==="buy") h += `<button class="btn primary" id="addBuy">구매 항목 추가</button>`;
+  else if(state.canEdit && state.tab!=="set") h += `<button class="btn primary" id="addTask">작업 추가</button>`;
   $("#tools").innerHTML = h;
 }
 
@@ -738,6 +974,7 @@ const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border
   <span><i class="sw" style="background:var(--weather)"></i>작업불가(기상 등)</span>
   <span><i class="sw" style="width:2px;height:12px;background:var(--crit)"></i>기준일</span>
   <span><i class="sw" style="width:8px;height:8px;background:var(--prog);clip-path:polygon(0 0,100% 0,0 100%)"></i>착수 제한일</span>
+  <span><i class="sw" style="width:10px;height:7px;background:#7B4FB8;clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 기한</span>
   ${state.canEdit ? `<span style="color:var(--ink-3)">· 막대를 끌어 이동, 양 끝(↔)을 끌어 기간 조정</span>` : ""}`}
 </div>`;
 
@@ -747,7 +984,9 @@ function renderGantt(M){
   const rows = []; M.groups.forEach(g => { rows.push({ g:g.name }); g.items.forEach(t => rows.push({ t: M.by.get(t.id) })); });
   let end = M.finish; if(isDate(M.p.targetDate) && M.p.targetDate > end) end = M.p.targetDate;
   rows.forEach(r => { if(r.t && r.t.base && r.t.base[1] > end) end = r.t.base[1]; });
-  const a0 = addDays(D(M.p.startDate), -3), a1 = addDays(D(end), 10);
+  const buys = computePurchases(M).filter(x => x.orderBy && x.t);
+  let first = M.p.startDate; buys.forEach(x => { if(x.orderBy < first) first = x.orderBy; });
+  const a0 = addDays(D(first), -3), a1 = addDays(D(end), 10);
   const nDays = Math.round((a1-a0)/864e5);
   const W = nDays*px, H = HH + rows.length*RH;
   const X = s => Math.round((D(s)-a0)/864e5)*px;
@@ -761,7 +1000,14 @@ function renderGantt(M){
     if(px>=16) hdr += `<text class="t-day" x="${x+px/2}" y="40" text-anchor="middle">${d.getUTCDate()}</text>`;
     else if(w===1) hdr += `<line class="l-grid" x1="${x}" y1="28" x2="${x}" y2="${HH}"/><text class="t-day" x="${x+3}" y="42">${d.getUTCDate()}</text>`;
   }
-  let grp = "", bars = "";
+  let grp = "", bars = "", pos = "";
+  const rowOf = new Map(); rows.forEach((r,i) => { if(r.t) rowOf.set(r.t.id, i); });
+  buys.forEach(x => {
+    const i = rowOf.get(x.t.id); if(i == null) return;
+    const cx = X(x.orderBy) + px/2, y = HH + i*RH + 3;
+    const cls = x.st === "recv" ? "done" : (x.st === "late" || x.st === "overdue" || x.st === "etaLate") ? "late" : "";
+    pos += `<path class="b-po ${cls}" data-buy="${esc(x.id)}" d="M${cx-5} ${y} h10 l-5 7 z"><title>${esc(`발주 기한 ${fmt(x.orderBy)} · ${x.name}\n${BUY_ST[x.st][0]} · 조달 ${num(x.lead)}일 → 현장 필요 ${fmt(x.needBy)}`)}</title></path>`;
+  });
   rows.forEach((r,i) => {
     const y = HH + i*RH;
     if(r.g!=null){ grp += `<rect class="r-grp" x="0" y="${y}" width="${W}" height="${RH}"/>`; return; }
@@ -794,7 +1040,7 @@ function renderGantt(M){
   return `<div class="panel"><div class="gantt">
     <div class="g-left"><div class="g-head">작업</div>${left}</div>
     <div class="g-right"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="간트 차트">
-      ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${bars}${marks}</svg></div>
+      ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${bars}${pos}${marks}</svg></div>
   </div>${legendHTML(false)}</div>`;
 }
 
@@ -931,6 +1177,7 @@ function closeDrawer(){ state.drawer=null; $("#drawer").hidden = true; $("#scrim
 function renderDrawer(){
   const dr = state.drawer; if(!dr) return;
   if(dr.kind === "project"){ renderNewProject(); return; }
+  if(dr.kind === "buy"){ renderBuyDrawer(); return; }
   const M = state.M; const raw = dr.id ? tasksOf().find(t=>t.id===dr.id) : null;
   const t = dr.id && M ? M.by.get(dr.id) : null;
   const codeOf = id => (tasksOf().find(x=>x.id===id)||{}).code;
@@ -1274,15 +1521,22 @@ document.addEventListener("click", e => {
   const st = e.target.closest("[data-start]");
   if(st){ st.disabled = true; createProject(st.dataset.start, "", "").then(ok => { if(!ok) st.disabled = false; }); return; }
   if(e.target.closest("#addTask")){ openTask(null); return; }
+  if(e.target.closest("#addBuy") || e.target.closest("#addBuy2")){ openBuy(null); return; }
+  if(e.target.closest("#buySample")){ e.target.closest("#buySample").disabled = true; insertSamplePurchases(); return; }
+  if(e.target.closest("#b-save")){ saveBuy(); return; }
+  if(e.target.closest("#b-del")){ deleteBuy(); return; }
+  const by = e.target.closest("#view [data-buy]");
+  if(by){ openBuy(by.dataset.buy); return; }
   if(e.target.closest("[data-close]") || e.target.id==="scrim"){ closeDrawer(); return; }
   if(e.target.closest("#f-save")){ saveTask(); return; }
   if(e.target.closest("#f-del")){ deleteTask(); return; }
   const row = e.target.closest("#view [data-id]");
   if(row) openTask(row.dataset.id);
 });
-document.addEventListener("change", e => { if(e.target.id === "projSel") selectProject(e.target.value); });
+document.addEventListener("change", e => { if(e.target.id === "projSel") selectProject(e.target.value); if(e.target.id === "b-task") updateBuyCalc(); });
 document.addEventListener("input", e => {
   if(["f-o","f-m","f-p"].includes(e.target.id)) updateTe();
+  if(["b-task","b-lead","b-buf"].includes(e.target.id)) updateBuyCalc();
   if(e.target.id==="f-prog") $("#f-progv").textContent = e.target.value + "%";
   if(state.drawer && state.drawer.arm && e.target.closest("#drawer")){ state.drawer.arm=false; const b=$("#f-del"); if(b){ b.classList.remove("armed"); b.textContent="삭제"; } }
 });
@@ -1354,7 +1608,7 @@ function onUser(user){
   }, () => { state.mode = "denied"; afterData(); });
 }
 async function boot(){
-  if(!["gantt","net","list","set"].includes(state.tab)) state.tab = "gantt";
+  if(!["gantt","net","list","buy","set"].includes(state.tab)) state.tab = "gantt";
   if(![5,12,24].includes(state.zoom)) state.zoom = 12;
   if(state.mode === "demo"){ state.projects = { main: sampleData(), vinyl: sampleVinyl() }; setCurrent(); afterData(); return; }
   render();
