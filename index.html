@@ -74,7 +74,14 @@ h1{margin:2px 0 0;font-size:26px;font-weight:700;letter-spacing:-.01em;text-wrap
 table.perm{min-width:0;width:auto}
 .b-po{fill:#7B4FB8;cursor:pointer}
 .b-po.late{fill:var(--bad)}
+.b-po.ordered{fill:var(--prog)}
+.b-po.ordered.risk{stroke:var(--bad);stroke-width:2}
 .b-po.done{fill:var(--done)}
+.b-po:hover{stroke:var(--ink);stroke-width:1.5}
+.btn.sm{padding:3px 10px;font-size:12px;white-space:nowrap}
+.btn.sm.go{border-color:var(--prog);color:var(--prog)}
+.btn.sm.ok{border-color:var(--accent);color:var(--accent)}
+.today{border:0;background:none;color:var(--prog);font-size:12px;padding:0 0 0 6px;text-decoration:underline;cursor:pointer}
 .buy-sum{display:flex;gap:8px;flex-wrap:wrap}
 .chip{display:inline-flex;align-items:baseline;gap:6px;padding:6px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-size:13px;color:var(--ink-2)}
 .chip b{font-family:var(--mono);font-size:16px;color:var(--ink)}
@@ -83,7 +90,7 @@ table.perm{min-width:0;width:auto}
 .p-late{background:var(--crit-soft);color:var(--bad)}
 .p-soon{background:#FBEFD5;color:#8A5A00}
 .p-po{background:#EDE5F7;color:#5B3A91}
-@media (prefers-color-scheme: dark){ .p-soon{background:#3A2E14;color:#E8B85A} .p-po{background:#2C2340;color:#C7B0EC} .b-po{fill:#B08BE8} }
+@media (prefers-color-scheme: dark){ .p-soon{background:#3A2E14;color:#E8B85A} .p-po{background:#2C2340;color:#C7B0EC} .b-po{fill:#B08BE8} .b-po.late{fill:var(--bad)} .b-po.ordered{fill:var(--prog)} .b-po.done{fill:var(--done)} }
 .dday{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .dday.bad{color:var(--bad);font-weight:600} .dday.warn{color:var(--warn);font-weight:600}
 tbody tr.b{cursor:pointer} tbody tr.b:hover{background:var(--surface-2)}
@@ -668,7 +675,10 @@ function renderPurchases(M){
       <td class="num">${esc(fmt(x.needBy))}</td>
       <td class="num">${x.eta ? esc(fmt(x.eta)) : "–"}</td>
       <td>${esc(x.vendor||"")}</td>
-      <td>${esc(x.owner||"")}</td></tr>`;
+      <td>${esc(x.owner||"")}</td>
+      ${state.canEdit ? `<td>${x.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${esc(fmt(x.receivedDate))} 입고</span>`
+        : x.eta ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" title="오늘 날짜로 입고일을 기록합니다">입고 완료</button>`
+        : `<button class="btn sm go" data-quick="order" data-id="${esc(x.id)}" title="오늘 날짜로 발주일을 기록합니다">발주 완료</button>`}</td>` : ""}</tr>`;
   }).join("");
   return `<div class="buy-sum" style="margin-bottom:12px">
       <span class="chip ${late?"bad":""}">발주 지연 <b>${late}</b></span>
@@ -677,7 +687,7 @@ function renderPurchases(M){
       <span class="chip">입고 완료 <b>${recv}</b></span>
     </div>
     <div class="panel tbl-wrap"><table>
-    <thead><tr><th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th>업체</th><th>담당자</th></tr></thead>
+    <thead><tr><th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th>업체</th><th>담당자</th>${state.canEdit ? "<th>처리</th>" : ""}</tr></thead>
     <tbody>${rows}</tbody></table></div>
     <p class="note">발주 기한 = 현장 필요일 − 조달기간, 현장 필요일 = 사용 공정 시작일 − 현장 여유일(달력일 기준). 공정 일정이 바뀌면 발주 기한도 자동으로 바뀝니다. ‘발주 임박’은 기한까지 알림 기준일(기본 7일) 이내인 항목입니다. 발주 임박·지연·입고 지연 항목은 평일 오전 8시에 담당자 이메일로 자동 알림이 갑니다.</p>`;
 }
@@ -735,8 +745,8 @@ function renderBuyDrawer(){
       </div>
       <div class="field"><label for="b-phone">담당자 휴대폰</label><input type="tel" id="b-phone" value="${esc(v.ownerPhone||"")}" placeholder="010-0000-0000 (카카오톡 알림용, 선택)"><span class="hint">발주 임박·지연이면 평일 오전 8시에 담당자에게 메일(카카오톡 설정 시 알림톡)이 갑니다. 이메일이 없으면 관리자에게 갑니다.</span></div>
       <div class="g2">
-        <div class="field"><label for="b-ord">발주일</label><input type="date" id="b-ord" value="${esc(v.orderedDate||"")}"></div>
-        <div class="field"><label for="b-rcv">입고일</label><input type="date" id="b-rcv" value="${esc(v.receivedDate||"")}"></div>
+        <div class="field"><label for="b-ord">발주일<button type="button" class="today" data-today="b-ord">오늘</button></label><input type="date" id="b-ord" value="${esc(v.orderedDate||"")}"></div>
+        <div class="field"><label for="b-rcv">입고일<button type="button" class="today" data-today="b-rcv">오늘</button></label><input type="date" id="b-rcv" value="${esc(v.receivedDate||"")}"></div>
       </div>
       <div class="field"><label for="b-note">메모</label><textarea id="b-note">${esc(v.note||"")}</textarea></div>
       <div class="err" id="b-err"></div>
@@ -785,6 +795,15 @@ async function deleteBuy(){
   if(!dr.arm){ dr.arm = true; renderDrawer(); return; }
   const ok = await commit(data => { data.purchases = (data.purchases || []).filter(p => p.id !== dr.id); }, "삭제했습니다");
   if(ok) closeDrawer();
+}
+async function quickBuy(id, what){
+  const cur = purchasesOf().find(p => p.id === id); if(!cur) return;
+  const today = localToday();
+  const before = { orderedDate: cur.orderedDate || "", receivedDate: cur.receivedDate || "" };
+  const upd = what === "order" ? { orderedDate: today } : { receivedDate: today, orderedDate: cur.orderedDate || today };
+  const apply = vals => data => { const p = (data.purchases || []).find(x => x.id === id); if(p) Object.assign(p, vals); };
+  const ok = await commit(apply(upd), null);
+  if(ok) toast(`${cur.name}: ${what === "order" ? "발주 완료" : "입고 완료"} (${fmt(today)})`, 7000, { label: "되돌리기", fn: () => commit(apply(before), "되돌렸습니다") });
 }
 async function insertSamplePurchases(){
   const kind = /비닐/.test(proj().name) ? "vinyl" : "glass";
@@ -974,7 +993,10 @@ const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border
   <span><i class="sw" style="background:var(--weather)"></i>작업불가(기상 등)</span>
   <span><i class="sw" style="width:2px;height:12px;background:var(--crit)"></i>기준일</span>
   <span><i class="sw" style="width:8px;height:8px;background:var(--prog);clip-path:polygon(0 0,100% 0,0 100%)"></i>착수 제한일</span>
-  <span><i class="sw" style="width:10px;height:7px;background:#7B4FB8;clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 기한</span>
+  <span><i class="sw" style="width:10px;height:7px;background:#7B4FB8;clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 전(발주 기한)</span>
+  <span><i class="sw" style="width:10px;height:7px;background:var(--prog);clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 완료(발주일)</span>
+  <span><i class="sw" style="width:10px;height:7px;background:var(--done);clip-path:polygon(0 0,100% 0,50% 100%)"></i>입고 완료</span>
+  <span><i class="sw" style="width:10px;height:7px;background:var(--bad);clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 지연</span>
   ${state.canEdit ? `<span style="color:var(--ink-3)">· 막대를 끌어 이동, 양 끝(↔)을 끌어 기간 조정</span>` : ""}`}
 </div>`;
 
@@ -985,7 +1007,8 @@ function renderGantt(M){
   let end = M.finish; if(isDate(M.p.targetDate) && M.p.targetDate > end) end = M.p.targetDate;
   rows.forEach(r => { if(r.t && r.t.base && r.t.base[1] > end) end = r.t.base[1]; });
   const buys = computePurchases(M).filter(x => x.orderBy && x.t);
-  let first = M.p.startDate; buys.forEach(x => { if(x.orderBy < first) first = x.orderBy; });
+  const markDate = x => isDate(x.orderedDate) ? x.orderedDate : x.orderBy;
+  let first = M.p.startDate; buys.forEach(x => { if(markDate(x) < first) first = markDate(x); });
   const a0 = addDays(D(first), -3), a1 = addDays(D(end), 10);
   const nDays = Math.round((a1-a0)/864e5);
   const W = nDays*px, H = HH + rows.length*RH;
@@ -1004,9 +1027,10 @@ function renderGantt(M){
   const rowOf = new Map(); rows.forEach((r,i) => { if(r.t) rowOf.set(r.t.id, i); });
   buys.forEach(x => {
     const i = rowOf.get(x.t.id); if(i == null) return;
-    const cx = X(x.orderBy) + px/2, y = HH + i*RH + 3;
-    const cls = x.st === "recv" ? "done" : (x.st === "late" || x.st === "overdue" || x.st === "etaLate") ? "late" : "";
-    pos += `<path class="b-po ${cls}" data-buy="${esc(x.id)}" d="M${cx-5} ${y} h10 l-5 7 z"><title>${esc(`발주 기한 ${fmt(x.orderBy)} · ${x.name}\n${BUY_ST[x.st][0]} · 조달 ${num(x.lead)}일 → 현장 필요 ${fmt(x.needBy)}`)}</title></path>`;
+    const cx = X(markDate(x)) + px/2, y = HH + i*RH + 3;
+    const cls = x.st === "recv" ? "done" : x.st === "late" ? "late" : x.eta ? ("ordered" + (x.st === "overdue" || x.st === "etaLate" ? " risk" : "")) : "";
+    const when = x.st === "recv" ? `발주 ${fmt(x.orderedDate)} · 입고 ${fmt(x.receivedDate)}` : x.eta ? `발주 ${fmt(x.orderedDate)} · 입고 예정 ${fmt(x.eta)}` : `발주 기한 ${fmt(x.orderBy)} (${ddayTxt(x.dleft)})`;
+    pos += `<path class="b-po ${cls}" data-buy="${esc(x.id)}" d="M${cx-5} ${y} h10 l-5 7 z"><title>${esc(`${x.name} · ${BUY_ST[x.st][0]}\n${when}\n현장 필요 ${fmt(x.needBy)}`)}</title></path>`;
   });
   rows.forEach((r,i) => {
     const y = HH + i*RH;
@@ -1525,6 +1549,10 @@ document.addEventListener("click", e => {
   if(e.target.closest("#buySample")){ e.target.closest("#buySample").disabled = true; insertSamplePurchases(); return; }
   if(e.target.closest("#b-save")){ saveBuy(); return; }
   if(e.target.closest("#b-del")){ deleteBuy(); return; }
+  const qb = e.target.closest("[data-quick]");
+  if(qb){ qb.disabled = true; quickBuy(qb.dataset.id, qb.dataset.quick); return; }
+  const td = e.target.closest("[data-today]");
+  if(td){ e.preventDefault(); const inp = $("#" + td.dataset.today); inp.value = localToday(); if(td.dataset.today === "b-rcv" && !$("#b-ord").value) $("#b-ord").value = localToday(); return; }
   const by = e.target.closest("#view [data-buy]");
   if(by){ openBuy(by.dataset.buy); return; }
   if(e.target.closest("[data-close]") || e.target.id==="scrim"){ closeDrawer(); return; }
