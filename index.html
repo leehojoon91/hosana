@@ -112,6 +112,15 @@ tr.lb input[type=number]{width:84px;padding:3px 6px;text-align:right}
 .mode-sel{width:auto;padding:2px 6px;font-size:12px;margin-left:8px}
 .team-in{width:150px;padding:2px 6px;font-size:12px}
 .vend-in{width:120px;padding:3px 6px;font-size:12px}
+table.vdt{min-width:1040px;font-size:12.5px}
+table.vdt td.r,table.vdt th.r{text-align:right}
+table.vdt tbody tr[data-vendor]{cursor:pointer}
+table.vdt tbody tr[data-vendor]:hover td{background:var(--surface-2)}
+table.vdt tr.tot td{background:var(--accent-soft);font-weight:700}
+.vd-pay input{padding:4px 6px}
+.vd-pay input[type=number]{width:130px;text-align:right}
+.vd-pay input[type=date]{width:150px}
+.neg{color:var(--crit)}
 .vend-in::placeholder{color:var(--ink-3)}
 .vend-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .vend-chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
@@ -430,6 +439,7 @@ textarea{resize:vertical;min-height:60px}
       <button role="tab" data-tab="buy">구매 일정</button>
       <button role="tab" data-tab="labor">시공 진도</button>
       <button role="tab" data-tab="evm">기성</button>
+      <button role="tab" data-tab="vend">업체 관리</button>
       <button role="tab" data-tab="res">자원</button>
       <button role="tab" data-tab="set">설정</button>
     </div>
@@ -2078,6 +2088,156 @@ async function exportClaimXlsx(M, perId){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   toast("기성내역서 엑셀을 만들었습니다");
 }
+/* ---------- 업체 관리 ----------
+   data.vendors = [{ id, name, contract(계약금액), person, phone, email, note, payments:[{ id, date, amount, note }] }]
+   업체 이름으로 구매 일정(업체)과 시공 진도(줄 업체 → 없으면 작업의 업체·팀) 항목을 모읍니다.
+   기성률 = 완료액 / 담당 항목 총액 (자재는 입고, 노무·경비는 수행 기준)
+   지급 가능액 = 계약금액 × 기성률,  미지급 = 지급 가능액 − 지급 누계 */
+const vendorsOf = () => (state.data && state.data.vendors) || [];
+const buyRecvFrac = p => { const ds = deliveriesOf(p);
+  if(ds.length){ const tot = toNum(p.qty) || ds.reduce((a, d) => a + toNum(d.qty), 0); return tot ? Math.min(1, ds.filter(d => isDate(d.receivedDate)).reduce((a, d) => a + toNum(d.qty), 0) / tot) : 0; }
+  return isDate(p.receivedDate) ? 1 : 0; };
+function vendorModel(M){
+  const L = laborOf(), LF = laborProgress(M).lineFrac, map = new Map(), none = { n: 0, a: 0 };
+  const get = name => { const k = String(name).trim(); if(!map.has(k)) map.set(k, { name: k, reg: null, buys: [], labs: [], matTot: 0, matDone: 0, labTot: 0, labDone: 0, ordered: 0 }); return map.get(k); };
+  vendorsOf().forEach(v => { if(String(v.name || "").trim()) get(v.name).reg = v; });
+  purchasesOf().forEach(p => { const n = String(p.vendor || "").trim(), a = num(p.amount); if(!n){ none.n++; none.a += a; return; }
+    const o = get(n), f = buyRecvFrac(p); o.buys.push({ p, a, f }); o.matTot += a; o.matDone += a * f;
+    if(isDate(p.orderedDate) || deliveriesOf(p).some(d => isDate(d.orderedDate))) o.ordered += a; });
+  boqOf().filter(isLabLine).forEach(x => { const n = lineVendor(x, L), a = x.l + x.e; if(!n){ none.n++; none.a += a; return; }
+    const o = get(n), f = num(LF[x.r]); o.labs.push({ x, a, f }); o.labTot += a; o.labDone += a * f; });
+  const list = [...map.values()].map(o => {
+    o.tot = o.matTot + o.labTot; o.done = o.matDone + o.labDone; o.rate = o.tot ? o.done / o.tot : 0;
+    o.contract = o.reg ? num(o.reg.contract) : 0; o.paid = o.reg ? (o.reg.payments || []).reduce((a, x) => a + num(x.amount), 0) : 0;
+    o.payable = o.contract ? Math.trunc(o.contract * o.rate) : 0; o.unpaid = o.contract ? o.payable - o.paid : 0;
+    o.kind = o.matTot && o.labTot ? "자재·시공" : o.matTot || o.buys.length ? "자재" : o.labTot || o.labs.length ? "시공" : "–";
+    const ps = (o.reg && o.reg.payments || []).map(x => x.date).filter(isDate).sort(); o.lastPay = ps[ps.length - 1] || "";
+    return o; });
+  list.sort((a, b) => (b.contract || b.tot) - (a.contract || a.tot) || a.name.localeCompare(b.name));
+  return { list, none };
+}
+function renderVendors(M){
+  const { list, none } = vendorModel(M), ed = state.canEdit, w = wonM;
+  const pct = r => (r * 100).toFixed(1) + "%";
+  const sum = k => list.reduce((a, o) => a + o[k], 0);
+  const T = { contract: sum("contract"), payable: sum("payable"), paid: sum("paid"), unpaid: sum("unpaid"), tot: sum("tot"), done: sum("done") };
+  const cards = `<div class="evm-cards">
+    <div class="kpi"><span class="k">업체</span><span class="v">${list.length}곳</span><span class="s">계약 등록 ${list.filter(o => o.contract).length}곳</span></div>
+    <div class="kpi"><span class="k">계약 총액</span><span class="v">${w(T.contract / 1e6)}백만</span><span class="s">${w(T.contract)}원</span></div>
+    <div class="kpi"><span class="k">기성 기준 지급 가능액</span><span class="v">${w(T.payable / 1e6)}백만</span><span class="s">${T.contract ? pct(T.payable / T.contract) + " · 계약 × 업체별 기성률" : "계약금액을 넣으면 계산됩니다"}</span></div>
+    <div class="kpi"><span class="k">지급 누계</span><span class="v">${w(T.paid / 1e6)}백만</span><span class="s">${w(T.paid)}원</span></div>
+    <div class="kpi"><span class="k">미지급 (지급 가능 − 지급)</span><span class="v ${T.unpaid < 0 ? "bad" : ""}">${w(T.unpaid / 1e6)}백만</span><span class="s">${T.unpaid < 0 ? "기성보다 많이 지급됨" : w(T.unpaid) + "원"}</span></div></div>`;
+  if(!list.length) return cards + `<div class="panel empty"><h2>업체가 없습니다</h2><p>구매 일정이나 시공 진도에서 항목에 업체를 넣으면 여기에 모입니다.${ed ? " 아래 ‘업체 추가’로 먼저 등록해도 됩니다." : ""}</p>${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}</div>`;
+  const rows = list.map(o => `<tr data-vendor="${esc(o.name)}">
+      <td><b>${esc(o.name)}</b>${o.reg && o.reg.person ? `<div style="font-size:11.5px;color:var(--ink-3)">${esc(o.reg.person)}${o.reg.phone ? " · " + esc(o.reg.phone) : ""}</div>` : ""}</td>
+      <td><span class="pill ${o.kind === "자재" ? "p-po" : "p-prog"}">${o.kind}</span></td>
+      <td class="r num">${o.contract ? w(o.contract) : `<span class="note">${ed ? "미입력" : "–"}</span>`}</td>
+      <td class="r num">${w(o.tot)}<div style="font-size:11px;color:var(--ink-3)">${o.buys.length ? `자재 ${o.buys.length}건` : ""}${o.buys.length && o.labs.length ? " · " : ""}${o.labs.length ? `시공 ${o.labs.length}줄` : ""}</div></td>
+      <td class="r num">${w(o.done)}</td>
+      <td class="r num">${pct(o.rate)}<span class="meter big"><i style="width:${(o.rate * 100).toFixed(1)}%"></i></span></td>
+      <td class="r num">${o.contract ? w(o.payable) : "–"}</td>
+      <td class="r num">${o.paid ? w(o.paid) : "–"}${o.lastPay ? `<div style="font-size:11px;color:var(--ink-3)">최근 ${esc(fmtLong(o.lastPay))}</div>` : ""}</td>
+      <td class="r num ${o.unpaid < 0 ? "neg" : ""}">${o.contract ? w(o.unpaid) : "–"}</td>
+      <td class="r num">${o.contract ? w(o.contract - o.paid) : "–"}</td></tr>`).join("");
+  const foot = `<tr class="tot"><td>합계</td><td></td><td class="r num">${w(T.contract)}</td><td class="r num">${w(T.tot)}</td><td class="r num">${w(T.done)}</td><td class="r num">${T.tot ? pct(T.done / T.tot) : "–"}</td><td class="r num">${w(T.payable)}</td><td class="r num">${w(T.paid)}</td><td class="r num">${w(T.unpaid)}</td><td class="r num">${w(T.contract - T.paid)}</td></tr>`;
+  return cards + `<div class="buy-tools">${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}
+      ${none.n ? `<span class="note" style="margin:0">업체가 지정되지 않은 항목 ${none.n}건 · ${w(none.a)}원 (구매 일정·시공 진도에서 업체를 넣으면 여기에 더해집니다)</span>` : ""}</div>
+    <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r">계약금액</th><th class="r" title="구매 일정 + 시공 진도에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="계약금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="계약금액 − 지급 누계">계약 잔액</th></tr></thead>
+    <tbody>${rows}${foot}</tbody></table></div>
+    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 지급 가능액 = 계약금액 × 기성률. 업체를 누르면 계약금액·연락처·지급 내역을 넣고 담당 항목을 볼 수 있습니다.</p>`;
+}
+function openVendor(name){
+  const reg = name ? vendorsOf().find(v => String(v.name).trim() === name) : null;
+  state.drawer = { kind: "vendor", id: reg ? reg.id : null, origName: name || "", name: name || "", contract: reg ? reg.contract || "" : "", person: reg ? reg.person || "" : "",
+    phone: reg ? reg.phone || "" : "", email: reg ? reg.email || "" : "", note: reg ? reg.note || "" : "", pay: reg ? clone(reg.payments || []) : [], arm: false, showItems: false };
+  renderDrawer(); $("#drawer").classList.add("wide"); $("#drawer").hidden = false; $("#scrim").hidden = false;
+}
+function renderVendorDrawer(){
+  const dr = state.drawer, el = $("#drawer"), ed = state.canEdit, w = wonM;
+  const o = vendorModel(state.M).list.find(x => x.name === dr.origName) || { buys: [], labs: [], tot: 0, done: 0, rate: 0, matTot: 0, matDone: 0, labTot: 0, labDone: 0, ordered: 0 };
+  const contract = num(dr.contract), paid = dr.pay.reduce((a, x) => a + num(x.amount), 0), payable = contract ? Math.trunc(contract * o.rate) : 0;
+  const ro = ed ? "" : "disabled";
+  const payRows = dr.pay.map((x, i) => `<tr><td><input type="date" data-vpay="${i}" data-vpf="date" value="${esc(x.date || "")}" ${ro} aria-label="지급일"></td>
+      <td class="r"><input type="number" step="10000" data-vpay="${i}" data-vpf="amount" value="${x.amount ?? ""}" placeholder="0" ${ro} aria-label="지급액"></td>
+      <td><input type="text" data-vpay="${i}" data-vpf="note" value="${esc(x.note || "")}" placeholder="예: 1회 기성 지급" ${ro} aria-label="메모"></td>
+      <td>${ed ? `<button class="btn sm" data-vpdel="${i}" aria-label="지급 내역 삭제">삭제</button>` : ""}</td></tr>`).join("");
+  const st = p => isDate(p.receivedDate) ? "입고" : deliveriesOf(p).some(d => isDate(d.receivedDate)) ? "일부 입고" : isDate(p.orderedDate) ? "발주" : "발주 전";
+  const items = dr.showItems ? `<div class="imp-tbl"><table><thead><tr><th>구분</th><th>항목</th><th>작업</th><th class="r">금액</th><th class="r">완료</th><th>상태</th></tr></thead><tbody>
+      ${o.buys.map(b => `<tr><td>자재</td><td>${esc(b.p.name)} <span style="color:var(--ink-3)">${esc(b.p.spec || "")}</span></td><td class="mono">${esc((state.M.by.get(b.p.taskId) || {}).code || "")}</td><td class="r num">${w(b.a)}</td><td class="r num">${(b.f * 100).toFixed(0)}%</td><td>${st(b.p)}</td></tr>`).join("")}
+      ${o.labs.map(l => `<tr><td>${labKind(l.x)}</td><td>${esc(l.x.n)} <span style="color:var(--ink-3)">${esc(l.x.s || "")}</span></td><td class="mono">${esc((state.M.by.get(l.x.t) || {}).code || "")}</td><td class="r num">${w(l.a)}</td><td class="r num">${(l.f * 100).toFixed(0)}%</td><td>${l.f >= 1 ? "완료" : l.f > 0 ? "시공 중" : "미시공"}</td></tr>`).join("")}
+      ${o.buys.length + o.labs.length ? "" : `<tr><td colspan="6" class="note">이 업체로 지정된 항목이 없습니다.</td></tr>`}</tbody></table></div>` : "";
+  el.innerHTML = `<div class="d-head"><h2>${dr.id ? esc(dr.origName) : dr.origName ? esc(dr.origName) + " · 업체 등록" : "업체 추가"}</h2><button class="x" data-close aria-label="닫기">×</button></div>
+    <div class="d-body">
+      <div class="g3">
+        <div class="field"><label for="v-name">업체 이름</label><input type="text" id="v-name" value="${esc(dr.name)}" ${ro}></div>
+        <div class="field"><label for="v-contract">계약금액 (원)</label><input type="number" id="v-contract" step="1000000" min="0" value="${dr.contract}" placeholder="예: 500000000" ${ro}></div>
+        <div class="field"><label for="v-person">담당자</label><input type="text" id="v-person" value="${esc(dr.person)}" ${ro}></div>
+        <div class="field"><label for="v-phone">연락처</label><input type="text" id="v-phone" value="${esc(dr.phone)}" ${ro}></div>
+        <div class="field"><label for="v-email">이메일</label><input type="email" id="v-email" value="${esc(dr.email)}" ${ro}></div>
+        <div class="field"><label for="v-note">메모</label><input type="text" id="v-note" value="${esc(dr.note)}" placeholder="예: 토공 장비 · 부가세 별도" ${ro}></div>
+      </div>
+      ${dr.origName && dr.name.trim() && dr.name.trim() !== dr.origName ? `<p class="note">저장하면 구매 일정·시공 진도에서 ‘${esc(dr.origName)}’로 지정된 항목도 ‘${esc(dr.name.trim())}’(으)로 바뀝니다.</p>` : ""}
+      <div class="imp-sum">
+        <span class="chip">담당 항목 <b>${w(o.tot)}원</b></span>
+        <span class="chip">완료 <b>${w(o.done)}원</b></span>
+        <span class="chip">기성률 <b>${(o.rate * 100).toFixed(1)}%</b></span>
+        <span class="chip">지급 가능 <b id="vd-payable">${contract ? w(payable) + "원" : "–"}</b></span>
+        <span class="chip">지급 누계 <b id="vd-paid">${w(paid)}원</b></span>
+        <span class="chip">미지급 <b id="vd-unpaid" class="${payable - paid < 0 ? "neg" : ""}">${contract ? w(payable - paid) + "원" : "–"}</b></span></div>
+      <p class="note">자재 ${w(o.matDone)} / ${w(o.matTot)}원 (발주 ${w(o.ordered)}원) · 노무·경비 ${w(o.labDone)} / ${w(o.labTot)}원</p>
+      <h3 style="font-size:13.5px;margin:12px 0 6px">지급 내역</h3>
+      <div class="imp-tbl vd-pay"><table><thead><tr><th>지급일</th><th class="r">금액 (원)</th><th>메모</th><th></th></tr></thead><tbody>${payRows || `<tr><td colspan="4" class="note">아직 지급 내역이 없습니다.</td></tr>`}</tbody></table></div>
+      ${ed ? `<button class="btn sm" id="v-addpay" style="margin-top:6px">+ 지급 추가${contract && payable - paid > 0 ? ` (미지급 ${w(payable - paid)}원 채움)` : ""}</button>` : ""}
+      <h3 style="font-size:13.5px;margin:14px 0 6px">담당 항목 ${o.buys.length + o.labs.length}건 <button class="linkx" id="v-items">${dr.showItems ? "닫기" : "보기"}</button></h3>
+      ${items}
+      <div class="err" id="v-err"></div>
+    </div>
+    <div class="d-foot"><div>${ed && dr.id ? `<button class="btn danger ${dr.arm ? "armed" : ""}" id="v-del">${dr.arm ? "한 번 더 누르면 등록 삭제" : "업체 등록 삭제"}</button>` : ""}</div>
+      <div style="display:flex;gap:8px"><button class="btn" data-close>${ed ? "취소" : "닫기"}</button>${ed ? `<button class="btn primary" id="v-save">저장</button>` : ""}</div></div>`;
+}
+function vendorInput(e){
+  const dr = state.drawer; if(!dr || dr.kind !== "vendor") return false;
+  const t = e.target, F = { "v-name": "name", "v-contract": "contract", "v-person": "person", "v-phone": "phone", "v-email": "email", "v-note": "note" };
+  if(F[t.id]){ dr[F[t.id]] = t.value; if(e.type === "change" && (t.id === "v-name" || t.id === "v-contract")){ const sc = $(".d-body").scrollTop; renderVendorDrawer(); $(".d-body").scrollTop = sc; } return true; }
+  if(t.dataset && t.dataset.vpay){ const x = dr.pay[Number(t.dataset.vpay)]; if(!x) return true; x[t.dataset.vpf] = t.dataset.vpf === "amount" ? (t.value === "" ? "" : num(t.value)) : t.value;
+    if(t.dataset.vpf === "amount"){ const contract = num(dr.contract), M = state.M, o = vendorModel(M).list.find(v => v.name === dr.origName), rate = o ? o.rate : 0, payable = contract ? Math.trunc(contract * rate) : 0, paid = dr.pay.reduce((a, y) => a + num(y.amount), 0);
+      const a = $("#vd-paid"); if(a) a.textContent = wonM(paid) + "원"; const b = $("#vd-unpaid"); if(b && contract){ b.textContent = wonM(payable - paid) + "원"; b.classList.toggle("neg", payable - paid < 0); } }
+    return true; }
+  return false;
+}
+function vendorClick(e){
+  const row = e.target.closest("#view [data-vendor]"); if(row){ openVendor(row.dataset.vendor); return true; }
+  if(e.target.closest("#addVendor")){ openVendor(""); return true; }
+  const dr = state.drawer; if(!dr || dr.kind !== "vendor") return false;
+  const redraw = () => { const sc = $(".d-body").scrollTop; renderVendorDrawer(); $(".d-body").scrollTop = sc; };
+  if(e.target.closest("#v-items")){ dr.showItems = !dr.showItems; redraw(); return true; }
+  if(!state.canEdit) return false;
+  if(e.target.closest("#v-addpay")){ const o = vendorModel(state.M).list.find(v => v.name === dr.origName), contract = num(dr.contract);
+    const left = contract && o ? Math.trunc(contract * o.rate) - dr.pay.reduce((a, x) => a + num(x.amount), 0) : 0;
+    dr.pay.push({ id: "pay" + Date.now().toString(36), date: localToday(), amount: left > 0 ? left : "", note: "" }); redraw(); return true; }
+  const pd = e.target.closest("[data-vpdel]"); if(pd){ dr.pay.splice(Number(pd.dataset.vpdel), 1); redraw(); return true; }
+  if(e.target.closest("#v-save")){ saveVendor(); return true; }
+  if(e.target.closest("#v-del")){ if(!dr.arm){ dr.arm = true; redraw(); return true; }
+    commit(d => { d.vendors = (d.vendors || []).filter(v => v.id !== dr.id); }, "업체 등록(계약·지급 내역)을 삭제했습니다. 항목의 업체 지정은 그대로입니다.").then(ok => { if(ok) closeDrawer(); }); return true; }
+  return false;
+}
+async function saveVendor(){
+  const dr = state.drawer, err = $("#v-err"); err.textContent = "";
+  const name = dr.name.trim(); if(!name){ err.textContent = "업체 이름을 넣어 주세요."; return; }
+  if(vendorsOf().some(v => v.id !== dr.id && String(v.name).trim() === name)){ err.textContent = "같은 이름의 업체가 이미 등록되어 있습니다."; return; }
+  if(dr.pay.some(x => num(x.amount) && !isDate(x.date))){ err.textContent = "지급 내역의 지급일을 넣어 주세요."; return; }
+  const id = dr.id || "v" + Date.now().toString(36);
+  const rec = { id, name, contract: num(dr.contract), person: dr.person.trim(), phone: dr.phone.trim(), email: dr.email.trim(), note: dr.note.trim(),
+    payments: dr.pay.filter(x => num(x.amount)).map(x => ({ id: x.id || "pay" + Math.random().toString(36).slice(2, 8), date: x.date, amount: num(x.amount), note: String(x.note || "").trim() })).sort((a, b) => a.date < b.date ? -1 : 1) };
+  const old = dr.origName.trim(), rename = !!old && old !== name;
+  const btn = $("#v-save"); btn.disabled = true;
+  const ok = await commit(d => {
+    const V = d.vendors || (d.vendors = []); const i = V.findIndex(v => v.id === id); if(i >= 0) V[i] = rec; else V.push(rec);
+    if(rename){ (d.purchases || []).forEach(p => { if(String(p.vendor || "").trim() === old) p.vendor = name; });
+      const L = d.labor; if(L) ["vendor", "team"].forEach(k => { const m = L[k]; if(m) Object.keys(m).forEach(r => { if(String(m[r] || "").trim() === old) m[r] = name; }); }); }
+  }, rename ? `업체를 저장하고 항목의 업체 이름도 ‘${name}’(으)로 바꿨습니다` : "업체를 저장했습니다");
+  if(ok){ $("#drawer").classList.remove("wide"); closeDrawer(); } else if($("#v-save")) $("#v-save").disabled = false;
+}
 /* ---- 진도 입력 창 ---- */
 function openPeriod(id, preset){
   const per = id ? periodsOf().find(x => x.id === id) : null;
@@ -2369,6 +2529,7 @@ function render(){
   else if(state.tab==="labor") v.insertAdjacentHTML("beforeend", renderLabor(M));
   else if(state.tab==="evm") v.insertAdjacentHTML("beforeend", renderEvm(M));
   else if(state.tab==="res") v.insertAdjacentHTML("beforeend", renderRes(M));
+  else if(state.tab==="vend") v.insertAdjacentHTML("beforeend", renderVendors(M));
   else v.insertAdjacentHTML("beforeend", renderList(M));
 }
 
@@ -2788,6 +2949,7 @@ function renderDrawer(){
   if(dr.kind === "buy"){ renderBuyDrawer(); return; }
   if(dr.kind === "period"){ renderPeriodDrawer(); return; }
   if(dr.kind === "print"){ renderPrintDrawer(); return; }
+  if(dr.kind === "vendor"){ renderVendorDrawer(); return; }
   const M = state.M; const raw = dr.id ? tasksOf().find(t=>t.id===dr.id) : null;
   const t = dr.id && M ? M.by.get(dr.id) : null;
   const codeOf = id => (tasksOf().find(x=>x.id===id)||{}).code;
@@ -3393,6 +3555,7 @@ document.addEventListener("click", e => {
   if(e.target.closest("#f-dup")){ const src = tasksOf().find(t => t.id === state.drawer.id); if(src){ state.drawer = { id: null, arm: false, copy: src }; renderDrawer(); } return; }
   if(periodClick(e)) return;
   if(claimClick(e)) return;
+  if(vendorClick(e)) return;
   if(resClick(e)) return;
   if(e.target.closest("#b-save")){ saveBuy(); return; }
   if(e.target.closest("#b-del")){ deleteBuy(); return; }
@@ -3422,6 +3585,7 @@ document.addEventListener("change", e => {
   if(e.target.id === "b-task") updateBuyCalc();
   if(splitEditorEvent(e)) return;
   if(periodInput(e)) return;
+  if(vendorInput(e)) return;
   if(resInput(e)) return;
   { const tr = e.target.closest && e.target.closest("[data-tri]"); if(tr && state.drawer && state.drawer.res){ const x = state.drawer.res[Number(tr.dataset.tri)]; x[e.target.dataset.trf] = e.target.dataset.trf === "qty" ? e.target.value : e.target.value; renderTaskRes(); return; } }
   const dr = state.drawer;
@@ -3449,7 +3613,7 @@ document.addEventListener("drop", e => {
 document.addEventListener("input", e => {
   if(["f-o","f-m","f-p","f-ms"].includes(e.target.id)) updateTe();
   if(["b-task","b-lead","b-buf"].includes(e.target.id)) updateBuyCalc();
-  splitEditorEvent(e); periodInput(e); resInput(e);
+  splitEditorEvent(e); periodInput(e); resInput(e); vendorInput(e);
   if(e.target.id === "buy-search" && !e.isComposing) scheduleBuySearch(e.target);
   if(e.target.id === "lab-search" && !e.isComposing) scheduleLabSearch();
   if(e.target.dataset && e.target.dataset.lqty) laborInput(e);   // 한글 조합 중에는 다시 그리지 않음
@@ -3524,7 +3688,7 @@ function onUser(user){
   }, () => { state.mode = "denied"; afterData(); });
 }
 async function boot(){
-  if(!["gantt","net","list","buy","labor","evm","res","set"].includes(state.tab)) state.tab = "gantt";
+  if(!["gantt","net","list","buy","labor","evm","vend","res","set"].includes(state.tab)) state.tab = "gantt";
   if(![5,12,24].includes(state.zoom)) state.zoom = 12;
   if(state.mode === "demo"){ state.projects = { main: sampleData(), vinyl: sampleVinyl() }; setCurrent(); afterData(); return; }
   render();
