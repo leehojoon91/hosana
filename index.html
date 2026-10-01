@@ -2124,13 +2124,18 @@ function vendorModel(M){
     const all = [...o.buys, ...o.labs]; o.noAmt = all.filter(x => !(x.a > 0)).length;
     o.rate = o.tot ? o.done / o.tot : 0;                                       // 금액 기준 (금액 없는 항목은 빠짐)
     o.contract = o.reg ? num(o.reg.contract) : 0; o.paid = o.reg ? (o.reg.payments || []).reduce((a, x) => a + num(x.amount), 0) : 0;
-    o.payable = o.contract ? Math.trunc(o.contract * o.rate) : 0; o.unpaid = o.contract ? o.payable - o.paid : 0;
+    o.payable = o.contract ? Math.trunc(o.contract * o.rate) : 0; o.payRate = o.contract ? o.paid / o.contract : null; o.unpaid = o.contract ? o.payable - o.paid : 0;
     o.kind = o.matTot && o.labTot ? "자재·시공" : o.matTot || o.buys.length ? "자재" : o.labTot || o.labs.length ? "시공" : "–";
     const ps = (o.reg && o.reg.payments || []).map(x => x.date).filter(isDate).sort(); o.lastPay = ps[ps.length - 1] || "";
     return o; });
   list.sort((a, b) => (b.contract || b.tot) - (a.contract || a.tot) || a.name.localeCompare(b.name));
   return { list, none };
 }
+/* 지급률(지급 누계 ÷ 발주금액)과 기성률 비교: 지급률이 기성률보다 높으면 기성보다 먼저 지급된 것 */
+const payGap = (payRate, rate) => { if(payRate == null) return ""; const d = (payRate - rate) * 100;
+  if(Math.abs(d) < 0.05) return `<div style="font-size:11px;color:var(--good)">기성률과 같음</div>`;
+  return d > 0 ? `<div style="font-size:11px;color:var(--crit)" title="기성보다 많이 지급됨">기성률보다 +${d.toFixed(1)}%p</div>`
+               : `<div style="font-size:11px;color:var(--ink-3)" title="기성보다 덜 지급됨 (미지급 있음)">기성률보다 ${d.toFixed(1)}%p</div>`; };
 function renderVendors(M){
   const { list, none } = vendorModel(M), ed = state.canEdit, w = wonM;
   const pct = r => (r * 100).toFixed(1) + "%";
@@ -2141,6 +2146,7 @@ function renderVendors(M){
     <div class="kpi"><span class="k">업체 발주금액 합계</span><span class="v">${w(T.contract / 1e6)}백만</span><span class="s">${w(T.contract)}원</span></div>
     <div class="kpi"><span class="k">기성 기준 지급 가능액</span><span class="v">${w(T.payable / 1e6)}백만</span><span class="s">${T.contract ? pct(T.payable / T.contract) + " · 발주금액 × 업체별 기성률" : "업체 발주금액을 넣으면 계산됩니다"}</span></div>
     <div class="kpi"><span class="k">지급 누계</span><span class="v">${w(T.paid / 1e6)}백만</span><span class="s">${w(T.paid)}원</span></div>
+    <div class="kpi"><span class="k">지급률 / 기성률</span><span class="v ${T.contract && T.paid / T.contract > T.payable / T.contract + 0.0005 ? "bad" : ""}">${T.contract ? pct(T.paid / T.contract) : "–"}</span><span class="s">${T.contract ? "기성률 " + pct(T.payable / T.contract) + " · 발주금액 기준" : "업체 발주금액을 넣으면 계산됩니다"}</span></div>
     <div class="kpi"><span class="k">미지급 (지급 가능 − 지급)</span><span class="v ${T.unpaid < 0 ? "bad" : ""}">${w(T.unpaid / 1e6)}백만</span><span class="s">${T.unpaid < 0 ? "기성보다 많이 지급됨" : w(T.unpaid) + "원"}</span></div></div>`;
   if(!list.length) return cards + `<div class="panel empty"><h2>업체가 없습니다</h2><p>구매 일정이나 시공 진도에서 항목에 업체를 넣으면 여기에 모입니다.${ed ? " 아래 ‘업체 추가’로 먼저 등록해도 됩니다." : ""}</p>${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}</div>`;
   const payList = o => ((o.reg && o.reg.payments) || []).slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
@@ -2154,24 +2160,25 @@ function renderVendors(M){
       <td class="r num">${pct(o.rate)}${o.noAmt ? `<div style="font-size:11px;color:var(--warn,#A86A00)" title="금액이 없는 항목은 기성률에 들어가지 않습니다">금액 없음 ${o.noAmt}건</div>` : ""}<span class="meter big"><i style="width:${(o.rate * 100).toFixed(1)}%"></i></span></td>
       <td class="r num">${o.contract ? w(o.payable) : "–"}</td>
       <td class="r num">${o.paid ? w(o.paid) : "–"}${pays.length ? `<div style="font-size:11px;color:var(--ink-3)">${pays.length}회 지급</div>` : ""}</td>
+      <td class="r num">${o.payRate == null ? "–" : `${pct(o.payRate)}<span class="meter big"><i style="width:${Math.min(100, o.payRate * 100).toFixed(1)}%;background:${o.payRate > o.rate + 0.0005 ? "var(--crit)" : "var(--prog)"}"></i></span>${payGap(o.payRate, o.rate)}`}</td>
       <td class="r num ${o.unpaid < 0 ? "neg" : ""}">${o.contract ? w(o.unpaid) : "–"}</td>
       <td class="r num">${o.contract ? w(o.contract - o.paid) : "–"}</td>
       <td>${ed ? `<button class="btn sm" data-vpadd="${esc(o.name)}">${open ? "닫기" : "지급 추가"}</button>` : ""}</td></tr>`;
-    const hist = pays.length ? `<tr class="vh"><td></td><td colspan="10"><div class="payh"><span class="note" style="margin:0">지급 내역</span>${pays.map((x, k) =>
+    const hist = pays.length ? `<tr class="vh"><td></td><td colspan="11"><div class="payh"><span class="note" style="margin:0">지급 내역</span>${pays.map((x, k) =>
         `<span class="pc">${k + 1}차 · ${esc(fmtLong(x.date))} · <b>${w(num(x.amount))}원</b>${x.note ? ` · ${esc(x.note)}` : ""}${ed ? `<button class="x2" data-vpx="${esc(o.name)}" data-vpid="${esc(x.id)}" title="이 지급 내역 삭제" aria-label="${k + 1}차 지급 삭제">✕</button>` : ""}</span>`).join("")}</div></td></tr>` : "";
-    const form = open ? `<tr class="vh"><td></td><td colspan="10"><div class="payf"><b style="font-size:12.5px">${pays.length + 1}차 지급</b>
+    const form = open ? `<tr class="vh"><td></td><td colspan="11"><div class="payf"><b style="font-size:12.5px">${pays.length + 1}차 지급</b>
         <input type="date" id="vp-date" value="${localToday()}" aria-label="지급일">
         <input type="number" id="vp-amt" min="0" step="10000" value="${o.contract && o.unpaid > 0 ? o.unpaid : ""}" placeholder="지급액 (원)" aria-label="지급액">
         <input type="text" id="vp-note" value="${pays.length + 1}차 기성 지급" style="width:200px" aria-label="메모">
         <button class="btn sm primary" id="vp-save" data-vname="${esc(o.name)}">기록</button><button class="btn sm" data-vpadd="${esc(o.name)}">취소</button>
         ${o.contract && o.unpaid > 0 ? `<span class="note" style="margin:0">미지급 ${w(o.unpaid)}원을 채워 두었습니다</span>` : ""}</div></td></tr>` : "";
     return main + hist + form; }).join("");
-  const foot = `<tr class="tot"><td>합계</td><td></td><td class="r num">${w(T.contract)}</td><td class="r num">${w(T.tot)}</td><td class="r num">${w(T.done)}</td><td class="r num">${T.tot ? pct(T.done / T.tot) : "–"}</td><td class="r num">${w(T.payable)}</td><td class="r num">${w(T.paid)}</td><td class="r num">${w(T.unpaid)}</td><td class="r num">${w(T.contract - T.paid)}</td><td></td></tr>`;
+  const foot = `<tr class="tot"><td>합계</td><td></td><td class="r num">${w(T.contract)}</td><td class="r num">${w(T.tot)}</td><td class="r num">${w(T.done)}</td><td class="r num">${T.tot ? pct(T.done / T.tot) : "–"}</td><td class="r num">${w(T.payable)}</td><td class="r num">${w(T.paid)}</td><td class="r num">${T.contract ? pct(T.paid / T.contract) : "–"}</td><td class="r num">${w(T.unpaid)}</td><td class="r num">${w(T.contract - T.paid)}</td><td></td></tr>`;
   return cards + `<div class="buy-tools">${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}
       ${none.n ? `<span class="note" style="margin:0">업체가 지정되지 않은 항목 ${none.n}건 · ${w(none.a)}원 (구매 일정·시공 진도에서 업체를 넣으면 여기에 더해집니다)</span>` : ""}</div>
-    <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r" title="이 업체에 발주(계약)한 금액">업체 발주금액</th><th class="r" title="구매 일정 + 시공 진도에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="업체 발주금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="업체 발주금액 − 지급 누계">발주 잔액</th><th></th></tr></thead>
+    <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r" title="이 업체에 발주(계약)한 금액">업체 발주금액</th><th class="r" title="구매 일정 + 시공 진도에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="업체 발주금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 누계 ÷ 업체 발주금액. 기성률과 비교해 기성보다 많이/적게 지급됐는지 봅니다">지급률</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="업체 발주금액 − 지급 누계">발주 잔액</th><th></th></tr></thead>
     <tbody>${rows}${foot}</tbody></table></div>
-    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 금액은 구매 항목의 금액(내역서로 만든 프로젝트는 자동)을 쓰고, 금액이 없는 항목은 기성률에 들어가지 않습니다. 업체를 눌러 담당 항목에서 금액을 바로 넣을 수 있습니다. 지급 가능액 = 업체 발주금액 × 기성률. ‘지급 추가’로 지급할 때마다 1차·2차… 내역이 쌓입니다. 업체 이름을 누르면 연락처·지급 내역 수정과 담당 항목을 볼 수 있습니다.</p>`;
+    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 금액은 구매 항목의 금액(내역서로 만든 프로젝트는 자동)을 쓰고, 금액이 없는 항목은 기성률에 들어가지 않습니다. 업체를 눌러 담당 항목에서 금액을 바로 넣을 수 있습니다. 지급 가능액 = 업체 발주금액 × 기성률. 지급률 = 지급 누계 ÷ 업체 발주금액이며, 기성률보다 높으면(빨간색) 공사한 것보다 먼저 지급된 것입니다. ‘지급 추가’로 지급할 때마다 1차·2차… 내역이 쌓입니다. 업체 이름을 누르면 연락처·지급 내역 수정과 담당 항목을 볼 수 있습니다.</p>`;
 }
 function openVendor(name){
   const reg = name ? vendorsOf().find(v => String(v.name).trim() === name) : null;
@@ -2211,6 +2218,7 @@ function renderVendorDrawer(){
         <span class="chip">기성률 <b>${(o.rate * 100).toFixed(1)}%</b></span>
         <span class="chip">지급 가능 <b id="vd-payable">${contract ? w(payable) + "원" : "–"}</b></span>
         <span class="chip">지급 누계 <b id="vd-paid">${w(paid)}원</b></span>
+        <span class="chip">지급률 <b>${contract ? (paid / contract * 100).toFixed(1) + "%" : "–"}</b></span>
         <span class="chip">미지급 <b id="vd-unpaid" class="${payable - paid < 0 ? "neg" : ""}">${contract ? w(payable - paid) + "원" : "–"}</b></span></div>
       ${o.noAmt ? `<p class="note" style="color:var(--warn,#A86A00)">금액이 없는 항목 ${o.noAmt}건은 기성률에 들어가지 않습니다.${state.canEdit ? " 아래 ‘담당 항목’에서 자재 금액을 바로 넣고 저장하세요." : ""}</p>` : ""}
       <p class="note">자재 ${w(o.matDone)} / ${w(o.matTot)}원 (발주 ${w(o.ordered)}원) · 노무·경비 ${w(o.labDone)} / ${w(o.labTot)}원</p>
