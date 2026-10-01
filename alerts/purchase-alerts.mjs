@@ -79,10 +79,44 @@ export function scheduleStarts(project, tasks, statusDate) {
 export const BUY_LABEL = { late: "발주 지연", soon: "발주 임박", plan: "발주 예정", etaLate: "입고 늦음 예상", overdue: "입고 지연", ordered: "발주 완료", recv: "입고 완료", nolink: "공정 미연결" };
 export const ALERT_STATES = new Set(["late", "soon", "overdue", "etaLate"]);
 
+const toNum = v => { if (typeof v === "number") return v; const n = Number(String(v ?? "").replace(/[,\s]/g, "")); return Number.isFinite(n) ? n : 0; };
+const ORDER = { late: 0, overdue: 1, etaLate: 2, soon: 3, plan: 4, nolink: 5, ordered: 6, recv: 7 };
+/* 분할 납품 (index.html 의 splitPurchase 와 같은 규칙) */
+function splitPurchase(p, t, starts, statusDate, alertDays) {
+  const lead = num(p.lead);
+  const list = p.deliveries.map((d, i) => {
+    const dt = d.mode === "task" ? starts.get(d.taskId) : null;
+    const buf = d.buffer === "" || d.buffer == null ? num(p.buffer) : num(d.buffer);
+    const needBy = d.mode === "task" ? (dt && dt.startDate ? shiftDate(dt.startDate, -buf) : "") : (isDate(d.date) ? d.date : "");
+    const ordered = isDate(d.orderedDate) ? d.orderedDate : isDate(p.orderedDate) ? p.orderedDate : "";
+    const orderBy = needBy ? shiftDate(needBy, -lead) : "";
+    const eta = ordered && (i === 0 || isDate(d.orderedDate)) ? shiftDate(ordered, lead) : "";
+    const due = needBy && eta ? (eta > needBy ? eta : needBy) : (needBy || eta);
+    let st;
+    if (isDate(d.receivedDate)) st = "recv";
+    else if (ordered) st = due && statusDate > due ? "overdue" : (eta && needBy && eta > needBy) ? "etaLate" : "ordered";
+    else if (!orderBy) st = "nolink";
+    else if (statusDate > orderBy) st = "late";
+    else if (dayCount(statusDate, orderBy) <= alertDays) st = "soon";
+    else st = "plan";
+    return { ...d, n: i + 1, task: dt || t, needBy, orderBy, ordered, eta, due, st };
+  });
+  const open = list.filter(x => x.st !== "recv");
+  const worst = open.length ? open.reduce((a, b) => ORDER[b.st] < ORDER[a.st] ? b : a) : null;
+  const next = open.slice().sort((a, b) => String(a.due || "9").localeCompare(String(b.due || "9")))[0] || null;
+  const pending = list.filter(x => !x.ordered && x.orderBy).map(x => x.orderBy).sort()[0] || "";
+  const first = list.map(x => x.orderBy).filter(Boolean).sort()[0] || "";
+  const st = worst ? worst.st : "recv";
+  const dleft = ["late", "soon", "plan"].includes(st) ? (pending ? dayCount(statusDate, pending) : null) : (next && next.due ? dayCount(statusDate, next.due) : null);
+  return { ...p, task: (worst && worst.task) || t, needBy: worst ? worst.needBy : "", orderBy: pending || first, eta: worst ? worst.due : "", st, dleft,
+    split: { list, worst, next, total: list.length, recv: list.length - open.length } };
+}
+
 export function computePurchases(data, statusDate) {
   const starts = scheduleStarts(data.project || {}, data.tasks || [], statusDate);
   return (data.purchases || []).map(p => {
     const t = p.taskId ? starts.get(p.taskId) : null;
+    if (Array.isArray(p.deliveries) && p.deliveries.length) return splitPurchase(p, t, starts, statusDate, p.alertDays === "" || p.alertDays == null ? 7 : num(p.alertDays));
     const needBy = t && t.startDate ? shiftDate(t.startDate, -num(p.buffer)) : "";
     const orderBy = needBy ? shiftDate(needBy, -num(p.lead)) : "";
     const eta = isDate(p.orderedDate) ? shiftDate(p.orderedDate, num(p.lead)) : "";
@@ -115,7 +149,12 @@ export function collectAlerts(docs, today = todayKST()) {
 /* ---------------- e-mail ---------------- */
 const escHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const COLOR = { late: "#B3261E", overdue: "#B3261E", etaLate: "#B3261E", soon: "#8A5A00" };
-const whenTxt = x => x.st === "overdue" ? `입고 예정 ${fmt(x.eta)} 지남` : x.st === "etaLate" ? `입고 예정 ${fmt(x.eta)} > 필요일 ${fmt(x.needBy)}` : `${fmt(x.orderBy)} (${ddayTxt(x.dleft)})`;
+const whenTxt = x => {
+  const w = x.split && x.split.worst, part = w ? `${w.n}차 ${w.qty} ${x.unit || ""}`.trim() : "";
+  if (x.st === "overdue") return w ? `${part} 납품 예정 ${fmt(w.due)} 지남` : `입고 예정 ${fmt(x.eta)} 지남`;
+  if (x.st === "etaLate") return w ? `${part} 도착 ${fmt(w.eta)} > 필요일 ${fmt(w.needBy)}` : `입고 예정 ${fmt(x.eta)} > 필요일 ${fmt(x.needBy)}`;
+  return `${fmt(x.orderBy)} (${ddayTxt(x.dleft)})` + (x.split ? ` · 분할 ${x.split.total}회 납품` : "");
+};
 
 export function buildEmail(items, { siteUrl, date, recipientLabel = "" }) {
   const late = items.filter(x => x.st === "late").length, soon = items.filter(x => x.st === "soon").length;
