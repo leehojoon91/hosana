@@ -106,6 +106,19 @@ details.imp summary{cursor:pointer;font-size:13px;color:var(--ink-2);margin:6px 
 .dday.bad{color:var(--bad);font-weight:600} .dday.warn{color:var(--warn);font-weight:600}
 tbody tr.b{cursor:pointer} tbody tr.b:hover{background:var(--surface-2)}
 tr.b.recv td{color:var(--ink-3)}
+tr.bgrp td{background:var(--surface-2);font-size:13px;border-top:2px solid var(--line)}
+tr.bgrp .gsum{color:var(--ink-2);font-weight:400;margin-left:8px}
+tr.bgrp .gsum b{font-family:var(--mono)}
+tr.b.sel td{background:var(--prog-soft)}
+.buy-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.buy-tools select,.buy-tools input[type=search]{width:auto;padding:5px 8px}
+.buy-tools input[type=search]{width:200px}
+.bulk{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;flex-direction:column;align-items:stretch}
+.bulk .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bulk input[type=date]{width:auto}
+.bulk input[type=text],.bulk input[type=email]{width:130px}
+.bulk input[type=number]{width:64px}
+.bulk .sep{width:1px;height:20px;background:var(--line)}
 .lk{fill:none;stroke:var(--ink-3);stroke-width:1;opacity:.75}
 .lk.crit{stroke:var(--crit);stroke-width:1.4;opacity:.95}
 .lk-g:hover .lk{stroke:var(--ink);stroke-width:2;opacity:1}
@@ -603,7 +616,7 @@ function setCurrent(){
 }
 function selectProject(id){
   if(id === state.pid) return;
-  state.pid = id; store.set("pid", id); state.draftOff = null; state.resDraft = null; state.sel = []; closeDrawer();
+  state.pid = id; store.set("pid", id); state.draftOff = null; state.resDraft = null; state.sel = []; state.buySel = new Set(); state.buyClosed = null; closeDrawer();
   setCurrent(); afterData();
 }
 const memberRef = email => FB.doc(db, "members", email);
@@ -971,7 +984,7 @@ function runImport(){
 async function handleImportFile(file){
   const dr = state.drawer; if(!dr || dr.kind !== "project") return;
   saveNpForm();
-  dr.imp = { fileName: file.name, loading: true, opt: { dailyLabor: 1200000, minMat: 500000, level: 2 } };
+  dr.imp = { fileName: file.name, loading: true, opt: { dailyLabor: 1200000, minMat: 0, level: 2 } };
   renderDrawer();
   try{
     if(!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name)) throw new Error("엑셀 파일(.xlsx, .xls)을 올려 주세요.");
@@ -1013,7 +1026,7 @@ function renderImport(imp){
       </div>
       <div class="imp-map">
         <div><label for="opt-labor">하루 투입 노무비 (원)</label><input type="number" id="opt-labor" step="100000" value="${imp.opt.dailyLabor}"></div>
-        <div><label for="opt-min">이 금액 미만 자재는 잡자재로 묶음 (원)</label><input type="number" id="opt-min" step="100000" value="${imp.opt.minMat}"></div>
+        <div><label for="opt-min">이 금액 미만 자재는 잡자재로 묶음 (원, 0 = 묶지 않고 모두 개별)</label><input type="number" id="opt-min" step="100000" value="${imp.opt.minMat}"></div>
         <div><label for="opt-level">작업 묶는 단위</label><select id="opt-level"><option value="2" ${imp.opt.level===2?"selected":""}>세부 공종 (7-1, 7-2 …)</option><option value="1" ${imp.opt.level===1?"selected":""}>큰 공종 (1, 2, 3 …)</option></select></div>
       </div>
       <p class="note">기간(최빈) = 작업 노무비 ÷ 하루 투입 노무비. 낙관은 ×0.75, 비관은 ×1.5로 잡습니다. 예: 5인 × 24만 원 = 120만 원/일.</p>
@@ -1110,7 +1123,7 @@ function splitRows(x, M){
     const [lab, cls] = BUY_ST[d.st];
     const ref = d.st === "recv" ? null : d.ordered ? d.due : d.orderBy;
     const dd = ref ? dayCount(M.statusDate, ref) : null;
-    return `<tr class="b sub ${d.st === "recv" ? "recv" : ""}" data-buy="${esc(x.id)}">
+    return `<tr class="b sub ${d.st === "recv" ? "recv" : ""}" data-buy="${esc(x.id)}">${state.canEdit ? "<td></td>" : ""}
       <td><span class="pill ${cls}">${lab}</span></td>
       <td style="padding-left:22px">└ ${d.n}차</td>
       <td class="r num">${esc(d.qty)} ${esc(x.unit || "")}</td>
@@ -1132,11 +1145,17 @@ function renderPurchases(M){
   if(!L.length) return `<div class="panel empty"><h2>등록된 구매 항목이 없습니다</h2>
     <p>자재마다 쓰일 공정과 조달기간을 넣으면, 공정 일정에 맞춰 발주 기한이 자동으로 계산됩니다.</p>
     ${state.canEdit ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px"><button class="btn primary" id="buySample">샘플 구매 목록 넣기</button><button class="btn" id="addBuy2">구매 항목 추가</button></div>` : ""}</div>`;
-  const rows = L.map(x => {
+  const ed = state.canEdit, view = state.buyView || "task", filt = state.buyFilter || "all", qtxt = (state.buySearch || "").trim().toLowerCase();
+  const selSet = state.buySel || (state.buySel = new Set());
+  const ORDERED = ["ordered","etaLate","overdue"], TODO = ["late","soon","plan","nolink"];
+  const FILT = { all: () => true, todo: x => TODO.includes(x.st), urgent: x => ["late","soon","overdue","etaLate"].includes(x.st), ordered: x => ORDERED.includes(x.st), recv: x => x.st === "recv" };
+  const V = L.filter(FILT[filt] || FILT.all).filter(x => !qtxt || [x.name, x.spec, x.vendor, x.owner, x.t && x.t.name, x.t && x.t.code].some(v => String(v || "").toLowerCase().includes(qtxt)));
+  const row = x => {
     const [lab, cls] = BUY_ST[x.st];
     const dcls = x.st === "late" ? "bad" : x.st === "soon" ? "warn" : "";
     const task = x.t ? `<span class="mono" style="color:var(--ink-3)">${esc(x.t.code)}</span> ${esc(x.t.name)}` : `<span style="color:var(--ink-3)">–</span>`;
-    return `<tr class="b ${x.st==="recv"?"recv":""}" data-buy="${esc(x.id)}">
+    return `<tr class="b ${x.st==="recv"?"recv":""} ${selSet.has(x.id)?"sel":""}" data-buy="${esc(x.id)}">
+      ${ed ? `<td class="ck"><input type="checkbox" data-bsel="${esc(x.id)}" ${selSet.has(x.id) ? "checked" : ""} aria-label="${esc(x.name)} 선택"></td>` : ""}
       <td><span class="pill ${cls}">${lab}</span></td>
       <td><b style="font-weight:600">${esc(x.name)}</b>${x.spec?`<div style="font-size:12px;color:var(--ink-3)">${esc(x.spec)}</div>`:""}${x.split ? splitSummary(x) : ""}</td>
       <td class="r num">${esc(x.qty||"")} ${esc(x.unit||"")}</td>
@@ -1148,20 +1167,125 @@ function renderPurchases(M){
       <td class="num">${x.eta ? esc(fmt(x.eta)) : "–"}</td>
       <td>${esc(x.vendor||"")}</td>
       <td>${esc(x.owner||"")}</td>
-      ${state.canEdit ? `<td>${x.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${esc(fmt(x.receivedDate))} 입고</span>`
+      ${ed ? `<td>${x.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${esc(fmt(x.receivedDate))} 입고</span>`
         : (x.split ? x.split.list.every(d => d.ordered) : x.eta) ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" title="오늘 날짜로 입고일을 기록합니다">${x.split && x.split.next ? x.split.next.n + "차 입고" : "입고 완료"}</button>`
         : `<button class="btn sm go" data-quick="order" data-id="${esc(x.id)}" title="오늘 날짜로 발주일을 기록합니다">발주 완료</button>`}</td>` : ""}</tr>` + (x.split ? splitRows(x, M) : "");
-  }).join("");
+  };
+  const ncol = 12 + (ed ? 1 : 0);
+  let rows = "";
+  if(view === "task"){
+    const order = new Map(); M.groups.forEach(g => g.items.forEach(t => order.set(t.id, order.size)));
+    const groups = new Map();
+    V.forEach(x => { const k = x.t ? x.t.id : "_none"; if(!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
+    const keys = [...groups.keys()].sort((a, b) => (order.has(a) ? order.get(a) : 1e9) - (order.has(b) ? order.get(b) : 1e9));
+    if(!state.buyClosed) state.buyClosed = new Set(V.length > 150 ? keys : []);
+    keys.forEach(k => {
+      const list = groups.get(k).sort((a, b) => (BUY_ORDER[a.st] - BUY_ORDER[b.st]) || String(a.orderBy || "9").localeCompare(String(b.orderBy || "9")));
+      const t = k === "_none" ? null : M.by.get(k);
+      const c = st => list.filter(x => st.includes(x.st)).length;
+      const nLate = c(["late","overdue","etaLate"]), nTodo = c(TODO), nOrd = c(ORDERED), nRecv = c(["recv"]);
+      const first = list.filter(x => TODO.includes(x.st) && x.orderBy).map(x => x.orderBy).sort()[0];
+      const allSel = list.every(x => selSet.has(x.id)), someSel = !allSel && list.some(x => selSet.has(x.id));
+      const closed = state.buyClosed.has(k);
+      const amt = list.reduce((s, x) => s + (num(x.amount) || 0), 0);
+      rows += `<tr class="bgrp">${ed ? `<td class="ck"><input type="checkbox" data-bgsel="${esc(k)}" ${allSel ? "checked" : ""} ${someSel ? 'data-some="1"' : ""} aria-label="이 공정 자재 모두 선택" title="이 공정의 자재 ${list.length}건 모두 선택"></td>` : ""}
+        <td colspan="${ncol - (ed ? 1 : 0)}"><button class="linkx" data-bgtoggle="${esc(k)}" style="text-decoration:none;font-size:13px">${closed ? "▸" : "▾"}</button>
+        <b>${t ? `<span class="mono" style="color:var(--ink-3)">${esc(t.code)}</span> ${esc(t.name)}` : "공정 미연결"}</b>
+        <span class="gsum">${list.length}건${amt ? ` · ${wonM(amt)}원` : ""} · 발주 전 <b>${nTodo}</b> · 발주 완료 <b>${nOrd}</b> · 입고 <b>${nRecv}</b>${nLate ? ` · <span class="late">지연 ${nLate}</span>` : ""}${first ? ` · 가장 이른 발주 기한 <b>${esc(fmt(first))}</b>` : ""}${t && t.startDate ? ` · 공정 시작 ${esc(fmt(t.startDate))}` : ""}</span></td></tr>`;
+      if(!closed) rows += list.map(row).join("");
+    });
+  } else rows = V.map(row).join("");
+  const today = localToday();
+  const bulk = ed && selSet.size ? `<div class="selbar bulk"><div class="row"><b>${selSet.size}개 선택</b>
+      <label>날짜 <input type="date" id="bk-date" value="${esc(state.bkDate || today)}"></label>
+      <button class="btn sm go" data-bk="order">발주 완료</button><button class="btn sm ok" data-bk="recv">입고 완료</button><button class="btn sm" data-bk="unorder" title="발주일·입고일을 지웁니다">발주 취소</button>
+      <span class="sep"></span><button class="btn sm danger" data-bk="del">${state.bkDelArm ? "한 번 더 누르면 삭제" : "삭제"}</button><button class="btn sm" data-bk="clear">선택 해제</button></div>
+    <div class="row"><input type="text" id="bk-vendor" placeholder="업체"><input type="text" id="bk-owner" placeholder="담당자"><input type="email" id="bk-mail" placeholder="담당자 이메일"><button class="btn sm" data-bk="who">업체·담당자 지정</button>
+      <span class="sep"></span>조달 <input type="number" id="bk-lead" min="0" placeholder="일"> 여유 <input type="number" id="bk-buf" min="0" placeholder="일"><button class="btn sm" data-bk="lead">기간 변경</button></div></div>` : "";
+  const tools = `<div class="buy-tools">
+      <span class="seg">${[["task","공정별"],["urgent","급한 순"]].map(([k,l]) => `<button data-bview="${k}" class="${view===k?"on":""}">${l}</button>`).join("")}</span>
+      <select id="buy-filter" aria-label="상태 거르기">${[["all","전체"],["todo","발주 전"],["urgent","지연·임박만"],["ordered","발주 완료(입고 대기)"],["recv","입고 완료"]].map(([k,l]) => `<option value="${k}" ${filt===k?"selected":""}>${l}</option>`).join("")}</select>
+      <input type="search" id="buy-search" value="${esc(state.buySearch || "")}" placeholder="자재·업체·공정 검색" aria-label="검색">
+      <span class="note">${V.length}건 표시${V.length !== L.length ? ` / 전체 ${L.length}건` : ""}</span>
+      ${ed ? `<button class="btn sm" data-bk="selvis">보이는 항목 모두 선택</button>` : ""}
+      ${view === "task" ? `<button class="btn sm" data-bk="openall">모두 펼치기</button><button class="btn sm" data-bk="closeall">모두 접기</button>` : ""}</div>`;
   return `<div class="buy-sum" style="margin-bottom:12px">
       <span class="chip ${late?"bad":""}">발주 지연 <b>${late}</b></span>
       <span class="chip ${soon?"warn":""}">발주 임박 <b>${soon}</b></span>
       <span class="chip">입고 대기 <b>${wait}</b></span>
       <span class="chip">입고 완료 <b>${recv}</b></span>
-    </div>
+    </div>${tools}${bulk}
     <div class="panel tbl-wrap"><table>
-    <thead><tr><th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th>업체</th><th>담당자</th>${state.canEdit ? "<th>처리</th>" : ""}</tr></thead>
-    <tbody>${rows}</tbody></table></div>
+    <thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th>업체</th><th>담당자</th>${ed ? "<th>처리</th>" : ""}</tr></thead>
+    <tbody>${rows || `<tr><td colspan="${ncol}" class="note">조건에 맞는 항목이 없습니다.</td></tr>`}</tbody></table></div>
     <p class="note">발주 기한 = 현장 필요일 − 조달기간, 현장 필요일 = 사용 공정 시작일 − 현장 여유일(달력일 기준). 공정 일정이 바뀌면 발주 기한도 자동으로 바뀝니다. ‘발주 임박’은 기한까지 알림 기준일(기본 7일) 이내인 항목입니다. 발주 임박·지연·입고 지연 항목은 평일 오전 8시에 담당자 이메일로 자동 알림이 갑니다.</p>`;
+}
+/* ---- 구매 일정 검색: 한글 조합이 끝난 뒤, 잠깐 쉬었다가 다시 그립니다 ---- */
+let buySearchT = null;
+function scheduleBuySearch(el){
+  clearTimeout(buySearchT);
+  buySearchT = setTimeout(() => {
+    const cur = $("#buy-search"); if(!cur) return;
+    const v = cur.value, pos = cur.selectionStart;
+    if(v === (state.buySearch || "")) return;
+    state.buySearch = v; state.buyClosed = null; render();
+    const n = $("#buy-search"); if(n){ n.focus(); try{ n.setSelectionRange(pos, pos); }catch{} }
+  }, 300);
+}
+document.addEventListener("compositionend", e => { if(e.target.id === "buy-search") scheduleBuySearch(e.target); });
+/* ---- 구매 일정 일괄 처리 ---- */
+function visibleBuyIds(){
+  const M = state.M, L = computePurchases(M), filt = state.buyFilter || "all", qtxt = (state.buySearch || "").trim().toLowerCase();
+  const ORDERED = ["ordered","etaLate","overdue"], TODO = ["late","soon","plan","nolink"];
+  const FILT = { all: () => true, todo: x => TODO.includes(x.st), urgent: x => ["late","soon","overdue","etaLate"].includes(x.st), ordered: x => ORDERED.includes(x.st), recv: x => x.st === "recv" };
+  return L.filter(FILT[filt] || FILT.all).filter(x => !qtxt || [x.name, x.spec, x.vendor, x.owner, x.t && x.t.name, x.t && x.t.code].some(v => String(v || "").toLowerCase().includes(qtxt)));
+}
+async function bulkBuy(kind){
+  const sel = state.buySel || (state.buySel = new Set());
+  if(kind === "selvis"){ visibleBuyIds().forEach(x => sel.add(x.id)); render(); return; }
+  if(kind === "openall"){ state.buyClosed = new Set(); render(); return; }
+  if(kind === "closeall"){ const ks = new Set(visibleBuyIds().map(x => x.t ? x.t.id : "_none")); state.buyClosed = ks; render(); return; }
+  if(kind === "clear"){ sel.clear(); state.bkDelArm = false; render(); return; }
+  const ids = [...sel]; if(!ids.length) return;
+  const date = ($("#bk-date") || {}).value || localToday(); state.bkDate = date;
+  const FIELDS = ["orderedDate","receivedDate","deliveries","vendor","owner","ownerEmail","lead","buffer"];
+  const before = new Map(purchasesOf().filter(p => sel.has(p.id)).map(p => [p.id, clone(Object.fromEntries(FIELDS.map(f => [f, p[f] === undefined ? (f === "deliveries" ? [] : "") : p[f]])))]));
+  const undo = () => commit(d => { (d.purchases || []).forEach(p => { if(before.has(p.id)) Object.assign(p, clone(before.get(p.id))); }); }, "되돌렸습니다");
+  let fn, msg;
+  if(kind === "order"){ fn = p => { p.orderedDate = date; }; msg = `${ids.length}건 발주 완료 (${fmt(date)})`; }
+  else if(kind === "recv"){ fn = p => { p.orderedDate = p.orderedDate || date; p.receivedDate = date; if(Array.isArray(p.deliveries)) p.deliveries.forEach(x => { if(!x.receivedDate) x.receivedDate = date; }); }; msg = `${ids.length}건 입고 완료 (${fmt(date)})`; }
+  else if(kind === "unorder"){ fn = p => { p.orderedDate = ""; p.receivedDate = ""; if(Array.isArray(p.deliveries)) p.deliveries.forEach(x => { x.receivedDate = ""; x.orderedDate = ""; }); }; msg = `${ids.length}건 발주를 취소했습니다`; }
+  else if(kind === "who"){
+    const v = $("#bk-vendor").value.trim(), o = $("#bk-owner").value.trim(), m = $("#bk-mail").value.trim();
+    if(!v && !o && !m){ toast("업체·담당자·이메일 중 하나 이상 넣어 주세요."); return; }
+    if(m && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)){ toast("이메일 주소를 확인해 주세요."); return; }
+    fn = p => { if(v) p.vendor = v; if(o) p.owner = o; if(m) p.ownerEmail = m; }; msg = `${ids.length}건에 업체·담당자를 지정했습니다`;
+  }
+  else if(kind === "lead"){
+    const l = $("#bk-lead").value, b = $("#bk-buf").value;
+    if(l === "" && b === ""){ toast("조달기간이나 여유일을 넣어 주세요."); return; }
+    fn = p => { if(l !== "") p.lead = Math.max(0, num(l)); if(b !== "") p.buffer = Math.max(0, num(b)); }; msg = `${ids.length}건의 기간을 바꿨습니다`;
+  }
+  else if(kind === "del"){
+    if(!state.bkDelArm){ state.bkDelArm = true; render(); return; }
+    const removed = purchasesOf().filter(p => sel.has(p.id)).map(p => clone(p));
+    const ok = await commit(d => { d.purchases = (d.purchases || []).filter(p => !sel.has(p.id)); }, null);
+    state.bkDelArm = false;
+    if(ok){ sel.clear(); render(); toast(`${removed.length}건 삭제했습니다`, 8000, { label: "되돌리기", fn: () => commit(d => { d.purchases = (d.purchases || []).concat(removed); }, "되돌렸습니다") }); }
+    return;
+  } else return;
+  const ok = await commit(d => { (d.purchases || []).forEach(p => { if(sel.has(p.id)) fn(p); }); }, null);
+  if(ok){ sel.clear(); state.bkDelArm = false; render(); toast(msg, 8000, { label: "되돌리기", fn: undo }); }
+}
+function bulkBuyClick(e){
+  const b = e.target.closest("[data-bsel]"); if(b){ const s0 = state.buySel || (state.buySel = new Set()); s0.has(b.dataset.bsel) ? s0.delete(b.dataset.bsel) : s0.add(b.dataset.bsel); state.bkDelArm = false; render(); return true; }
+  const g = e.target.closest("[data-bgsel]"); if(g){ const s0 = state.buySel || (state.buySel = new Set()); const k = g.dataset.bgsel;
+    const list = visibleBuyIds().filter(x => (x.t ? x.t.id : "_none") === k); const all = list.every(x => s0.has(x.id));
+    list.forEach(x => all ? s0.delete(x.id) : s0.add(x.id)); render(); return true; }
+  const tg = e.target.closest("[data-bgtoggle]"); if(tg){ const c = state.buyClosed || (state.buyClosed = new Set()); const k = tg.dataset.bgtoggle; c.has(k) ? c.delete(k) : c.add(k); render(); return true; }
+  const bv = e.target.closest("[data-bview]"); if(bv){ state.buyView = bv.dataset.bview; render(); return true; }
+  const bk = e.target.closest("[data-bk]"); if(bk){ bulkBuy(bk.dataset.bk); return true; }
+  return false;
 }
 function openBuy(id){
   state.drawer = { kind: "buy", id: id || null, arm: false };
@@ -2757,6 +2881,7 @@ document.addEventListener("click", e => {
   if(resClick(e)) return;
   if(e.target.closest("#b-save")){ saveBuy(); return; }
   if(e.target.closest("#b-del")){ deleteBuy(); return; }
+  if(bulkBuyClick(e)) return;
   const qb = e.target.closest("[data-quick]");
   if(qb){ qb.disabled = true; quickBuy(qb.dataset.id, qb.dataset.quick); return; }
   const td = e.target.closest("[data-today]");
@@ -2772,6 +2897,7 @@ document.addEventListener("click", e => {
 document.addEventListener("change", e => {
   if(e.target.id === "projSel") selectProject(e.target.value);
   if(e.target.id === "f-ms") updateTe();
+  if(e.target.id === "buy-filter"){ state.buyFilter = e.target.value; state.buyClosed = null; render(); return; }
   if(e.target.id === "f-group" && state.drawer && !state.drawer.id){ const c = $("#f-code"); if(c && (!c.value || c.value === state.drawer.autoCode)){ c.value = nextCode(e.target.value); state.drawer.autoCode = c.value; } }
   if(e.target.id === "pr-logo" && e.target.files[0]){ const f = e.target.files[0]; if(f.size > 1500000){ toast("로고 파일이 너무 큽니다 (1.5MB 이하)."); return; }
     const rd = new FileReader(); rd.onload = () => { readPrintForm(); state.drawer.o.logo = rd.result; savePrintOpts(state.drawer.o); renderPrintDrawer(); }; rd.readAsDataURL(f); return; }
@@ -2806,6 +2932,7 @@ document.addEventListener("input", e => {
   if(["f-o","f-m","f-p","f-ms"].includes(e.target.id)) updateTe();
   if(["b-task","b-lead","b-buf"].includes(e.target.id)) updateBuyCalc();
   splitEditorEvent(e); periodInput(e); resInput(e);
+  if(e.target.id === "buy-search" && !e.isComposing) scheduleBuySearch(e.target);   // 한글 조합 중에는 다시 그리지 않음
   if(e.target.id==="f-prog") $("#f-progv").textContent = e.target.value + "%";
   if(state.drawer && state.drawer.arm && e.target.closest("#drawer")){ state.drawer.arm=false; const b=$("#f-del"); if(b){ b.classList.remove("armed"); b.textContent="삭제"; } }
 });
