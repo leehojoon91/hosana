@@ -148,6 +148,11 @@ td.over{color:var(--bad);font-weight:700;background:var(--crit-soft)}
 .c-fc{fill:none;stroke:var(--prog);stroke-width:2;stroke-dasharray:6 4}
 .c-ev{fill:none;stroke:var(--crit);stroke-width:2.5}
 .c-evp{fill:var(--crit);stroke:var(--surface);stroke-width:1.5}
+.c-site{fill:none;stroke:#7B4FB8;stroke-width:2.5}
+.c-sitep{fill:#7B4FB8;stroke:var(--surface);stroke-width:1.5}
+@media (prefers-color-scheme: dark){ .c-site{stroke:#B08BE8} .c-sitep{fill:#B08BE8} }
+.site-break{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 0}
+.site-break .chip b{font-size:14px}
 .c-bar{fill:var(--accent-soft)}
 .c-now{stroke:var(--crit);stroke-width:1;stroke-dasharray:2 3}
 .evm-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}
@@ -1369,7 +1374,13 @@ async function saveLabor(){
   const before = clone(laborOf());
   const ok = await commit(d => {
     const L = d.labor || (d.labor = {}); const done = L.done || (L.done = {}), at = L.doneAt || (L.doneAt = {});
-    entries.forEach(([r, v]) => { if(num(v) > 0){ if(num(done[r]) !== num(v)) at[r] = today; done[r] = num(v); } else { delete done[r]; delete at[r]; } });
+    const log = L.log || (L.log = {});
+    entries.forEach(([r, v]) => {
+      if(!log[r] && num(done[r]) > 0) log[r] = [[at[r] || today, num(done[r])]];          // 예전 체크는 마지막 수행일로 기록
+      const h = log[r] || (log[r] = []); const last = h[h.length - 1];
+      if(last && last[0] === today) last[1] = num(v); else if(!last || last[1] !== num(v)) h.push([today, num(v)]);
+      if(num(v) > 0){ if(num(done[r]) !== num(v)) at[r] = today; done[r] = num(v); } else { delete done[r]; delete at[r]; }
+    });
     if(sync){
       state.data = { ...state.data, labor: L };                   // 새 값으로 진척률 계산
       const P = laborProgress(state.M);
@@ -1685,15 +1696,37 @@ function evm(M){
   const last = ends[ends.length - 1] || M.finish;
   const months = [];
   for(let d = p.startDate.slice(0,7) + "-01"; d <= last; ){ const y = +d.slice(0,4), m = +d.slice(5,7); const next = (m === 12 ? (y+1) + "-01" : y + "-" + String(m+1).padStart(2,"0")) + "-01"; months.push({ key: d.slice(0,7), end: shiftDate(next, -1) }); d = next; if(months.length > 60) break; }
+  /* 현장 실적 = 자재 입고 금액 + 노무 수행 + 경비 수행 (내역 금액 기준) */
+  const boq = boqOf(), hasSite = boq.length > 0;
+  const Lb = laborOf(), log = Lb.log || {}, done = Lb.done || {}, doneAt = Lb.doneAt || {};
+  const qtyAt = (r, d) => { const h = log[r]; if(h && h.length){ let v = 0; h.forEach(([dt, q]) => { if(dt <= d) v = q; }); return v; } return (doneAt[r] || "9999") <= d ? num(done[r]) : 0; };
+  const siteAt = d => {
+    if(!hasSite) return null;
+    let mat = 0; purchasesOf().forEach(p => { const a = num(p.amount); if(!a) return;
+      if(Array.isArray(p.deliveries) && p.deliveries.length){ const tot = toNum(p.qty) || p.deliveries.reduce((s0, x) => s0 + toNum(x.qty), 0);
+        mat += tot ? a * p.deliveries.filter(x => isDate(x.receivedDate) && x.receivedDate <= d).reduce((s0, x) => s0 + toNum(x.qty), 0) / tot : 0; }
+      else if(isDate(p.receivedDate) && p.receivedDate <= d) mat += a; });
+    const fr = x => x.q > 0 ? Math.min(1, qtyAt(x.r, d) / x.q) : (qtyAt(x.r, d) > 0 ? 1 : 0);
+    const T = {}; const labTot = {};
+    boq.forEach(x => { if(x.l > 0 && x.t){ T[x.t] = (T[x.t] || 0) + x.l * fr(x); labTot[x.t] = (labTot[x.t] || 0) + x.l; } });
+    let lab = 0, exp = 0;
+    boq.forEach(x => { if(x.l > 0) lab += x.l * fr(x);
+      if(x.e > 0){ const own = qtyAt(x.r, d) > 0; exp += x.e * (x.l > 0 || own ? fr(x) : (labTot[x.t] ? T[x.t] / labTot[x.t] : 0)); } });
+    return { mat, lab, exp, total: mat + lab + exp };
+  };
+  const siteTot = hasSite ? { mat: boq.reduce((s0, x) => s0 + x.m, 0), lab: boq.reduce((s0, x) => s0 + x.l, 0), exp: boq.reduce((s0, x) => s0 + x.e, 0) } : null;
+  const siteNow = siteAt(M.statusDate > localToday() ? M.statusDate : localToday());
   months.forEach(mo => {
     mo.pv = pvAt(mo.end); mo.late = lateAt(mo.end); mo.fc = fcAt(mo.end);
+    const sd = M.statusDate > localToday() ? M.statusDate : localToday();
+    mo.site = !hasSite ? null : mo.end <= sd ? siteAt(mo.end).total : (mo.key === sd.slice(0, 7) ? siteAt(sd).total : null);
     const inMonth = periods.filter(x => x.date <= mo.end); const lastPer = inMonth[inMonth.length - 1];
     mo.ev = lastPer && mo.end >= periods[0].date ? evOf(lastPer) : null;
     if(mo.ev != null && periods.length && lastPer.date.slice(0,7) !== mo.key && mo.end > M.statusDate) mo.ev = null;
   });
   const pvNow = pvAt(M.statusDate);
   const perRows = periods.map((per, i) => ({ per, ev: evOf(per), pv: pvAt(per.date), prev: i ? evOf(periods[i-1]) : 0 }));
-  return { hasAmt, BAC, months, pvNow, evNow, sv: evNow - pvNow, spi: pvNow > 0 ? evNow / pvNow : null, periods, perRows, w, tasks, pvAt, fcAt, lateAt, evOf };
+  return { hasAmt, BAC, months, pvNow, evNow, sv: evNow - pvNow, spi: pvNow > 0 ? evNow / pvNow : null, periods, perRows, w, tasks, pvAt, fcAt, lateAt, evOf, hasSite, siteNow, siteTot, siteAt };
 }
 const wonM = n => Math.round(n).toLocaleString("ko-KR");
 const pctTxt = (n, BAC) => (n / BAC * 100).toFixed(1) + "%";
@@ -1709,7 +1742,13 @@ function renderEvm(M){
     <div class="kpi"><span class="k">실적 공정률 (EV)</span><span class="v">${pctTxt(E.evNow, BAC)}</span><span class="s">${E.hasAmt ? wonM(E.evNow) + "원" : "작업 진척률 기준"}</span></div>
     <div class="kpi"><span class="k">일정 차이 SV · SPI</span><span class="v ${spiCls}">${E.spi == null ? "–" : E.spi.toFixed(2)}</span><span class="s">SV ${E.sv >= 0 ? "+" : ""}${E.hasAmt ? wonM(E.sv) + "원" : pctTxt(E.sv, BAC)}${E.spi != null ? (E.spi >= 1 ? " · 계획보다 빠름" : " · 계획보다 늦음") : ""}</span></div>
     <div class="kpi"><span class="k">예상 준공 / 기준 준공</span><span class="v">${esc(fmt(M.finish))}</span><span class="s">${M.baseFinish ? "기준 " + esc(fmt(M.baseFinish)) + (M.projDelay ? ` · ${M.projDelay > 0 ? "+" : ""}${M.projDelay}일` : "") : "기준 공정 미설정"}</span></div>
-    <div class="kpi"><span class="k">기성 청구 예상 (누계)</span><span class="v">${claim(E.evNow / BAC)}</span><span class="s">도급액 × 실적 공정률</span></div></div>`;
+    <div class="kpi"><span class="k">기성 청구 예상 (누계)</span><span class="v">${claim(E.evNow / BAC)}</span><span class="s">도급액 × 실적 공정률</span></div>
+    ${E.hasSite ? `<div class="kpi"><span class="k">현장 실적 (입고+시공)</span><span class="v" style="color:#7B4FB8">${pctTxt(E.siteNow.total, BAC)}</span><span class="s">${wonM(E.siteNow.total)}원 / ${wonM(BAC)}원</span></div>` : ""}</div>
+    ${E.hasSite ? `<div class="site-break">
+      <span class="chip">자재 입고 <b>${E.siteTot.mat ? (E.siteNow.mat / E.siteTot.mat * 100).toFixed(1) : 0}%</b> ${wonM(E.siteNow.mat)} / ${wonM(E.siteTot.mat)}원</span>
+      <span class="chip">노무 수행 <b>${E.siteTot.lab ? (E.siteNow.lab / E.siteTot.lab * 100).toFixed(1) : 0}%</b> ${wonM(E.siteNow.lab)} / ${wonM(E.siteTot.lab)}원</span>
+      <span class="chip">경비 수행 <b>${E.siteTot.exp ? (E.siteNow.exp / E.siteTot.exp * 100).toFixed(1) : 0}%</b> ${wonM(E.siteNow.exp)} / ${wonM(E.siteTot.exp)}원</span>
+      <span class="note" style="align-self:center">구매 일정의 입고 완료와 시공 진도의 수행 체크로 계산한 실제 진행 금액입니다.</span></div>` : ""}`;
   // ---- S-curve
   const mo = E.months, W = Math.max(560, mo.length * 64 + 70), H = 250, L = 52, T = 14, B = 34, ch = H - T - B;
   const xOf = i => L + 28 + i * ((W - L - 40) / Math.max(1, mo.length - 1 || 1));
@@ -1723,14 +1762,16 @@ function renderEvm(M){
   svg += `<polyline class="c-late" points="${path("late")}"/><polyline class="c-pv" points="${path("pv")}"/>`;
   if(nowIdx >= 0) svg += `<polyline class="c-fc" points="${evPts.length ? `${evPts[evPts.length-1][0].toFixed(1)},${evPts[evPts.length-1][1].toFixed(1)} ` : ""}${path("fc", nowIdx)}"/>`;
   if(evPts.length) svg += `<polyline class="c-ev" points="${evPts.map(q => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" ")}"/>` + evPts.map(q => `<circle class="c-evp" cx="${q[0]}" cy="${q[1]}" r="4"><title>실적 ${pctTxt(q[2], BAC)}</title></circle>`).join("");
+  const sitePts = mo.map((m, i) => m.site == null ? null : [xOf(i), yOf(m.site), m.site, m.key]).filter(Boolean);
+  if(sitePts.length) svg += `<polyline class="c-site" points="${sitePts.map(q => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" ")}"/>` + sitePts.map(q => `<circle class="c-sitep" cx="${q[0]}" cy="${q[1]}" r="3.5"><title>${q[3]} 현장 실적 ${pctTxt(q[2], BAC)} · ${wonM(q[2])}원</title></circle>`).join("");
   if(nowIdx >= 0) svg += `<line class="c-now" x1="${xOf(nowIdx)}" y1="${T}" x2="${xOf(nowIdx)}" y2="${T+ch}"/>`;
   svg += `</svg>`;
-  const legend = `<div class="legend" style="padding:8px 4px"><span><i class="sw" style="height:3px;border:0;background:var(--accent)"></i>계획 PV (${M.p.baseline ? "기준 공정" : "현재 일정"})</span><span><i class="sw" style="height:0;border:0;border-top:2px dashed var(--accent)"></i>만기 계획 (가장 늦은 일정)</span><span><i class="sw" style="height:3px;border:0;background:var(--crit)"></i>실적 EV (기성 회차)</span><span><i class="sw" style="height:0;border:0;border-top:2px dashed var(--prog)"></i>예상 (현재 일정)</span><span><i class="sw" style="background:var(--accent-soft)"></i>월별 계획 금회</span></div>`;
+  const legend = `<div class="legend" style="padding:8px 4px"><span><i class="sw" style="height:3px;border:0;background:var(--accent)"></i>계획 PV (${M.p.baseline ? "기준 공정" : "현재 일정"})</span><span><i class="sw" style="height:0;border:0;border-top:2px dashed var(--accent)"></i>만기 계획 (가장 늦은 일정)</span><span><i class="sw" style="height:3px;border:0;background:var(--crit)"></i>실적 EV (기성 회차)</span>${E.hasSite ? `<span><i class="sw" style="height:3px;border:0;background:#7B4FB8"></i>현장 실적 (자재 입고 + 노무·경비 수행)</span>` : ""}<span><i class="sw" style="height:0;border:0;border-top:2px dashed var(--prog)"></i>예상 (현재 일정)</span><span><i class="sw" style="background:var(--accent-soft)"></i>월별 계획 금회</span></div>`;
   // ---- monthly table
   const monthRows = mo.map((m, i) => { const pvInc = m.pv - (i ? mo[i-1].pv : 0); const evPrev = mo.slice(0, i).reverse().find(x => x.ev != null); const evInc = m.ev == null ? null : m.ev - (evPrev ? evPrev.ev : 0);
     return `<tr class="${m.key === M.statusDate.slice(0,7) ? "cur" : ""}"><td class="mono">${m.key.replace("-", ".")}</td><td class="r num">${money(pvInc)}</td><td class="r num">${money(m.pv)}</td><td class="r num">${pctTxt(m.pv, BAC)}</td>
       <td class="r num">${evInc == null ? "–" : money(evInc)}</td><td class="r num">${m.ev == null ? "–" : money(m.ev)}</td><td class="r num">${m.ev == null ? "–" : pctTxt(m.ev, BAC)}</td>
-      <td class="r num">${m.ev == null ? "–" : (m.ev - m.pv >= 0 ? "+" : "") + pctTxt(m.ev - m.pv, BAC)}</td>${contract ? `<td class="r num">${m.ev == null ? claim(m.pv / BAC) : claim(m.ev / BAC)}</td>` : ""}</tr>`; }).join("");
+      <td class="r num">${m.ev == null ? "–" : (m.ev - m.pv >= 0 ? "+" : "") + pctTxt(m.ev - m.pv, BAC)}</td>${E.hasSite ? `<td class="r num">${m.site == null ? "–" : money(m.site)}</td><td class="r num">${m.site == null ? "–" : pctTxt(m.site, BAC)}</td>` : ""}${contract ? `<td class="r num">${m.ev == null ? claim(m.pv / BAC) : claim(m.ev / BAC)}</td>` : ""}</tr>`; }).join("");
   const perRows = E.perRows.map(r => `<tr data-period="${esc(r.per.id)}" style="cursor:pointer"><td>${esc(r.per.label || "")}</td><td class="num">${esc(fmtLong(r.per.date))}</td>
       <td class="r num">${money(r.ev - r.prev)}</td><td class="r num">${money(r.ev)}</td><td class="r num">${pctTxt(r.ev, BAC)}</td><td class="r num">${pctTxt(r.pv, BAC)}</td>
       <td class="r num">${r.pv > 0 ? (r.ev / r.pv).toFixed(2) : "–"}</td>${contract ? `<td class="r num">${claim((r.ev - r.prev) / BAC)}</td><td class="r num">${claim(r.ev / BAC)}</td>` : ""}<td>${esc(r.per.note || "")}</td></tr>`).join("");
@@ -1738,7 +1779,7 @@ function renderEvm(M){
     ${state.canEdit && boqOf().some(x => x.l > 0) ? `<div class="evm-sec" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" id="perFromLabor">시공 진도로 기성 회차 만들기</button><span class="note">‘시공 진도’ 탭에서 체크한 수행 물량으로 작업별 진척률을 계산해 새 회차에 채웁니다.</span></div>` : ""}
     <div class="evm-sec"><h3>기성 회차</h3>${E.perRows.length ? `<div class="panel tbl-wrap"><table class="evt"><thead><tr><th>회차</th><th>기준일</th><th class="r">금회 기성</th><th class="r">누계 기성</th><th class="r">누계 기성률</th><th class="r">계획 공정률</th><th class="r">SPI</th>${contract ? `<th class="r">금회 청구(도급 기준)</th><th class="r">누계 청구</th>` : ""}<th>메모</th></tr></thead><tbody>${perRows}</tbody></table></div>`
       : `<div class="panel empty" style="padding:20px">${state.canEdit ? "아직 기성 회차가 없습니다. 오른쪽 위 <b>진도 입력 (새 회차)</b>로 이번 기준일의 누계 진척률을 입력하세요." : "아직 입력된 기성 회차가 없습니다."}</div>`}</div>
-    <div class="evm-sec"><h3>월별 계획 대비 실적</h3><div class="panel tbl-wrap"><table class="evt"><thead><tr><th>월</th><th class="r">계획 금회</th><th class="r">계획 누계</th><th class="r">계획 %</th><th class="r">실적 금회</th><th class="r">실적 누계</th><th class="r">실적 %</th><th class="r">차이</th>${contract ? `<th class="r" title="실적이 있는 달은 실적, 없는 달은 계획 기준">청구 누계(도급)</th>` : ""}</tr></thead><tbody>${monthRows}</tbody></table></div>
+    <div class="evm-sec"><h3>월별 계획 대비 실적</h3><div class="panel tbl-wrap"><table class="evt"><thead><tr><th>월</th><th class="r">계획 금회</th><th class="r">계획 누계</th><th class="r">계획 %</th><th class="r">실적 금회</th><th class="r">실적 누계</th><th class="r">실적 %</th><th class="r">차이</th>${E.hasSite ? `<th class="r" title="자재 입고 + 노무·경비 수행">현장 실적 누계</th><th class="r">현장 %</th>` : ""}${contract ? `<th class="r" title="실적이 있는 달은 실적, 없는 달은 계획 기준">청구 누계(도급)</th>` : ""}</tr></thead><tbody>${monthRows}</tbody></table></div>
     <p class="note">계획은 ${M.p.baseline ? "저장한 기준 공정" : "현재 공정표(기준 공정을 저장하면 그 일정)"}의 작업 기간에 금액을 고르게 나눠 계산합니다. 실적은 기성 회차에 입력한 누계 진척률(또는 내역 수량) × 작업 금액입니다. ${E.hasAmt ? "" : "작업에 금액이 없어 공기(te) 가중 %로 계산했습니다. 내역서로 만든 프로젝트는 금액 기준으로 계산됩니다."}</p></div>
     <div class="evm-sec"><h3>도급 금액</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="number" id="e-contract" step="1000000" value="${contract || ""}" placeholder="부가세 포함 도급 금액 (원)" style="max-width:260px" ${state.canEdit ? "" : "disabled"} aria-label="도급 금액">${state.canEdit ? `<button class="btn" id="e-contract-save">저장</button>` : ""}<span class="note">넣으면 기성률 × 도급액으로 청구 예상액을 보여 줍니다.</span></div></div>`;
 }
