@@ -61,7 +61,13 @@ export function scheduleStarts(project, tasks, statusDate) {
     const t = by.get(id); const { dur } = pert(t);
     const prog = t.actualEnd ? 100 : Math.min(100, Math.max(0, num(t.progress)));
     const status = t.actualEnd ? "done" : (t.actualStart ? "prog" : "wait");
-    let es = 0; for (const pid of t._preds) es = Math.max(es, by.get(pid).ef);
+    let es = 0;
+    for (const pid of t._preds) {          // FS/SS/FF/SF + Lag (index.html 의 relStart 와 같음)
+      const pr = by.get(pid), r = (t.rel || {})[pid] || {}, type = ["SS", "FF", "SF"].includes(r.type) ? r.type : "FS", lag = Math.round(num(r.lag));
+      const c = type === "SS" ? pr.es + lag : type === "FF" ? pr.ef + lag - dur : type === "SF" ? pr.es + lag - dur : pr.ef + lag;
+      es = Math.max(es, c);
+    }
+    es = Math.max(0, es);
     if (isDate(t.notBefore)) es = Math.max(es, idxOf(cal, t.notBefore));
     if (isDate(t.actualStart)) es = idxOf(cal, t.actualStart);
     else if (es < sIdx) es = sIdx;
