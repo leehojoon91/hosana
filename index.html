@@ -2113,8 +2113,7 @@ function vendorModel(M){
   const list = [...map.values()].map(o => {
     o.tot = o.matTot + o.labTot; o.done = o.matDone + o.labDone;
     const all = [...o.buys, ...o.labs]; o.noAmt = all.filter(x => !(x.a > 0)).length;
-    o.byCount = !o.tot && all.length > 0;                                    // 금액이 하나도 없으면 건수 기준
-    o.rate = o.tot ? o.done / o.tot : o.byCount ? all.reduce((a, x) => a + x.f, 0) / all.length : 0;
+    o.rate = o.tot ? o.done / o.tot : 0;                                       // 금액 기준 (금액 없는 항목은 빠짐)
     o.contract = o.reg ? num(o.reg.contract) : 0; o.paid = o.reg ? (o.reg.payments || []).reduce((a, x) => a + num(x.amount), 0) : 0;
     o.payable = o.contract ? Math.trunc(o.contract * o.rate) : 0; o.unpaid = o.contract ? o.payable - o.paid : 0;
     o.kind = o.matTot && o.labTot ? "자재·시공" : o.matTot || o.buys.length ? "자재" : o.labTot || o.labs.length ? "시공" : "–";
@@ -2141,7 +2140,7 @@ function renderVendors(M){
       <td class="r num">${o.contract ? w(o.contract) : `<span class="note">${ed ? "미입력" : "–"}</span>`}</td>
       <td class="r num">${w(o.tot)}<div style="font-size:11px;color:var(--ink-3)">${o.buys.length ? `자재 ${o.buys.length}건` : ""}${o.buys.length && o.labs.length ? " · " : ""}${o.labs.length ? `시공 ${o.labs.length}줄` : ""}</div></td>
       <td class="r num">${w(o.done)}</td>
-      <td class="r num">${pct(o.rate)}${o.byCount ? `<div style="font-size:11px;color:var(--warn,#A86A00)" title="항목에 금액이 없어 완료 건수로 계산했습니다">건수 기준</div>` : o.noAmt ? `<div style="font-size:11px;color:var(--warn,#A86A00)" title="금액이 없는 항목은 기성률에 들어가지 않습니다">금액 없음 ${o.noAmt}건</div>` : ""}<span class="meter big"><i style="width:${(o.rate * 100).toFixed(1)}%"></i></span></td>
+      <td class="r num">${pct(o.rate)}${o.noAmt ? `<div style="font-size:11px;color:var(--warn,#A86A00)" title="금액이 없는 항목은 기성률에 들어가지 않습니다">금액 없음 ${o.noAmt}건</div>` : ""}<span class="meter big"><i style="width:${(o.rate * 100).toFixed(1)}%"></i></span></td>
       <td class="r num">${o.contract ? w(o.payable) : "–"}</td>
       <td class="r num">${o.paid ? w(o.paid) : "–"}${o.lastPay ? `<div style="font-size:11px;color:var(--ink-3)">최근 ${esc(fmtLong(o.lastPay))}</div>` : ""}</td>
       <td class="r num ${o.unpaid < 0 ? "neg" : ""}">${o.contract ? w(o.unpaid) : "–"}</td>
@@ -2151,12 +2150,13 @@ function renderVendors(M){
       ${none.n ? `<span class="note" style="margin:0">업체가 지정되지 않은 항목 ${none.n}건 · ${w(none.a)}원 (구매 일정·시공 진도에서 업체를 넣으면 여기에 더해집니다)</span>` : ""}</div>
     <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r">계약금액</th><th class="r" title="구매 일정 + 시공 진도에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="계약금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="계약금액 − 지급 누계">계약 잔액</th></tr></thead>
     <tbody>${rows}${foot}</tbody></table></div>
-    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 금액은 구매 항목에 넣은 금액(내역서로 만든 프로젝트는 자동)을 씁니다. 항목에 금액이 하나도 없는 업체는 완료 건수로 계산합니다. 지급 가능액 = 계약금액 × 기성률. 업체를 누르면 계약금액·연락처·지급 내역을 넣고 담당 항목을 볼 수 있습니다.</p>`;
+    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 금액은 구매 항목의 금액(내역서로 만든 프로젝트는 자동)을 쓰고, 금액이 없는 항목은 기성률에 들어가지 않습니다. 업체를 눌러 담당 항목에서 금액을 바로 넣을 수 있습니다. 지급 가능액 = 계약금액 × 기성률. 업체를 누르면 계약금액·연락처·지급 내역을 넣고 담당 항목을 볼 수 있습니다.</p>`;
 }
 function openVendor(name){
   const reg = name ? vendorsOf().find(v => String(v.name).trim() === name) : null;
   state.drawer = { kind: "vendor", id: reg ? reg.id : null, origName: name || "", name: name || "", contract: reg ? reg.contract || "" : "", person: reg ? reg.person || "" : "",
-    phone: reg ? reg.phone || "" : "", email: reg ? reg.email || "" : "", note: reg ? reg.note || "" : "", pay: reg ? clone(reg.payments || []) : [], arm: false, showItems: false };
+    phone: reg ? reg.phone || "" : "", email: reg ? reg.email || "" : "", note: reg ? reg.note || "" : "", pay: reg ? clone(reg.payments || []) : [], arm: false, showItems: false, amt: {} };
+  { const o = vendorModel(state.M).list.find(x => x.name === name); if(o && o.noAmt && state.canEdit) state.drawer.showItems = true; }
   renderDrawer(); $("#drawer").classList.add("wide"); $("#drawer").hidden = false; $("#scrim").hidden = false;
 }
 function renderVendorDrawer(){
@@ -2170,7 +2170,7 @@ function renderVendorDrawer(){
       <td>${ed ? `<button class="btn sm" data-vpdel="${i}" aria-label="지급 내역 삭제">삭제</button>` : ""}</td></tr>`).join("");
   const st = p => isDate(p.receivedDate) ? "입고" : deliveriesOf(p).some(d => isDate(d.receivedDate)) ? "일부 입고" : isDate(p.orderedDate) ? "발주" : "발주 전";
   const items = dr.showItems ? `<div class="imp-tbl"><table><thead><tr><th>구분</th><th>항목</th><th>작업</th><th class="r">금액</th><th class="r">완료</th><th>상태</th></tr></thead><tbody>
-      ${o.buys.map(b => `<tr><td>자재</td><td>${esc(b.p.name)} <span style="color:var(--ink-3)">${esc(b.p.spec || "")}</span></td><td class="mono">${esc((state.M.by.get(b.p.taskId) || {}).code || "")}</td><td class="r num">${b.a ? w(b.a) : `<span class="note">금액 없음</span>`}</td><td class="r num">${(b.f * 100).toFixed(0)}%</td><td>${st(b.p)}</td></tr>`).join("")}
+      ${o.buys.map(b => `<tr><td>자재</td><td>${esc(b.p.name)} <span style="color:var(--ink-3)">${esc(b.p.spec || "")}</span></td><td class="mono">${esc((state.M.by.get(b.p.taskId) || {}).code || "")}</td><td class="r num">${ed ? `<input type="number" min="0" step="10000" data-vbamt="${esc(b.p.id)}" value="${dr.amt[b.p.id] ?? (b.a || "")}" placeholder="금액 없음" style="width:120px;text-align:right" aria-label="${esc(b.p.name)} 금액">` : b.a ? w(b.a) : `<span class="note">금액 없음</span>`}</td><td class="r num">${(b.f * 100).toFixed(0)}%</td><td>${st(b.p)}</td></tr>`).join("")}
       ${o.labs.map(l => `<tr><td>${labKind(l.x)}</td><td>${esc(l.x.n)} <span style="color:var(--ink-3)">${esc(l.x.s || "")}</span></td><td class="mono">${esc((state.M.by.get(l.x.t) || {}).code || "")}</td><td class="r num">${w(l.a)}</td><td class="r num">${(l.f * 100).toFixed(0)}%</td><td>${l.f >= 1 ? "완료" : l.f > 0 ? "시공 중" : "미시공"}</td></tr>`).join("")}
       ${o.buys.length + o.labs.length ? "" : `<tr><td colspan="6" class="note">이 업체로 지정된 항목이 없습니다.</td></tr>`}</tbody></table></div>` : "";
   el.innerHTML = `<div class="d-head"><h2>${dr.id ? esc(dr.origName) : dr.origName ? esc(dr.origName) + " · 업체 등록" : "업체 추가"}</h2><button class="x" data-close aria-label="닫기">×</button></div>
@@ -2191,7 +2191,7 @@ function renderVendorDrawer(){
         <span class="chip">지급 가능 <b id="vd-payable">${contract ? w(payable) + "원" : "–"}</b></span>
         <span class="chip">지급 누계 <b id="vd-paid">${w(paid)}원</b></span>
         <span class="chip">미지급 <b id="vd-unpaid" class="${payable - paid < 0 ? "neg" : ""}">${contract ? w(payable - paid) + "원" : "–"}</b></span></div>
-      ${o.byCount ? `<p class="note" style="color:var(--warn,#A86A00)">담당 항목에 금액이 없어 기성률을 <b>완료 건수</b>로 계산했습니다. 구매 일정의 각 항목에 금액을 넣으면 금액 기준으로 바뀝니다.</p>` : o.noAmt ? `<p class="note" style="color:var(--warn,#A86A00)">금액이 없는 항목 ${o.noAmt}건은 기성률에 들어가지 않습니다. 구매 일정에서 금액을 넣어 주세요.</p>` : ""}
+      ${o.noAmt ? `<p class="note" style="color:var(--warn,#A86A00)">금액이 없는 항목 ${o.noAmt}건은 기성률에 들어가지 않습니다.${state.canEdit ? " 아래 ‘담당 항목’에서 자재 금액을 바로 넣고 저장하세요." : ""}</p>` : ""}
       <p class="note">자재 ${w(o.matDone)} / ${w(o.matTot)}원 (발주 ${w(o.ordered)}원) · 노무·경비 ${w(o.labDone)} / ${w(o.labTot)}원</p>
       <h3 style="font-size:13.5px;margin:12px 0 6px">지급 내역</h3>
       <div class="imp-tbl vd-pay"><table><thead><tr><th>지급일</th><th class="r">금액 (원)</th><th>메모</th><th></th></tr></thead><tbody>${payRows || `<tr><td colspan="4" class="note">아직 지급 내역이 없습니다.</td></tr>`}</tbody></table></div>
@@ -2207,6 +2207,7 @@ function vendorInput(e){
   const dr = state.drawer; if(!dr || dr.kind !== "vendor") return false;
   const t = e.target, F = { "v-name": "name", "v-contract": "contract", "v-person": "person", "v-phone": "phone", "v-email": "email", "v-note": "note" };
   if(F[t.id]){ dr[F[t.id]] = t.value; if(e.type === "change" && (t.id === "v-name" || t.id === "v-contract")){ const sc = $(".d-body").scrollTop; renderVendorDrawer(); $(".d-body").scrollTop = sc; } return true; }
+  if(t.dataset && t.dataset.vbamt){ if(t.value === "") delete dr.amt[t.dataset.vbamt]; else dr.amt[t.dataset.vbamt] = Math.max(0, Math.round(num(t.value))); return true; }
   if(t.dataset && t.dataset.vpay){ const x = dr.pay[Number(t.dataset.vpay)]; if(!x) return true; x[t.dataset.vpf] = t.dataset.vpf === "amount" ? (t.value === "" ? "" : num(t.value)) : t.value;
     if(t.dataset.vpf === "amount"){ const contract = num(dr.contract), M = state.M, o = vendorModel(M).list.find(v => v.name === dr.origName), rate = o ? o.rate : 0, payable = contract ? Math.trunc(contract * rate) : 0, paid = dr.pay.reduce((a, y) => a + num(y.amount), 0);
       const a = $("#vd-paid"); if(a) a.textContent = wonM(paid) + "원"; const b = $("#vd-unpaid"); if(b && contract){ b.textContent = wonM(payable - paid) + "원"; b.classList.toggle("neg", payable - paid < 0); } }
@@ -2241,6 +2242,7 @@ async function saveVendor(){
   const btn = $("#v-save"); btn.disabled = true;
   const ok = await commit(d => {
     const V = d.vendors || (d.vendors = []); const i = V.findIndex(v => v.id === id); if(i >= 0) V[i] = rec; else V.push(rec);
+    (d.purchases || []).forEach(p => { if(dr.amt[p.id] != null) p.amount = dr.amt[p.id]; });          // 담당 항목에서 넣은 자재 금액
     if(rename){ (d.purchases || []).forEach(p => { if(String(p.vendor || "").trim() === old) p.vendor = name; });
       const L = d.labor; if(L) ["vendor", "team"].forEach(k => { const m = L[k]; if(m) Object.keys(m).forEach(r => { if(String(m[r] || "").trim() === old) m[r] = name; }); }); }
   }, rename ? `업체를 저장하고 항목의 업체 이름도 ‘${name}’(으)로 바꿨습니다` : "업체를 저장했습니다");
