@@ -159,6 +159,16 @@ td.over{color:var(--bad);font-weight:700;background:var(--crit-soft)}
 .evm-cards .kpi .v{font-size:18px}
 .evm-sec{margin-top:16px}
 .evm-sec h3{font-size:14px;margin:0 0 8px}
+.cl-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.cl-bar select{max-width:260px}
+table.clt{min-width:860px;font-size:12.5px}
+table.clt td.r,table.clt th.r{text-align:right}
+table.clt tr.sub td{background:var(--surface-2);font-weight:600}
+table.clt tr.tot td{background:var(--accent-soft);font-weight:700}
+table.clt input[type=number]{width:84px;padding:3px 6px;text-align:right}
+table.clt input.amt{width:120px}
+.cl-cost{margin-top:10px}
+.cl-cost summary{cursor:pointer;font-weight:600;font-size:13px;padding:6px 0}
 table.evt{min-width:720px;font-size:12.5px}
 table.evt td.r,table.evt th.r{text-align:right}
 tr.cur td{background:var(--accent-soft)}
@@ -1250,7 +1260,7 @@ function laborProgress(M, doneOverride){
     let f = isDate(p.receivedDate) ? 1 : 0;
     if(Array.isArray(p.deliveries) && p.deliveries.length){ const tot = toNum(p.qty) || p.deliveries.reduce((s, d) => s + toNum(d.qty), 0); f = tot ? p.deliveries.filter(d => isDate(d.receivedDate)).reduce((s, d) => s + toNum(d.qty), 0) / tot : 0; }
     recvFrac[r] = Math.min(1, f); });
-  const res = new Map();
+  const res = new Map(), lineFrac = {};
   byTask.forEach((ls, tid) => {
     const lab = ls.filter(x => x.l > 0);
     const labTot = lab.reduce((s, x) => s + x.l, 0);
@@ -1258,9 +1268,11 @@ function laborProgress(M, doneOverride){
     const T = labTot ? lab.reduce((s, x) => s + x.l * lf(x), 0) / labTot : null;
     const tot = ls.reduce((s, x) => s + x.a, 0);
     const frac = x => x.l > 0 ? lf(x) : (x.e > 0 && !(x.m > 0) && num(done[x.r]) > 0) ? lf(x) : (x.m > 0 && rule === "receive" && recvFrac[x.r] != null) ? recvFrac[x.r] : (T ?? 0);
+    ls.forEach(x => { lineFrac[x.r] = Math.round(frac(x) * 10000) / 10000; });
     const val = ls.reduce((s, x) => s + x.a * frac(x), 0);
     res.set(tid, { pct: tot ? val / tot * 100 : 0, val, tot, labTot, labDone: lab.reduce((s, x) => s + x.l * lf(x), 0), labLines: lab.length, doneLines: lab.filter(x => lf(x) >= 1).length, hasLabor: lab.length > 0, T: T ?? 0 });
   });
+  res.lineFrac = lineFrac;
   return res;
 }
 const isLabLine = x => !!x.t && (x.l > 0 || (x.e > 0 && !(x.m > 0)));   // 노무 줄, 또는 경비만 있는 줄
@@ -1354,7 +1366,7 @@ function laborClick(e){
   const dn = e.target.closest("[data-ldone]"); if(dn){ const x = line(dn.dataset.ldone); if(x){ draft[x.r] = dn.checked ? (x.q || 1) : 0; render(); } return true; }
   if(e.target.closest("#lab-cancel")){ state.labDraft = {}; render(); return true; }
   if(e.target.closest("#lab-save")){ saveLabor(); return true; }
-  if(e.target.closest("#perFromLabor")){ const P = laborProgress(state.M), pct = {}; state.M.order.forEach(id => { const p = P.get(id); pct[id] = p && p.hasLabor ? +p.pct.toFixed(2) : state.M.by.get(id).prog; }); openPeriod(null, { pct }); return true; }
+  if(e.target.closest("#perFromLabor")){ const P = laborProgress(state.M), pct = {}; state.M.order.forEach(id => { const p = P.get(id); pct[id] = p && p.hasLabor ? +p.pct.toFixed(2) : state.M.by.get(id).prog; }); openPeriod(null, { pct, lines: P.lineFrac }); return true; }
   return false;
 }
 function laborInput(e){
@@ -1779,9 +1791,271 @@ function renderEvm(M){
     ${state.canEdit && boqOf().some(x => x.l > 0) ? `<div class="evm-sec" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" id="perFromLabor">시공 진도로 기성 회차 만들기</button><span class="note">‘시공 진도’ 탭에서 체크한 수행 물량으로 작업별 진척률을 계산해 새 회차에 채웁니다.</span></div>` : ""}
     <div class="evm-sec"><h3>기성 회차</h3>${E.perRows.length ? `<div class="panel tbl-wrap"><table class="evt"><thead><tr><th>회차</th><th>기준일</th><th class="r">금회 기성</th><th class="r">누계 기성</th><th class="r">누계 기성률</th><th class="r">계획 공정률</th><th class="r">SPI</th>${contract ? `<th class="r">금회 청구(도급 기준)</th><th class="r">누계 청구</th>` : ""}<th>메모</th></tr></thead><tbody>${perRows}</tbody></table></div>`
       : `<div class="panel empty" style="padding:20px">${state.canEdit ? "아직 기성 회차가 없습니다. 오른쪽 위 <b>진도 입력 (새 회차)</b>로 이번 기준일의 누계 진척률을 입력하세요." : "아직 입력된 기성 회차가 없습니다."}</div>`}</div>
+    ${renderClaim(M)}
     <div class="evm-sec"><h3>월별 계획 대비 실적</h3><div class="panel tbl-wrap"><table class="evt"><thead><tr><th>월</th><th class="r">계획 금회</th><th class="r">계획 누계</th><th class="r">계획 %</th><th class="r">실적 금회</th><th class="r">실적 누계</th><th class="r">실적 %</th><th class="r">차이</th>${E.hasSite ? `<th class="r" title="자재 입고 + 노무·경비 수행">현장 실적 누계</th><th class="r">현장 %</th>` : ""}${contract ? `<th class="r" title="실적이 있는 달은 실적, 없는 달은 계획 기준">청구 누계(도급)</th>` : ""}</tr></thead><tbody>${monthRows}</tbody></table></div>
     <p class="note">계획은 ${M.p.baseline ? "저장한 기준 공정" : "현재 공정표(기준 공정을 저장하면 그 일정)"}의 작업 기간에 금액을 고르게 나눠 계산합니다. 실적은 기성 회차에 입력한 누계 진척률(또는 내역 수량) × 작업 금액입니다. ${E.hasAmt ? "" : "작업에 금액이 없어 공기(te) 가중 %로 계산했습니다. 내역서로 만든 프로젝트는 금액 기준으로 계산됩니다."}</p></div>
     <div class="evm-sec"><h3>도급 금액</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="number" id="e-contract" step="1000000" value="${contract || ""}" placeholder="부가세 포함 도급 금액 (원)" style="max-width:260px" ${state.canEdit ? "" : "disabled"} aria-label="도급 금액">${state.canEdit ? `<button class="btn" id="e-contract-save">저장</button>` : ""}<span class="note">넣으면 기성률 × 도급액으로 청구 예상액을 보여 줍니다.</span></div></div>`;
+}
+/* ---------- 기성내역서 (도급 · 전회 · 금회 · 누계 · 잔여) ----------
+   내역 줄의 누계 비율 = 회차의 내역 수량 → 회차에 저장한 줄 비율(시공 진도) → 작업 누계 진척률
+   금액은 원 단위 절사(TRUNC). 금회 = 누계 − 전회, 잔여 = 도급 − 누계 */
+const clamp01 = v => Math.min(1, Math.max(0, v));
+function lineFracFn(per){
+  if(!per) return () => 0;
+  const q = per.qty || {}, L = per.lines || {}, has = v => v !== undefined && v !== null && v !== "";
+  const qtyTask = new Set(boqOf().filter(x => x.t && x.a > 0 && x.q > 0 && has(q[x.r])).map(x => x.t));
+  const tp = new Map(), taskPct = t => { if(!tp.has(t)) tp.set(t, periodPct(per, t)); return tp.get(t); };
+  return x => {
+    if(x.q > 0 && has(q[x.r])) return clamp01(num(q[x.r]) / x.q);
+    if(x.t && qtyTask.has(x.t)) return x.a > 0 && x.q > 0 ? 0 : clamp01(taskPct(x.t) / 100);
+    if(has(L[x.r])) return clamp01(num(L[x.r]));
+    return x.t ? clamp01(taskPct(x.t) / 100) : 0;
+  };
+}
+/* 원가계산서 비목 (밀양 기성내역서 기준). fixed = 회차마다 비율로 늘지 않고 금회 청구액을 직접 넣는 항목 */
+const COST_ITEMS = [
+  { k:"indMat", n:"간접재료비", b:"직접재료비", rate:0, base: v => v.dm, grp:"mat" },
+  { k:"scrap", n:"작업설·부산물 (△)", b:"직접재료비", rate:0, base: v => v.dm, grp:"mat", minus:true },
+  { k:"indLab", n:"간접노무비", b:"직접노무비", rate:6, base: v => v.dl, grp:"lab" },
+  { k:"accid", n:"산재보험료", b:"노무비", rate:3.56, base: v => v.lab, grp:"exp" },
+  { k:"employ", n:"고용보험료", b:"노무비", rate:1.01, base: v => v.lab, grp:"exp" },
+  { k:"health", n:"국민건강보험료", b:"직접노무비", rate:3.545, base: v => v.dl, grp:"exp", fixed:true },
+  { k:"pension", n:"국민연금보험료", b:"직접노무비", rate:4.5, base: v => v.dl, grp:"exp", fixed:true },
+  { k:"retire", n:"퇴직공제부금비", b:"직접노무비", rate:2.3, base: v => v.dl, grp:"exp", fixed:true },
+  { k:"safety", n:"산업안전보건관리비", b:"(재료비+직접노무비)", rate:1.97, base: v => v.mat + v.dl, grp:"exp", fixed:true },
+  { k:"care", n:"노인장기요양보험료", b:"건강보험료", rate:12.95, base: v => v.health, grp:"exp", fixed:true },
+  { k:"safeMgmt", n:"안전관리비", b:"금액 직접 입력", amt:true, grp:"exp", fixed:true },
+  { k:"quality", n:"품질관리비", b:"금액 직접 입력", amt:true, grp:"exp", fixed:true },
+  { k:"env", n:"환경보전비", b:"(재료비+직접노무비+경비)", rate:0.3, base: v => v.mat + v.dl + v.de, grp:"exp", fixed:true },
+  { k:"etc", n:"기타경비", b:"(재료비+노무비)", rate:2.9, base: v => v.mat + v.lab, grp:"exp" },
+  { k:"subGuar", n:"하도급지급보증수수료", b:"(재료비+직접노무비+경비)", rate:0.075, base: v => v.mat + v.dl + v.de, grp:"exp", fixed:true },
+  { k:"machGuar", n:"건설기계대여금지급보증서발급수수료", b:"(재료비+직접노무비+경비)", rate:0.07, base: v => v.mat + v.dl + v.de, grp:"exp", fixed:true },
+  { k:"gen", n:"일반관리비", b:"계", rate:3.5, base: v => v.sum, grp:"top" },
+  { k:"profit", n:"이윤", b:"(노무비+경비+일반관리비)", rate:7.5, base: v => v.lab + v.exp + v.gen, grp:"top" },
+  { k:"vat", n:"부가가치세", b:"공급가액", rate:10, base: v => v.supply, grp:"vat" },
+];
+function costItems(){
+  const c = ((state.data && state.data.project) || {}).claimCfg || {};
+  return COST_ITEMS.map(it => ({ ...it, rate: c.rates && c.rates[it.k] != null ? num(c.rates[it.k]) : (it.rate || 0),
+    fixed: it.amt ? true : it.k === "vat" ? false : c.fixed && c.fixed[it.k] != null ? !!c.fixed[it.k] : !!it.fixed,
+    amount: c.amt && c.amt[it.k] != null ? num(c.amt[it.k]) : 0 }));
+}
+/* d = { dm, dl, de }. claimOf(it) → 고정 항목의 누계 청구액 (도급 열은 null → 요율로 계산) */
+function costSection(d, items, claimOf){
+  const T = Math.trunc, v = { dm: d.dm, dl: d.dl, de: d.de };
+  const val = it => { if(claimOf && it.fixed) return T(claimOf(it)); if(it.amt) return T(it.amount); return T(it.base(v) * it.rate / 100); };
+  const run = g => items.filter(it => it.grp === g).forEach(it => { v[it.k] = val(it); });
+  run("mat"); v.mat = T(v.dm + v.indMat - v.scrap);
+  run("lab"); v.lab = T(v.dl + v.indLab);
+  run("exp"); v.exp = T(v.de + items.filter(it => it.grp === "exp").reduce((a, it) => a + v[it.k], 0));
+  v.sum = v.mat + v.lab + v.exp;
+  run("top"); v.supply = v.sum + v.gen + v.profit;
+  run("vat"); v.total = v.supply + v.vat;
+  return v;
+}
+const COST_ROWS = () => [
+  ["직접재료비", "", "dm"], ["간접재료비", "indMat"], ["작업설·부산물 (△)", "scrap"], ["[ 재료비 소계 ]", "", "mat", "sub"],
+  ["직접노무비", "", "dl"], ["간접노무비", "indLab"], ["[ 노무비 소계 ]", "", "lab", "sub"],
+  ["경비", "", "de"], ...COST_ITEMS.filter(it => it.grp === "exp").map(it => [it.n, it.k]), ["[ 경비 소계 ]", "", "exp", "sub"],
+  ["계", "", "sum", "sub"], ["일반관리비", "gen"], ["이윤", "profit"], ["공급가액", "", "supply", "sub"], ["부가가치세", "vat"], ["합계 (부가세 포함)", "", "total", "tot"],
+].map(([n, k, f, cls]) => ({ n, k: k || "", f: f || k, cls: cls || "" }));
+function claimModel(M, perId){
+  const pers = periodsOf(), i = pers.findIndex(p => p.id === perId); if(i < 0) return null;
+  const cur = pers[i], prev = i ? pers[i - 1] : null, fc = lineFracFn(cur), fp = lineFracFn(prev);
+  const T = Math.trunc, R3 = n => Math.round(n * 1000) / 1000;
+  const part = (x, f) => { const m = T(x.m * f + 1e-6), l = T(x.l * f + 1e-6), e = T(x.e * f + 1e-6); return { q: R3(x.q * f), m, l, e, a: x.m + x.l + x.e ? m + l + e : T(x.a * f + 1e-6) }; };
+  const diff = (A, B) => ({ q: R3(A.q - B.q), m: A.m - B.m, l: A.l - B.l, e: A.e - B.e, a: A.a - B.a });
+  const lines = boqOf().map(x => { const C = { q: x.q, m: x.m, l: x.l, e: x.e, a: x.m + x.l + x.e || x.a }, P = part(x, fp(x)), N = part(x, fc(x));
+    return { x, f: fc(x), s: [C, P, diff(N, P), N, diff(C, N)] }; });
+  const sumOf = ls => [0, 1, 2, 3, 4].map(k => ls.reduce((o, L) => { const z = L.s[k]; o.m += z.m; o.l += z.l; o.e += z.e; o.a += z.a; return o; }, { m:0, l:0, e:0, a:0 }));
+  const byT = new Map(); lines.forEach(L => { const k = L.x.t && M.by.has(L.x.t) ? L.x.t : ""; if(!byT.has(k)) byT.set(k, []); byT.get(k).push(L); });
+  const tasks = [];
+  M.groups.forEach(g => g.items.forEach(it => { const t = M.by.get(it.id); if(byT.has(t.id)) tasks.push({ g: g.name, code: t.code, name: t.name, lines: byT.get(t.id) }); }));
+  if(byT.has("")) tasks.push({ g: "기타", code: "", name: "기타 (작업 미연결)", lines: byT.get("") });
+  tasks.forEach(t => { t.sum = sumOf(t.lines); });
+  const total = sumOf(lines), items = costItems();
+  const D = k => ({ dm: total[k].m, dl: total[k].l, de: total[k].e });
+  const claimTo = (k, upto) => pers.slice(0, upto + 1).reduce((a, p) => a + num((p.fixedClaim || {})[k]), 0);
+  const cC = costSection(D(0), items, null), cP = costSection(D(1), items, it => prev ? claimTo(it.k, i - 1) : 0), cN = costSection(D(3), items, it => claimTo(it.k, i));
+  const sub = (A, B) => Object.fromEntries(Object.keys(A).map(k => [k, A[k] - B[k]]));
+  const cost = [cC, cP, sub(cN, cP), cN, sub(cC, cN)];
+  return { per: cur, prev, idx: i, lines, tasks, total, cost, items, rate: total[0].a ? total[3].a / total[0].a : 0 };
+}
+const SEC_NAMES = ["도급", "전회 기성", "금회 기성", "누계 기성", "잔여"];
+function renderClaim(M){
+  if(!boqOf().length) return "";
+  const pers = periodsOf();
+  const head = `<div class="evm-sec"><h3>기성내역서</h3>`;
+  if(!pers.length) return head + `<div class="panel empty" style="padding:20px">기성 회차를 먼저 만들면, 그 회차의 도급 · 전회 · 금회 · 누계 · 잔여 기성내역서를 엑셀로 만들 수 있습니다.</div></div>`;
+  const id = pers.some(p => p.id === state.clPer) ? state.clPer : pers[pers.length - 1].id;
+  const C = claimModel(M, id), ed = state.canEdit, w = wonM;
+  const pctOf = (a, b) => b ? (a / b * 100).toFixed(1) + "%" : "–";
+  let gPrev = null;
+  const rows = C.tasks.map(t => { let h = "";
+    if(t.g !== gPrev){ gPrev = t.g; h = `<tr class="grp"><td colspan="8">${esc(t.g)}</td></tr>`; }
+    return h + `<tr><td class="mono">${esc(t.code)}</td><td>${esc(t.name)} <span style="color:var(--ink-3);font-size:11.5px">${t.lines.length}줄</span></td>${t.sum.map(z => `<td class="r num">${w(z.a)}</td>`).join("")}<td class="r num">${pctOf(t.sum[3].a, t.sum[0].a)}</td></tr>`; }).join("");
+  const cs = C.cost;
+  const foot = `<tr class="sub"><td></td><td>직접공사비</td>${C.total.map(z => `<td class="r num">${w(z.a)}</td>`).join("")}<td class="r num">${pctOf(C.total[3].a, C.total[0].a)}</td></tr>
+    <tr class="sub"><td></td><td>공급가액 (간접비·일반관리비·이윤 포함)</td>${cs.map(v => `<td class="r num">${w(v.supply)}</td>`).join("")}<td class="r num">${pctOf(cs[3].supply, cs[0].supply)}</td></tr>
+    <tr class="tot"><td></td><td>합계 (부가세 포함)</td>${cs.map(v => `<td class="r num">${w(v.total)}</td>`).join("")}<td class="r num">${pctOf(cs[3].total, cs[0].total)}</td></tr>`;
+  const contract = num(M.p.contractAmount);
+  const gap = contract ? `<span class="note">내역서로 계산한 도급액 ${w(cs[0].total)}원 · 입력한 도급 금액 ${w(contract)}원 (차이 ${cs[0].total - contract >= 0 ? "+" : ""}${w(cs[0].total - contract)}원)</span>` : "";
+  const claimNow = C.per.fixedClaim || {};
+  const costRows = COST_ROWS().map(r => { const it = r.k ? C.items.find(x => x.k === r.k) : null;
+    const basis = it ? (it.amt ? "금액 직접 입력" : `${it.b} × ${ed ? `<input type="number" step="0.001" min="0" data-clrate="${it.k}" value="${it.rate}" aria-label="${esc(it.n)} 요율">` : it.rate}%`) : "";
+    const mode = it && it.k !== "vat" ? (it.amt ? `<span class="note">고정</span>` : ed ? `<label class="chk" style="margin:0"><input type="checkbox" data-clfix="${it.k}" ${it.fixed ? "checked" : ""}> 고정</label>` : it.fixed ? "고정" : "비율") : "";
+    const c0 = it && it.amt && ed ? `<input type="number" class="amt" step="1000" min="0" data-clamt="${it.k}" value="${it.amount || ""}" aria-label="${esc(it.n)} 도급 금액">` : w(cs[0][r.f]);
+    const c2 = it && it.fixed && ed ? `<input type="number" class="amt" step="1000" data-clclaim="${it.k}" value="${claimNow[it.k] ?? ""}" placeholder="0" aria-label="${esc(it.n)} 금회 청구">` : w(cs[2][r.f]);
+    return `<tr class="${r.cls}"><td>${esc(r.n)}</td><td>${basis}</td><td>${mode}</td><td class="r num">${c0}</td><td class="r num">${w(cs[1][r.f])}</td><td class="r">${c2}</td><td class="r num">${w(cs[3][r.f])}</td><td class="r num">${w(cs[4][r.f])}</td></tr>`; }).join("");
+  return head + `<div class="cl-bar"><label for="cl-per" class="note" style="margin:0">회차</label><select id="cl-per">${pers.map(p => `<option value="${esc(p.id)}" ${p.id === id ? "selected" : ""}>${esc(p.label || "기성")} · ${esc(fmtLong(p.date))}</option>`).join("")}</select>
+      <button class="btn primary" id="cl-xlsx">기성내역서 엑셀 내려받기</button>
+      <span class="note">표지 · 원가계산서 · 공종별집계표 · 공종별내역서 4장. 전회 = ${C.prev ? esc(C.prev.label || "") + " " + esc(fmtLong(C.prev.date)) : "없음 (첫 회차)"}</span></div>
+    <div class="panel tbl-wrap"><table class="clt"><thead><tr><th>코드</th><th>공종</th>${SEC_NAMES.map(n => `<th class="r">${n}</th>`).join("")}<th class="r">누계 기성률</th></tr></thead><tbody>${rows}${foot}</tbody></table></div>
+    ${gap}
+    <details class="cl-cost" ${state.clCostOpen ? "open" : ""}><summary>원가계산서 · 요율과 고정 항목 금회 청구</summary>
+      <div class="panel tbl-wrap"><table class="clt"><thead><tr><th>비목</th><th>산출 기준</th><th>기성 방식</th><th class="r">도급</th><th class="r">전회</th><th class="r">금회</th><th class="r">누계</th><th class="r">잔여</th></tr></thead><tbody>${costRows}</tbody></table></div>
+      <p class="note">요율 항목은 회차마다 내역 기성액에 요율을 곱해 계산합니다. <b>고정</b> 항목(4대보험·안전관리비 등 정산 항목)은 도급 금액을 요율로 정해 두고, 이번 회차에 청구할 금액을 ‘금회’ 칸에 직접 넣습니다.</p>
+      ${ed ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="cl-fill">고정 항목 금회를 공정률(${(C.rate * 100).toFixed(1)}%)로 채우기</button><button class="btn primary" id="cl-save">요율·청구액 저장</button></div>` : ""}
+    </details></div>`;
+}
+function claimClick(e){
+  if(e.target.closest(".cl-cost summary")){ state.clCostOpen = !e.target.closest("details").open; return false; }
+  if(e.target.closest("#cl-xlsx")){ const b = e.target.closest("#cl-xlsx"); b.disabled = true; exportClaimXlsx(state.M, $("#cl-per").value).finally(() => { b.disabled = false; }); return true; }
+  if(e.target.closest("#cl-fill")){ const C = claimModel(state.M, $("#cl-per").value);
+    const pers = periodsOf(), before = k => pers.slice(0, C.idx).reduce((a, p) => a + num((p.fixedClaim || {})[k]), 0);
+    document.querySelectorAll("[data-clclaim]").forEach(inp => { const k = inp.dataset.clclaim, it = C.items.find(x => x.k === k);
+      const amt = it.amt ? num((document.querySelector(`[data-clamt="${k}"]`) || {}).value) : C.cost[0][k];
+      inp.value = Math.max(0, Math.trunc(amt * C.rate) - before(k)); });
+    toast("고정 항목 금회 청구액을 채웠습니다. 저장을 눌러야 반영됩니다."); return true; }
+  if(e.target.closest("#cl-save")){ const id = $("#cl-per").value, rates = {}, fixed = {}, amt = {}, claim = {};
+    document.querySelectorAll("[data-clrate]").forEach(i => { rates[i.dataset.clrate] = num(i.value); });
+    document.querySelectorAll("[data-clfix]").forEach(i => { fixed[i.dataset.clfix] = i.checked; });
+    document.querySelectorAll("[data-clamt]").forEach(i => { amt[i.dataset.clamt] = num(i.value); });
+    document.querySelectorAll("[data-clclaim]").forEach(i => { if(i.value !== "" && num(i.value)) claim[i.dataset.clclaim] = num(i.value); });
+    state.clCostOpen = true;
+    commit(d => { d.project = { ...(d.project || {}), claimCfg: { rates, fixed, amt } };
+      const p = (d.periods || []).find(x => x.id === id); if(p) p.fixedClaim = claim; }, "원가계산 요율과 청구액을 저장했습니다");
+    return true; }
+  return false;
+}
+/* ---- 엑셀 (ExcelJS) ---- */
+let excelJsReady = null;
+function loadExcelJS(){
+  if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if(!excelJsReady) excelJsReady = new Promise((ok, bad) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+    sc.onload = () => ok(window.ExcelJS);
+    sc.onerror = () => { excelJsReady = null; bad(new Error("엑셀 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.")); };
+    document.head.appendChild(sc);
+  });
+  return excelJsReady;
+}
+async function exportClaimXlsx(M, perId){
+  let ExcelJS; try{ ExcelJS = await loadExcelJS(); }catch(err){ toast(err.message, 5000); return; }
+  const C = claimModel(M, perId); if(!C) return;
+  const per = C.per, pname = M.p.name || "공사", title2 = `${per.label || "기성"} (기준일 ${fmtLong(per.date)})`;
+  const wb = new ExcelJS.Workbook(); wb.creator = "온실 공정표"; wb.created = new Date();
+  const NF = "#,###;\\-#,###;#;", QF = "#,##0.###;\\-#,##0.###;#;", FONT = "굴림체";
+  const thin = { style: "thin", color: { argb: "FF808080" } }, BOX = { top: thin, left: thin, bottom: thin, right: thin };
+  const FILL_H = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }, FILL_S = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F4F0" } }, FILL_T = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF3CC" } };
+  const put = (ws, r, c, v, o = {}) => { const x = ws.getCell(r, c); x.value = v;
+    x.font = { name: FONT, size: o.size || 10, bold: !!o.bold }; x.border = BOX;
+    x.alignment = { vertical: "middle", horizontal: o.h || (typeof v === "number" ? "right" : "left"), wrapText: !!o.wrap, indent: o.indent || 0 };
+    if(typeof v === "number") x.numFmt = o.nf || NF; if(o.fill) x.fill = o.fill; return x; };
+  const titleRows = (ws, nCol, title) => {
+    ws.mergeCells(1, 1, 1, nCol); const t = ws.getCell(1, 1); t.value = title; t.font = { name: FONT, size: 18, bold: true }; t.alignment = { horizontal: "center", vertical: "middle" }; ws.getRow(1).height = 34;
+    const split = nCol > 9 ? 8 : nCol - 3, from = nCol > 9 ? nCol - 5 : nCol - 2;
+    ws.mergeCells(2, 1, 2, split); const a = ws.getCell(2, 1); a.value = `공 사 명 : ${pname}`; a.font = { name: FONT, size: 11 };
+    ws.mergeCells(2, from, 2, nCol); const b = ws.getCell(2, from); b.value = title2; b.font = { name: FONT, size: 11 }; b.alignment = { horizontal: "right" };
+  };
+  const setup = (ws, paper, titles) => { ws.pageSetup = { paperSize: paper, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
+    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }, printTitlesRow: titles };
+    ws.headerFooter = { oddFooter: "&C&P / &N" }; };
+  const SEC_T = ["도 급 내 역", "전 회 기 성", "금 회 기 성", "누 계 기 성", "잔 여 기 성"];
+  const cs = C.cost, T0 = C.total;
+
+  /* 1. 표지 */
+  { const ws = wb.addWorksheet("표지"); ws.columns = [{ width: 4 }, { width: 22 }, { width: 26 }, { width: 26 }, { width: 4 }];
+    const big = (r, v, size, bold) => { ws.mergeCells(r, 2, r, 4); const x = ws.getCell(r, 2); x.value = v; x.font = { name: FONT, size, bold }; x.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; ws.getRow(r).height = size * 2; };
+    big(3, "기 성 내 역 서", 28, true); big(5, `제 ${C.idx + 1} 회  (${per.label || "기성"})`, 16, false); big(7, pname, 15, true);
+    const kv = [["기성 기준일", fmtLong(per.date)], ["전회 기준일", C.prev ? fmtLong(C.prev.date) : "–"], ["도 급 금 액", cs[0].total], ["전회 기성금액", cs[1].total], ["금회 기성금액", cs[2].total], ["누계 기성금액", cs[3].total], ["잔 여 금 액", cs[4].total],
+      ["누계 기성률", cs[0].total ? cs[3].total / cs[0].total : 0]];
+    kv.forEach(([k, v], i) => { const r = 10 + i; ws.getRow(r).height = 26;
+      put(ws, r, 2, k, { size: 12, bold: true, h: "center", fill: FILL_H }); ws.mergeCells(r, 3, r, 4);
+      const x = put(ws, r, 3, v, { size: 12, h: typeof v === "number" ? "right" : "center", bold: k === "금회 기성금액" });
+      if(k === "누계 기성률") x.numFmt = "0.00%"; else if(typeof v === "number") x.numFmt = '#,##0"원"'; });
+    ws.mergeCells(20, 2, 20, 4); const n = ws.getCell(20, 2); n.value = "금액은 부가가치세 포함입니다. 위와 같이 기성 내역을 제출합니다."; n.font = { name: FONT, size: 11 }; n.alignment = { horizontal: "center" };
+    ws.mergeCells(23, 2, 23, 4); const d = ws.getCell(23, 2); d.value = `${per.date.slice(0, 4)}년  ${+per.date.slice(5, 7)}월  ${+per.date.slice(8, 10)}일`; d.font = { name: FONT, size: 12 }; d.alignment = { horizontal: "center" };
+    ws.mergeCells(26, 3, 26, 4); const g = ws.getCell(26, 3); g.value = "시 공 자 :                              (인)"; g.font = { name: FONT, size: 12 };
+    ws.pageSetup = { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 1, horizontalCentered: true }; }
+
+  /* 2. 원가계산서 */
+  { const ws = wb.addWorksheet("원가계산서"); ws.columns = [{ width: 30 }, { width: 30 }, { width: 17 }, { width: 17 }, { width: 17 }, { width: 17 }, { width: 17 }, { width: 14 }];
+    titleRows(ws, 8, "원 가 계 산 서");
+    ["비      목", "구 성 비", "도 급 금 액", "전 회 기 성", "금 회 기 성", "누 계 기 성", "잔 여", "비 고"].forEach((h, j) => put(ws, 3, j + 1, h, { bold: true, h: "center", fill: FILL_H }));
+    ws.getRow(3).height = 24;
+    COST_ROWS().forEach((r, i) => { const R = 4 + i, it = r.k ? C.items.find(x => x.k === r.k) : null, fill = r.cls === "tot" ? FILL_T : r.cls === "sub" ? FILL_S : null, bold = !!r.cls;
+      put(ws, R, 1, r.n, { bold, fill, indent: r.cls ? 0 : 1 });
+      put(ws, R, 2, it ? (it.amt ? "(고정)" : `${it.fixed ? "(고정) " : ""}${it.b} × ${it.rate}%`) : "", { fill, size: 9 });
+      cs.forEach((v, j) => put(ws, R, 3 + j, v[r.f] || 0, { bold, fill }));
+      put(ws, R, 8, "", { fill }); ws.getRow(R).height = 20; });
+    ws.views = [{ state: "frozen", ySplit: 3 }]; setup(ws, 9, "1:3"); }
+
+  /* 3. 공종별집계표 */
+  { const ws = wb.addWorksheet("공종별집계표"); const NC = 2 + 20 + 2;
+    ws.columns = [{ width: 10 }, { width: 30 }, ...Array(20).fill({ width: 14 }), { width: 9 }, { width: 12 }];
+    titleRows(ws, NC, "공 종 별 집 계 표");
+    put(ws, 3, 1, "코드", { bold: true, h: "center", fill: FILL_H }); put(ws, 3, 2, "공      종", { bold: true, h: "center", fill: FILL_H });
+    ws.mergeCells(3, 1, 4, 1); ws.mergeCells(3, 2, 4, 2);
+    SEC_T.forEach((h, s) => { const c = 3 + s * 4; put(ws, 3, c, h, { bold: true, h: "center", fill: FILL_H }); for(let j = 1; j < 4; j++) put(ws, 3, c + j, "", { fill: FILL_H }); ws.mergeCells(3, c, 3, c + 3);
+      ["재료비", "노무비", "경비", "합계"].forEach((n, j) => put(ws, 4, c + j, n, { bold: true, h: "center", fill: FILL_H })); });
+    put(ws, 3, NC - 1, "누계율", { bold: true, h: "center", fill: FILL_H }); put(ws, 3, NC, "비 고", { bold: true, h: "center", fill: FILL_H }); ws.mergeCells(3, NC - 1, 4, NC - 1); ws.mergeCells(3, NC, 4, NC);
+    let R = 5;
+    const line = (code, name, sums, o = {}) => { put(ws, R, 1, code, { h: "center", fill: o.fill }); put(ws, R, 2, name, { bold: o.bold, fill: o.fill, indent: o.indent });
+      sums.forEach((z, s) => [z.m, z.l, z.e, z.a].forEach((v, j) => put(ws, R, 3 + s * 4 + j, v, { bold: o.bold, fill: o.fill })));
+      const x = put(ws, R, NC - 1, sums[0].a ? sums[3].a / sums[0].a : 0, { bold: o.bold, fill: o.fill }); x.numFmt = "0.0%"; put(ws, R, NC, "", { fill: o.fill }); R++; };
+    const groups = []; C.tasks.forEach(t => { let g = groups[groups.length - 1]; if(!g || g.name !== t.g){ g = { name: t.g, tasks: [] }; groups.push(g); } g.tasks.push(t); });
+    const addS = list => [0, 1, 2, 3, 4].map(k => list.reduce((o, t) => { const z = t.sum[k]; o.m += z.m; o.l += z.l; o.e += z.e; o.a += z.a; return o; }, { m:0, l:0, e:0, a:0 }));
+    groups.forEach(g => { put(ws, R, 1, "", { fill: FILL_S }); put(ws, R, 2, g.name, { bold: true, fill: FILL_S }); for(let c = 3; c <= NC; c++) put(ws, R, c, "", { fill: FILL_S }); R++;
+      g.tasks.forEach(t => line(t.code, t.name, t.sum, { indent: 1 }));
+      if(groups.length > 1) line("", `[ ${g.name} 소계 ]`, addS(g.tasks), { bold: true }); });
+    line("", "[ 직 접 공 사 비  합 계 ]", T0, { bold: true, fill: FILL_T });
+    ws.views = [{ state: "frozen", xSplit: 2, ySplit: 4 }]; setup(ws, 8, "1:4"); }
+
+  /* 4. 공종별내역서 */
+  { const ws = wb.addWorksheet("공종별내역서"); const NC = 5 + 45 + 1;
+    ws.columns = [{ width: 9 }, { width: 30 }, { width: 32 }, { width: 8 }, { width: 6 }, ...Array(5).fill(0).flatMap(() => [{ width: 10 }, ...Array(8).fill({ width: 13 })]), { width: 14 }];
+    titleRows(ws, NC, "공 종 별 내 역 서");
+    [["코드", 1], ["품      명", 2], ["규      격", 3], ["계약별", 4], ["단위", 5], ["비 고", NC]].forEach(([h, c]) => { put(ws, 3, c, h, { bold: true, h: "center", fill: FILL_H }); put(ws, 4, c, "", { fill: FILL_H }); put(ws, 5, c, "", { fill: FILL_H }); ws.mergeCells(3, c, 5, c); });
+    SEC_T.forEach((h, s) => { const c = 6 + s * 9;
+      put(ws, 3, c, h, { bold: true, h: "center", fill: FILL_H }); for(let j = 1; j < 9; j++) put(ws, 3, c + j, "", { fill: FILL_H }); ws.mergeCells(3, c, 3, c + 8);
+      put(ws, 4, c, "수 량", { bold: true, h: "center", fill: FILL_H }); put(ws, 5, c, "", { fill: FILL_H }); ws.mergeCells(4, c, 5, c);
+      ["재 료 비", "노 무 비", "경    비", "합    계"].forEach((n, j) => { const cc = c + 1 + j * 2; put(ws, 4, cc, n, { bold: true, h: "center", fill: FILL_H }); put(ws, 4, cc + 1, "", { fill: FILL_H }); ws.mergeCells(4, cc, 4, cc + 1);
+        put(ws, 5, cc, "단 가", { bold: true, h: "center", fill: FILL_H }); put(ws, 5, cc + 1, "금 액", { bold: true, h: "center", fill: FILL_H }); }); });
+    let R = 6;
+    const blank = (from, fill) => { for(let c = from; c <= NC; c++) put(ws, R, c, "", { fill }); };
+    const sumRow = (label, sums, fill) => { put(ws, R, 1, "", { fill }); put(ws, R, 2, label, { bold: true, h: "center", fill }); for(let c = 3; c <= 5; c++) put(ws, R, c, "", { fill });
+      sums.forEach((z, s) => { const c = 6 + s * 9; put(ws, R, c, "", { fill }); [z.m, z.l, z.e, z.a].forEach((v, j) => { put(ws, R, c + 1 + j * 2, "", { fill }); put(ws, R, c + 2 + j * 2, v, { bold: true, fill }); }); });
+      put(ws, R, NC, "", { fill }); R++; };
+    C.tasks.forEach(t => {
+      put(ws, R, 1, t.code, { bold: true, h: "center", fill: FILL_S }); put(ws, R, 2, t.name, { bold: true, fill: FILL_S }); blank(3, FILL_S); R++;
+      t.lines.forEach(L => { const x = L.x, up = v => x.q > 0 ? v / x.q : 0, tot = x.m + x.l + x.e || x.a;
+        put(ws, R, 1, ""); put(ws, R, 2, x.n, { wrap: true }); put(ws, R, 3, x.s || "", { wrap: true, size: 9 }); put(ws, R, 4, "도급", { h: "center", size: 9 }); put(ws, R, 5, x.u || "", { h: "center" });
+        L.s.forEach((z, s) => { const c = 6 + s * 9;
+          put(ws, R, c, z.q, { nf: QF });
+          [[x.m, z.m], [x.l, z.l], [x.e, z.e], [tot, z.a]].forEach(([u, a], j) => { put(ws, R, c + 1 + j * 2, up(u)); put(ws, R, c + 2 + j * 2, a); }); });
+        put(ws, R, NC, x.r ? `내역 ${x.r}행` : "", { size: 8, h: "center" }); R++; });
+      sumRow("[ 합           계 ]", t.sum, null); });
+    sumRow("[ 총           계 ]", T0, FILL_T);
+    ws.views = [{ state: "frozen", xSplit: 5, ySplit: 5 }]; setup(ws, 8, "1:5"); }
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `${pname} 기성내역서 ${per.label || ""} ${per.date}.xlsx`.replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, " ");
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast("기성내역서 엑셀을 만들었습니다");
 }
 /* ---- 진도 입력 창 ---- */
 function openPeriod(id, preset){
@@ -1792,7 +2066,8 @@ function openPeriod(id, preset){
   M.order.forEach(tid => { const t = M.by.get(tid); pct[tid] = preset ? num(preset.pct[tid]) : per ? num((per.pct || {})[tid]) : (prev ? periodPct(prev, tid) : t.prog); });
   if(!preset) Object.assign(qty, per ? (per.qty || {}) : (prev ? (prev.qty || {}) : {}));
   state.drawer = { kind:"period", id: per ? per.id : null, date: per ? per.date : localToday(), label: per ? per.label : `${periodsOf().length + 1}회 기성`, note: per ? per.note || "" : "",
-    pct, qty, prevId: prev ? prev.id : null, open: {}, sync: true, arm: false, note: preset ? "시공 진도 기준" : (per ? per.note || "" : "") };
+    pct, qty, prevId: prev ? prev.id : null, open: {}, sync: true, arm: false, note: preset ? "시공 진도 기준" : (per ? per.note || "" : ""),
+    lines: preset && preset.lines ? { ...preset.lines } : per && per.lines ? { ...per.lines } : null };
   renderDrawer(); $("#drawer").classList.add("wide"); $("#drawer").hidden = false; $("#scrim").hidden = false;
 }
 function renderPeriodDrawer(){
@@ -1858,6 +2133,14 @@ async function savePeriod(){
   const M = state.M, id = dr.id || "pr" + Date.now().toString(36);
   const pct = {}; M.order.forEach(tid => { const q = taskQtyPct(tid, dr.qty); pct[tid] = +(q != null ? q : num(dr.pct[tid])).toFixed(2); });
   const per = { id, date: dr.date, label: dr.label.trim() || "기성", note: dr.note.trim(), pct, qty: { ...dr.qty } };
+  if(dr.lines){   // 시공 진도의 줄별 비율: 작업 진척률을 손으로 바꾼 작업은 버림
+    const lines = {}, bl = boqOf();
+    M.order.forEach(tid => { const ls = bl.filter(x => x.t === tid), tot = ls.reduce((a, x) => a + x.a, 0); if(!tot) return;
+      const w = ls.reduce((a, x) => a + x.a * (dr.lines[x.r] != null ? num(dr.lines[x.r]) : pct[tid] / 100), 0) / tot * 100;
+      if(Math.abs(w - pct[tid]) < 0.05) ls.forEach(x => { if(dr.lines[x.r] != null) lines[x.r] = num(dr.lines[x.r]); }); });
+    if(Object.keys(lines).length) per.lines = lines;
+  }
+  { const old = periodsOf().find(x => x.id === id); if(old && old.fixedClaim) per.fixedClaim = old.fixedClaim; }
   const isLatest = !periodsOf().some(x => x.id !== dr.id && x.date > dr.date);
   const sync = isLatest && dr.sync;
   const btn = $("#pd-save"); btn.disabled = true;
@@ -3088,6 +3371,7 @@ document.addEventListener("click", e => {
   const dgo = e.target.closest("[data-dupgo]"); if(dgo){ duplicateGroup(dgo.dataset.dupgo); return; }
   if(e.target.closest("#f-dup")){ const src = tasksOf().find(t => t.id === state.drawer.id); if(src){ state.drawer = { id: null, arm: false, copy: src }; renderDrawer(); } return; }
   if(periodClick(e)) return;
+  if(claimClick(e)) return;
   if(resClick(e)) return;
   if(e.target.closest("#b-save")){ saveBuy(); return; }
   if(e.target.closest("#b-del")){ deleteBuy(); return; }
@@ -3108,6 +3392,7 @@ document.addEventListener("click", e => {
 document.addEventListener("change", e => {
   if(e.target.id === "projSel") selectProject(e.target.value);
   if(e.target.id === "f-ms") updateTe();
+  if(e.target.id === "cl-per"){ state.clPer = e.target.value; render(); return; }
   if(e.target.id === "buy-filter"){ state.buyFilter = e.target.value; state.buyClosed = null; render(); return; }
   if(laborInput(e)) return;
   if(e.target.id === "f-group" && state.drawer && !state.drawer.id){ const c = $("#f-code"); if(c && (!c.value || c.value === state.drawer.autoCode)){ c.value = nextCode(e.target.value); state.drawer.autoCode = c.value; } }
