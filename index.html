@@ -106,6 +106,9 @@ details.imp summary{cursor:pointer;font-size:13px;color:var(--ink-2);margin:6px 
 .dday.bad{color:var(--bad);font-weight:600} .dday.warn{color:var(--warn);font-weight:600}
 tbody tr.b{cursor:pointer} tbody tr.b:hover{background:var(--surface-2)}
 tr.b.recv td{color:var(--ink-3)}
+.lk{fill:none;stroke:var(--ink-3);stroke-width:1;opacity:.75}
+.lk.crit{stroke:var(--crit);stroke-width:1.4;opacity:.95}
+.lk-g:hover .lk{stroke:var(--ink);stroke-width:2;opacity:1}
 .g-resl{display:flex;flex-direction:column;justify-content:center;padding:0 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-top:1px solid var(--line)}
 .res-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
 .res-ctl label{display:inline-flex;gap:4px;align-items:center}
@@ -549,7 +552,7 @@ const state = {
   mode: (!(CFG.firebase && CFG.firebase.apiKey) || params.has("demo")) ? "demo" : "boot",   // demo | boot | login | denied | setup | live | error
   account: null, data: null, role: null, members: [], canEdit: false, errMsg: "",
   projects: {}, pid: store.get("pid", ""), roles: {},
-  tab: store.get("tab","gantt"), zoom: Number(store.get("zoom","12")) || 12, sched: store.get("sched","early"),
+  tab: store.get("tab","gantt"), zoom: Number(store.get("zoom","12")) || 12, sched: store.get("sched","early"), links: store.get("links","on"),
   drawer: null, M: null, draftOff: null, busy: false
 };
 const DEFAULT_PROJECT = { name:"온실 신축공사", startDate: localToday(), targetDate:"", workSaturday:true, offDays:[], statusDate:"", baseline:null };
@@ -1831,6 +1834,7 @@ function renderKpis(M){
 }
 function renderTools(){
   let h = "";
+  if(state.tab==="gantt") h += `<button class="btn ${state.links !== "off" ? "primary" : ""}" id="toggleLinks" title="선행 관계 화살표 켜기/끄기">연결선</button>`;
   if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="일정 기준"><button data-sched="early" class="${state.sched!=="late"?"on":""}" title="가장 이른 일정(ES-EF)">조기</button><button data-sched="late" class="${state.sched==="late"?"on":""}" title="가장 늦은 일정(LS-LF): 늦어도 이때까지는 해야 함">만기</button></div>`;
   if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="확대">${[[5,"월"],[12,"주"],[24,"일"]].map(([z,l])=>`<button data-zoom="${z}" class="${state.zoom===z?"on":""}">${l}</button>`).join("")}</div>`;
   if(state.tab==="gantt" && resOf().length) h += `<button class="btn ${state.showRes ? "primary" : ""}" id="toggleRes" title="간트 아래에 일별 노무 투입량을 같은 시간축으로 보여 줍니다">자원 보기</button>`;
@@ -1854,6 +1858,7 @@ const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border
   <span><i class="sw" style="width:8px;height:8px;background:var(--prog);clip-path:polygon(0 0,100% 0,0 100%)"></i>착수 제한일</span>
   <span><i class="sw" style="width:9px;height:9px;background:var(--accent-soft);border-color:var(--accent);transform:rotate(45deg)"></i>마일스톤</span>
   <span><i class="sw" style="width:2px;height:12px;border:0;border-left:2px dashed #7B4FB8"></i>중간관리일</span>
+  <span>→ 선행 연결 <span style="color:var(--crit)">(빨강 = 주공정)</span></span>
   <span style="color:var(--bad)">▲n 착수·종료 지연(기준 공정 대비)</span>
   ${state.sched === "late" ? `<span style="color:var(--prog);font-weight:600">· 만기 일정(가장 늦은 일정) 보기 중</span>` : ""}
   <span><i class="sw" style="width:10px;height:7px;background:#7B4FB8;clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 전(발주 기한)</span>
@@ -1908,6 +1913,7 @@ function renderGantt(M){
     const when = x.st === "recv" ? `발주 ${fmt(x.orderedDate)} · 입고 ${fmt(x.receivedDate)}` : x.eta ? `발주 ${fmt(x.orderedDate)} · 입고 예정 ${fmt(x.eta)}` : `발주 기한 ${fmt(x.orderBy)} (${ddayTxt(x.dleft)})`;
     pos += `<path class="b-po ${cls}" data-buy="${esc(x.id)}" d="M${cx-5} ${y} h10 l-5 7 z"><title>${esc(`${x.name} · ${BUY_ST[x.st][0]}\n${when}\n현장 필요 ${fmt(x.needBy)}`)}</title></path>`;
   });
+  const geo = new Map();
   rows.forEach((r,i) => {
     const y = HH + i*RH;
     if(r.g!=null){ grp += `<rect class="r-grp" x="0" y="${y}" width="${W}" height="${RH}"/>`; return; }
@@ -1920,9 +1926,11 @@ function renderGantt(M){
     if(t.base){ const bx=X(t.base[0]), bw=Math.max(px, X(t.base[1])+px-bx); g += `<rect class="b-base" x="${bx}" y="${y+RH-8}" width="${bw}" height="4" rx="1"/>`; }
     if(t.dur===0 && t.ef===t.es){
       const cx = X(sD)+px/2, cy=y+RH/2-2;
+      geo.set(t.id, { xs: cx - 7, xe: cx + 7, y: cy });
       g += `<path class="b-bg" d="M${cx} ${cy-7} L${cx+7} ${cy} L${cx} ${cy+7} L${cx-7} ${cy} Z"/><text class="b-lbl" x="${cx+10}" y="${cy+4}">${esc(fmt(sD))}</text>`;
     } else {
       const x = X(sD), w = Math.max(px, X(fD)+px-x);
+      geo.set(t.id, { xs: x, xe: x + w, y: y + RH/2 - 2 });
       g += `<rect class="b-bg" x="${x}" y="${y+6}" width="${w}" height="${RH-16}" rx="3"/>`;
       if(isDate(t.notBefore) && t.status==="wait") g += `<path class="b-pin" d="M${x} ${y+1} h6 l-6 6 z"/>`;
       if(t.prog>0) g += `<rect class="b-pg" x="${x}" y="${y+6}" width="${Math.max(2,w*t.prog/100)}" height="${RH-16}" rx="3"/>`;
@@ -1933,6 +1941,15 @@ function renderGantt(M){
     const tip = `${t.code} ${t.name}\n${fmt(t.startDate)} → ${fmt(t.finishDate)} (${t.dur}작업일)\n기대값 ${t.te.toFixed(1)}일 · 여유 ${t.float}일${isDate(t.notBefore)&&t.status==="wait"?`\n착수 제한 ${fmt(t.notBefore)} 이후`:""}${t.delay?`\n기준 대비 ${t.delay>0?"+":""}${t.delay}일`:""}${editable?(t.status==="prog"?"\n오른쪽 끝을 끌어 공기 조정":"\n끌어서 이동 · 양 끝을 끌어 기간 조정"):""}`;
     bars += `<g class="bar ${cls} ${editable?"edit":""}" data-id="${esc(t.id)}" data-st="${t.status}"><title>${esc(tip)}</title>${g}</g>`;
   });
+  let links = "";
+  if(state.links !== "off"){
+    const codeOf = id => (M.by.get(id) || {}).code || "";
+    links = `<defs><marker id="lka" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--ink-3)"/></marker><marker id="lkc" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--crit)"/></marker></defs>`;
+    rows.forEach(r => { if(!r.t || !geo.has(r.t.id)) return; const t = r.t, b = geo.get(t.id);
+      t._preds.forEach(pid => { const a = geo.get(pid); if(!a) return; const rl = relOf(t, pid), pt = M.by.get(pid);
+        const crit = pt.crit && t.crit && t._con && t._con[pid] === t.es;
+        links += `<g class="lk-g"><path class="lk ${crit ? "crit" : ""}" d="${linkPath(a, b, rl.type, RH)}" marker-end="url(#${crit ? "lkc" : "lka"})"><title>${esc(relTxt(codeOf(pid), rl) + " → " + t.code)}</title></path></g>`; }); });
+  }
   let marks = "";
   if(M.statusDate >= S(a0) && M.statusDate <= S(a1)){ const x = X(M.statusDate); marks += `<line class="l-today" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-today" x="${x+3}" y="${HH-8}">기준일</text>`; }
   if(isDate(M.p.targetDate)){ const x = X(M.p.targetDate)+px; marks += `<line class="l-target" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-target" x="${x+3}" y="${HH-8}">목표</text>`; }
@@ -1957,7 +1974,7 @@ function renderGantt(M){
   return `<div class="panel"><div class="gantt">
     <div class="g-left"><div class="g-head">작업</div>${left}${RB ? `<div class="g-resl" style="height:${RB}px"><b>노무 투입</b><span>일별 합계 (최대 ${fmtQty(Math.max(0, ...[...dailyLoad(M, state.sched === "late").values()].map(o => resOf().filter(r => (r.type || "노무") === "노무").reduce((s, r) => s + (o[r.id] || 0), 0))))})</span><span style="color:var(--ink-3)">막대를 옮기면 바로 다시 계산</span></div>` : ""}</div>
     <div class="g-right"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="간트 차트">
-      ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${bars}${pos}${band}${marks}</svg></div>
+      ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${links}${bars}${pos}${band}${marks}</svg></div>
   </div>${legendHTML(false)}</div>`;
 }
 
@@ -2207,6 +2224,17 @@ function renderTaskRes(){
       <input type="number" min="0" step="any" data-trf="qty" value="${x.qty ?? ""}" aria-label="총 투입량"> <span style="font-size:12px;color:var(--ink-3);white-space:nowrap">${esc((r || {}).unit || "")}${d && num(x.qty) ? ` · 하루 ${fmtQty(num(x.qty)/d)}` : ""}</span>
       <button type="button" class="x" data-trdel="${i}" aria-label="삭제">×</button></div>`; }).join("") || `<span class="note">없음</span>`;
 }
+/* 간트 연결선: a, b = { xs, xe, y }  (막대 시작·끝 x, 가운데 y). FS 끝→시작, SS 시작→시작, FF 끝→끝, SF 시작→끝 */
+function linkPath(a, b, type, rowH){
+  const fromEnd = type === "FS" || type === "FF", toEnd = type === "FF" || type === "SF";
+  const x1 = fromEnd ? a.xe : a.xs, y1 = a.y, x2 = toEnd ? b.xe : b.xs, y2 = b.y;
+  const sx = x1 + (fromEnd ? 6 : -6), ex = x2 + (toEnd ? 6 : -6);
+  const ym = y2 + (y1 < y2 ? -rowH / 2 : rowH / 2);
+  if(!toEnd && fromEnd && sx <= ex) return `M${x1} ${y1} H${ex} V${y2} H${x2 - 1}`;            // FS 정방향
+  if(!toEnd && !fromEnd) return `M${x1} ${y1} H${Math.min(sx, ex)} V${y2} H${x2 - 1}`;          // SS
+  if(toEnd && fromEnd) return `M${x1} ${y1} H${Math.max(sx, ex)} V${y2} H${x2 + 1}`;            // FF
+  return `M${x1} ${y1} H${sx} V${ym} H${ex} V${y2} H${x2 + (toEnd ? 1 : -1)}`;                 // 역방향 FS, SF
+}
 /* "B5, C1 SS+3, D2 FF-1, A1+2" → [{task, type, lag}] */
 function parsePreds(text, all){
   const byCode = new Map(all.map(t => [t.code, t]));
@@ -2338,6 +2366,14 @@ function printGanttPages(o, M){
   const off = new Map((M.p.offDays || []).map(x => [x.date, x]));
   return chunks.map((chunk, pi) => {
     const H = HH + chunk.length * RH + 2;
+    const pgeo = new Map();
+    chunk.forEach((r, i) => { if(!r.t) return; const t = r.t, y = HH + i * RH + RH/2;
+      if(t.ms){ const cx = clampX(X(t.startDate) + dayW/2); pgeo.set(t.id, { xs: cx - 5, xe: cx + 5, y }); }
+      else pgeo.set(t.id, { xs: clampX(X(t.startDate)), xe: clampX(X(t.finishDate) + dayW), y }); });
+    let plinks = "";
+    chunk.forEach(r => { if(!r.t || !pgeo.has(r.t.id)) return; const t = r.t;
+      t._preds.forEach(pid => { const a = pgeo.get(pid); if(!a) return; const pt = M.by.get(pid), crit = pt.crit && t.crit && t._con && t._con[pid] === t.es;
+        plinks += `<path d="${linkPath(a, pgeo.get(t.id), relOf(t, pid).type, RH)}" fill="none" stroke="${crit ? "#BF4E17" : "#8A958F"}" stroke-width="${crit ? .9 : .6}" marker-end="url(#pa${crit ? "c" : "n"})"/>`; }); });
     let g = `<svg viewBox="0 0 ${unitsW} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Malgun Gothic, sans-serif">`;
     g += `<rect x="0" y="0" width="${unitsW}" height="${HH}" fill="#E8EEE9"/>`;
     [["코드",4],["작업명",40],["공기",236],["시작",262],["완료",296]].forEach(([t,x]) => g += `<text x="${x}" y="${HH-6}" font-size="9" font-weight="700" fill="#333">${t}</text>`);
@@ -2361,6 +2397,7 @@ function printGanttPages(o, M){
       if(t.prog > 0) g += `<rect x="${x1}" y="${y+4}" width="${Math.max(1, (x2-x1) * t.prog / 100)}" height="${RH-8}" fill="${dark}"/>`;
       if(!done && t.float > 0){ const fx = clampX(X(t.lateFinish) + dayW); if(fx > x2) g += `<line x1="${x2}" y1="${y+RH/2}" x2="${fx}" y2="${y+RH/2}" stroke="#7A8881" stroke-width=".8" stroke-dasharray="2 2"/>`; }
     });
+    g += `<defs><marker id="pan" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#8A958F"/></marker><marker id="pac" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#BF4E17"/></marker></defs>${plinks}`;
     g += `<line x1="${LW}" y1="0" x2="${LW}" y2="${H}" stroke="#555" stroke-width=".8"/>`;
     const vline = (d, color, dash, label) => { if(!isDate(d) || d < from || d > to) return; const x = X(d) + dayW/2; g += `<line x1="${x}" y1="${HH}" x2="${x}" y2="${H}" stroke="${color}" stroke-width="1" ${dash ? `stroke-dasharray="${dash}"` : ""}/>${label ? `<text x="${x+2}" y="${HH+8}" font-size="7.5" font-weight="700" fill="${color}">${esc(label)}</text>` : ""}`; };
     (M.p.keyDates || []).forEach(k => vline(k.date, "#7B4FB8", "3 2", "◆" + (k.label || "")));
@@ -2686,6 +2723,7 @@ document.addEventListener("click", e => {
   if(state.suppressClick){ state.suppressClick = false; return; }
   const tab = e.target.closest("#tabs button");
   if(tab){ state.tab = tab.dataset.tab; store.set("tab", state.tab); if(state.tab==="set"){ state.draftOff=null; state.draftKey=null; } state.resDraft = null; render(); return; }
+  if(e.target.closest("#toggleLinks")){ state.links = state.links === "off" ? "on" : "off"; store.set("links", state.links); render(); return; }
   const sc = e.target.closest("[data-sched]");
   if(sc){ state.sched = sc.dataset.sched; store.set("sched", state.sched); render(); return; }
   const z = e.target.closest("[data-zoom]");
