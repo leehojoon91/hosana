@@ -106,6 +106,47 @@ details.imp summary{cursor:pointer;font-size:13px;color:var(--ink-2);margin:6px 
 .dday.bad{color:var(--bad);font-weight:600} .dday.warn{color:var(--warn);font-weight:600}
 tbody tr.b{cursor:pointer} tbody tr.b:hover{background:var(--surface-2)}
 tr.b.recv td{color:var(--ink-3)}
+.g-resl{display:flex;flex-direction:column;justify-content:center;padding:0 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-top:1px solid var(--line)}
+.res-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
+.res-ctl label{display:inline-flex;gap:4px;align-items:center}
+.res-mst input,.res-mst select{padding:4px 6px;font-size:12.5px}
+.res-mst td{padding:4px 6px}
+.res-sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+td.over{color:var(--bad);font-weight:700;background:var(--crit-soft)}
+.dr-res{display:flex;flex-direction:column;gap:6px;margin:4px 0 6px}
+.dr-res .rr{display:flex;gap:6px;align-items:center}
+.dr-res select{flex:1 1 auto}
+.dr-res input{width:90px}
+.evm-chart{overflow-x:auto;padding:8px 4px 0}
+.evm-chart svg{display:block}
+.c-axis{font-size:10.5px;fill:var(--ink-3);font-family:var(--mono)}
+.c-grid{stroke:var(--line);stroke-width:1}
+.c-pv{fill:none;stroke:var(--accent);stroke-width:2}
+.c-late{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:4 4;opacity:.7}
+.c-fc{fill:none;stroke:var(--prog);stroke-width:2;stroke-dasharray:6 4}
+.c-ev{fill:none;stroke:var(--crit);stroke-width:2.5}
+.c-evp{fill:var(--crit);stroke:var(--surface);stroke-width:1.5}
+.c-bar{fill:var(--accent-soft)}
+.c-now{stroke:var(--crit);stroke-width:1;stroke-dasharray:2 3}
+.evm-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.evm-cards .kpi .v{font-size:18px}
+.evm-sec{margin-top:16px}
+.evm-sec h3{font-size:14px;margin:0 0 8px}
+table.evt{min-width:720px;font-size:12.5px}
+table.evt td.r,table.evt th.r{text-align:right}
+tr.cur td{background:var(--accent-soft)}
+.pd-tbl{max-height:none}
+.pd-tbl input[type=number]{width:76px;padding:4px 6px;text-align:right}
+.pd-boq td{background:var(--surface-2);font-size:12px}
+.pd-boq input[type=number]{width:86px}
+.linkx{border:0;background:none;color:var(--prog);text-decoration:underline;cursor:pointer;padding:0;font-size:12px}
+.l-key{stroke:#7B4FB8;stroke-width:1.2;stroke-dasharray:3 3}
+.t-key{font-size:10px;font-weight:700;fill:#7B4FB8}
+.r-key{fill:var(--surface)}
+.e-lbl{font-size:10px;font-family:var(--mono);fill:var(--prog);font-weight:600}
+.g-row .lamp{font-size:11px;color:var(--bad);margin-left:auto;flex:none}
+.p-lamp{background:var(--crit-soft);color:var(--bad)}
+.ms-mark{color:var(--prog);font-weight:700}
 tr.b.sub td{font-size:12.5px;background:var(--surface-2);padding-top:5px;padding-bottom:5px}
 .split-sum{font-size:12px;color:var(--prog);margin-top:2px;white-space:normal}
 .split-ed{display:flex;flex-direction:column;gap:6px;margin:6px 0}
@@ -233,6 +274,43 @@ th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white
 th{font-size:12px;font-weight:500;color:var(--ink-3);background:var(--surface);position:sticky;top:0}
 td.r,th.r{text-align:right}
 tbody tr.t{cursor:pointer}
+tbody tr.t.sel td{background:var(--prog-soft)}
+.selbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--prog);background:var(--prog-soft);border-radius:8px;margin-bottom:8px;font-size:13px}
+.selbar input{width:180px;padding:5px 8px}
+.selbar .ord{font-family:var(--mono);color:var(--prog);font-weight:600}
+td.ck{width:28px;text-align:center} td.ck input{width:16px;height:16px;cursor:pointer}
+.grp-tools{float:right;font-weight:400}
+.dup-form{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-weight:400;font-size:12.5px}
+.dup-form input{width:160px;padding:4px 7px}
+#printPreview{position:fixed;inset:0;z-index:40;background:rgba(10,20,15,.55);overflow:auto;padding:24px 16px}
+#printPreview .pv-bar{position:sticky;top:0;display:flex;gap:8px;justify-content:center;margin-bottom:12px;z-index:2}
+#printArea .pg{background:#fff;color:#111;margin:0 auto 16px;box-shadow:0 4px 20px rgba(0,0,0,.3);padding:8mm;box-sizing:border-box;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+#printArea .pg.A3{width:420mm;min-height:297mm} #printArea .pg.A4{width:297mm;min-height:210mm}
+.ph{display:flex;align-items:flex-start;gap:12px;border-bottom:2px solid #1D4D3C;padding-bottom:6px;margin-bottom:6px}
+.ph .logo{max-height:16mm;max-width:40mm}
+.ph .tt{flex:1;min-width:0}
+.ph h1{font-size:20pt;margin:0;color:#111}
+.ph .sub{font-size:10pt;color:#333;margin-top:2px}
+.ph .info{font-size:8.5pt;color:#333;margin-top:3px}
+.sign{border-collapse:collapse;font-size:8.5pt;width:auto;min-width:0;flex:none}
+.sign td{border:1px solid #555;text-align:center;width:20mm;padding:1mm;white-space:nowrap}
+.sign tr.box td{height:13mm}
+.sign td.lbl{width:7mm;writing-mode:vertical-rl;background:#f0f3f1}
+.pfoot{display:flex;justify-content:space-between;font-size:8pt;color:#555;margin-top:4px}
+.pg svg{display:block;width:100%;height:auto}
+.ptbl{border-collapse:collapse;width:100%;min-width:0;font-size:8pt}
+.ptbl th,.ptbl td{border:1px solid #999;padding:2px 4px;white-space:nowrap}
+.ptbl th{background:#e8eee9}
+.ptbl td.r{text-align:right}
+.ptbl tr.g td{background:#f2f4f2;font-weight:700}
+@media print{
+  body{background:#fff!important;padding:0!important}
+  body > *:not(#printPreview){display:none!important}
+  #printPreview{position:static;background:none;padding:0;overflow:visible}
+  #printPreview .pv-bar{display:none}
+  #printArea .pg{box-shadow:none;margin:0;page-break-after:always;min-height:0}
+  #printArea .pg:last-child{page-break-after:auto}
+}
 tbody tr.t:hover{background:var(--surface-2)}
 tr.grp td{background:var(--surface-2);font-weight:600}
 .pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;font-weight:500}
@@ -307,6 +385,8 @@ textarea{resize:vertical;min-height:60px}
       <button role="tab" data-tab="net">PERT 네트워크</button>
       <button role="tab" data-tab="list">작업 목록</button>
       <button role="tab" data-tab="buy">구매 일정</button>
+      <button role="tab" data-tab="evm">기성</button>
+      <button role="tab" data-tab="res">자원</button>
       <button role="tab" data-tab="set">설정</button>
     </div>
     <div class="tools" id="tools"></div>
@@ -469,7 +549,7 @@ const state = {
   mode: (!(CFG.firebase && CFG.firebase.apiKey) || params.has("demo")) ? "demo" : "boot",   // demo | boot | login | denied | setup | live | error
   account: null, data: null, role: null, members: [], canEdit: false, errMsg: "",
   projects: {}, pid: store.get("pid", ""), roles: {},
-  tab: store.get("tab","gantt"), zoom: Number(store.get("zoom","12")) || 12,
+  tab: store.get("tab","gantt"), zoom: Number(store.get("zoom","12")) || 12, sched: store.get("sched","early"),
   drawer: null, M: null, draftOff: null, busy: false
 };
 const DEFAULT_PROJECT = { name:"온실 신축공사", startDate: localToday(), targetDate:"", workSaturday:true, offDays:[], statusDate:"", baseline:null };
@@ -520,7 +600,7 @@ function setCurrent(){
 }
 function selectProject(id){
   if(id === state.pid) return;
-  state.pid = id; store.set("pid", id); state.draftOff = null; closeDrawer();
+  state.pid = id; store.set("pid", id); state.draftOff = null; state.resDraft = null; state.sel = []; closeDrawer();
   setCurrent(); afterData();
 }
 const memberRef = email => FB.doc(db, "members", email);
@@ -561,6 +641,18 @@ function buildCal(p){
   return days;
 }
 function idxOf(cal, s){ let lo=0, hi=cal.length; while(lo<hi){ const mid=(lo+hi)>>1; if(cal[mid] < s) lo=mid+1; else hi=mid; } return lo; }
+/* 연결 관계: preds = 선행 작업 id 목록(기본 FS, Lag 0). rel[선행id] = { type: "FS"|"SS"|"FF"|"SF", lag: 작업일(음수 가능) } */
+const REL_TYPES = ["FS","SS","FF","SF"];
+function relOf(t, pid){ const r = (t.rel || {})[pid] || {}; return { type: REL_TYPES.includes(r.type) ? r.type : "FS", lag: Math.round(num(r.lag)) }; }
+function relTxt(code, r){ return code + (r.type !== "FS" ? " " + r.type : "") + (r.lag ? (r.lag > 0 ? "+" : "") + r.lag : ""); }
+/* 선행 p 기준 후행 t 의 가장 이른 시작(작업일 번호). dur = 후행 공기 */
+function relStart(p, r, dur){
+  return r.type === "SS" ? p.es + r.lag : r.type === "FF" ? p.ef + r.lag - dur : r.type === "SF" ? p.es + r.lag - dur : p.ef + r.lag;
+}
+/* 후행 s 기준 선행 t 의 가장 늦은 종료. d = 선행 실제 공기 */
+function relFinish(s, r, d){
+  return r.type === "SS" ? s.ls - r.lag + d : r.type === "FF" ? s.lf - r.lag : r.type === "SF" ? s.lf - r.lag + d : s.ls - r.lag;
+}
 function pert(t){
   const o=num(t.o), m=num(t.m), p=num(t.p);
   const te=(o+4*m+p)/6, v=((p-o)/6)**2;
@@ -590,7 +682,9 @@ function compute(){
     const prog = t.actualEnd ? 100 : Math.min(100, Math.max(0, num(t.progress)));
     t.prog = prog;
     t.status = t.actualEnd ? "done" : (t.actualStart ? "prog" : "wait");
-    let es = 0; for(const pid of t._preds) es = Math.max(es, by.get(pid).ef);
+    let es = 0; t._con = {};
+    for(const pid of t._preds){ const c = relStart(by.get(pid), relOf(t, pid), t.dur); t._con[pid] = c; es = Math.max(es, c); }
+    es = Math.max(0, es);
     t.predEs = es;
     if(isDate(t.notBefore)) es = Math.max(es, idxOf(cal, t.notBefore));
     if(isDate(t.actualStart)) es = idxOf(cal, t.actualStart);
@@ -605,7 +699,7 @@ function compute(){
   const projEF = valid.reduce((m,t)=>Math.max(m,t.ef), 0);
   for(let i=order.length-1;i>=0;i--){
     const t = by.get(order[i]); const ss = succ.get(t.id).map(s=>by.get(s)).filter(s=>s.es!=null);
-    const lf = ss.length ? Math.min(...ss.map(s=>s.ls)) : projEF;
+    const lf = ss.length ? Math.min(...ss.map(s => relFinish(s, relOf(s, t.id), t.ef - t.es))) : projEF;
     t.lf = lf; t.ls = lf - (t.ef - t.es); t.float = t.ls - t.es;
     t.crit = t.status!=="done" && t.float <= 0;
   }
@@ -613,7 +707,7 @@ function compute(){
   let cur = valid.filter(t=>t.status!=="done").sort((a,b)=>b.ef-a.ef)[0];
   while(cur){
     variance += cur.v * (1-cur.prog/100);
-    cur = cur._preds.map(id=>by.get(id)).filter(x=>x.ef===cur.es && x.status!=="done").sort((a,b)=>a.float-b.float)[0];
+    const c0 = cur; cur = cur._preds.map(id=>by.get(id)).filter(x => c0._con[x.id] === c0.es && x.status!=="done" && x !== c0).sort((a,b)=>a.float-b.float)[0];
   }
   const sigma = Math.sqrt(variance);
   const dateAt = i => cal[Math.max(0, Math.min(cal.length-1, i))];
@@ -621,9 +715,16 @@ function compute(){
     t.startDate = dateAt(t.es);
     t.finishDate = t.ef>t.es ? dateAt(t.ef-1) : dateAt(t.es);
     t.lateFinish = t.lf>t.ls ? dateAt(t.lf-1) : dateAt(t.lf);
+    t.lateStart = dateAt(t.ls);
+    t.ms = t.dur === 0;
     const b = p.baseline && p.baseline.items && p.baseline.items[t.id];
     t.delay = b ? (idxOf(cal, t.finishDate) - idxOf(cal, b[1])) : null;
     t.base = b || null;
+    // 지연 상태: 기준 공정 대비 착수지연 / 종료지연
+    t.lamp = null;
+    if(b && t.status === "wait" && statusDate > b[0]) t.lamp = { k:"start", label:"착수지연", days: idxOf(cal, statusDate) - idxOf(cal, b[0]) };
+    else if(b && t.status === "prog" && statusDate > b[1]) t.lamp = { k:"finish", label:"종료지연", days: idxOf(cal, statusDate) - idxOf(cal, b[1]) };
+    else if(b && t.status === "done" && t.actualEnd > b[1]) t.lamp = { k:"done", label:"지연완료", days: idxOf(cal, t.actualEnd) - idxOf(cal, b[1]) };
   });
   const finish = projEF ? dateAt(projEF-1) : p.startDate;
   let prob = null;
@@ -636,7 +737,7 @@ function compute(){
   const progress = sumTe ? valid.reduce((s,t)=>s+t.te*t.prog,0)/sumTe : 0;
   const baseFinish = p.baseline && p.baseline.finish;
   return { p, cal, tasks, by, order, cyc, projEF, finish, sigma, prob, p85, progress, sIdx, statusDate, groups: groupTasks(tasks),
-    remaining: Math.max(0, projEF - sIdx), critCount: valid.filter(t=>t.crit).length, baseFinish,
+    remaining: Math.max(0, projEF - sIdx), critCount: valid.filter(t=>t.crit).length, baseFinish, lampCount: valid.filter(t => t.lamp && t.lamp.k !== "done").length,
     projDelay: baseFinish ? idxOf(cal, finish) - idxOf(cal, baseFinish) : null };
 }
 function groupTasks(tasks){
@@ -686,6 +787,18 @@ const toNum = v => { if(typeof v === "number") return v; const n = Number(String
 const won = n => Math.round(n).toLocaleString("ko-KR");
 const SUBTOTAL = /^(소계|합계|계|총계|누계|공종계|총공사비|직접공사비|순공사비)$|^(소계|합계|총계)|(소계|합계|총계)$/;
 const NOT_MATERIAL = /노무|인건|경비|운반|장비|손료|인부|시운전|청소|측량|설치\s*·?\s*해체|타설$|조립$|피복$|정리$/;
+const KR_HOLIDAYS = [
+  ["2026-01-01","신정"],["2026-02-16","설 연휴"],["2026-02-17","설날"],["2026-02-18","설 연휴"],["2026-03-01","삼일절"],["2026-03-02","삼일절 대체공휴일"],
+  ["2026-05-05","어린이날"],["2026-05-24","부처님오신날"],["2026-05-25","부처님오신날 대체공휴일"],["2026-06-03","전국동시지방선거"],["2026-06-06","현충일"],
+  ["2026-08-15","광복절"],["2026-08-17","광복절 대체공휴일"],["2026-09-24","추석 연휴"],["2026-09-25","추석"],["2026-09-26","추석 연휴"],
+  ["2026-10-03","개천절"],["2026-10-05","개천절 대체공휴일"],["2026-10-09","한글날"],["2026-12-25","성탄절"],
+  ["2027-01-01","신정"],["2027-02-05","설 연휴"],["2027-02-06","설날"],["2027-02-07","설 연휴"],["2027-02-08","설 대체공휴일"],["2027-03-01","삼일절"],
+  ["2027-05-05","어린이날"],["2027-05-13","부처님오신날"],["2027-06-06","현충일"],["2027-08-15","광복절"],["2027-08-16","광복절 대체공휴일"],
+  ["2027-09-14","추석 연휴"],["2027-09-15","추석"],["2027-09-16","추석 연휴"],["2027-10-03","개천절"],["2027-10-04","개천절 대체공휴일"],
+  ["2027-10-09","한글날"],["2027-10-11","한글날 대체공휴일"],["2027-12-25","성탄절"],["2027-12-27","성탄절 대체공휴일"],
+  ["2028-01-01","신정"],["2028-01-25","설 연휴"],["2028-01-26","설날"],["2028-01-27","설 연휴"],["2028-03-01","삼일절"],["2028-04-12","국회의원선거"],
+  ["2028-05-02","부처님오신날"],["2028-05-05","어린이날"],["2028-06-06","현충일"],["2028-08-15","광복절"],["2028-10-02","추석 연휴"],["2028-10-03","추석·개천절"],
+  ["2028-10-04","추석 연휴"],["2028-10-05","추석 대체공휴일"],["2028-10-09","한글날"],["2028-12-25","성탄절"]];
 const KR_OFFDAYS = [["2026-10-03","개천절"],["2026-10-05","개천절 대체공휴일"],["2026-10-09","한글날"],["2026-12-25","성탄절"],["2027-01-01","신정"],
   ["2027-03-01","삼일절"],["2027-05-05","어린이날"],["2027-06-06","현충일"],["2027-08-15","광복절"],["2027-10-03","개천절"],["2027-10-09","한글날"],["2027-12-25","성탄절"]]
   .map(([date, reason]) => ({ date, type:"holiday", reason }));
@@ -1238,6 +1351,301 @@ async function insertSamplePurchases(){
     `샘플 구매 항목 ${list.length}개를 넣었습니다` + (linked < list.length ? ` (공정 연결 ${linked}개)` : ""));
 }
 
+/* ---------- 진도·기성 (EVM) ----------
+   기성 회차 periods[] = { id, date(기준일), label, pct:{작업id: 누계%}, qty:{내역행: 누계수량}, note }
+   BAC = 작업 금액 합(내역서 연결 금액). 금액이 없으면 공기(te) 가중으로 % 만 계산합니다.
+   PV(d) = Σ 금액 × (d까지 지난 계획 작업일 / 계획 공기)  · 계획 = 기준 공정(없으면 현재 조기 일정)
+   EV = Σ 금액 × 누계 진척률,  SV = EV − PV,  SPI = EV / PV */
+const periodsOf = () => ((state.data && state.data.periods) || []).slice().sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+const boqOf = () => (state.data && state.data.boq) || [];
+function taskQtyPct(taskId, qty){
+  const lines = boqOf().filter(x => x.t === taskId && x.a > 0 && x.q > 0);
+  const tot = lines.reduce((s,x) => s + x.a, 0); if(!tot) return null;
+  let any = false;
+  const done = lines.reduce((s,x) => { const v = qty[x.r]; if(v === undefined || v === "") return s; any = true; return s + x.a * Math.min(1, Math.max(0, num(v) / x.q)); }, 0);
+  return any ? done / tot * 100 : null;
+}
+function periodPct(per, taskId){
+  if(!per) return 0;
+  const q = taskQtyPct(taskId, per.qty || {});
+  if(q != null) return q;
+  return num((per.pct || {})[taskId]);
+}
+function evm(M){
+  const p = M.p, cal = M.cal, tasks = M.order.map(id => M.by.get(id));
+  const hasAmt = tasks.some(t => num(t.amount) > 0);
+  const w = t => hasAmt ? num(t.amount) : t.te;
+  const BAC = tasks.reduce((s,t) => s + w(t), 0) || 1;
+  const doneDays = d => idxOf(cal, shiftDate(d, 1));           // d 날까지(포함) 지난 작업일 수
+  const frac = (k, s0, e0) => e0 <= s0 ? (k > s0 ? 1 : 0) : Math.min(1, Math.max(0, (k - s0) / (e0 - s0)));
+  const planSpan = t => t.base ? [idxOf(cal, t.base[0]), idxOf(cal, t.base[1]) + 1] : [t.es, t.ef];
+  const pvAt = d => { const k = doneDays(d); return tasks.reduce((s,t) => { const [a,b] = planSpan(t); return s + w(t) * frac(k, a, b); }, 0); };
+  const lateAt = d => { const k = doneDays(d); return tasks.reduce((s,t) => s + w(t) * frac(k, t.ls, t.lf), 0); };
+  const fcAt = d => { const k = doneDays(d); return tasks.reduce((s,t) => s + w(t) * Math.max(t.prog / 100, frac(k, t.es, t.ef)), 0); };
+  const periods = periodsOf();
+  const evOf = per => tasks.reduce((s,t) => s + w(t) * periodPct(per, t.id) / 100, 0);
+  const lastP = periods[periods.length - 1];
+  const evNow = lastP && lastP.date >= M.statusDate ? evOf(lastP) : tasks.reduce((s,t) => s + w(t) * t.prog / 100, 0);   // 최신 회차가 기준일이면 그 값
+  // months from start to the latest end
+  const ends = [M.finish, p.targetDate, M.baseFinish].filter(isDate).sort();
+  const last = ends[ends.length - 1] || M.finish;
+  const months = [];
+  for(let d = p.startDate.slice(0,7) + "-01"; d <= last; ){ const y = +d.slice(0,4), m = +d.slice(5,7); const next = (m === 12 ? (y+1) + "-01" : y + "-" + String(m+1).padStart(2,"0")) + "-01"; months.push({ key: d.slice(0,7), end: shiftDate(next, -1) }); d = next; if(months.length > 60) break; }
+  months.forEach(mo => {
+    mo.pv = pvAt(mo.end); mo.late = lateAt(mo.end); mo.fc = fcAt(mo.end);
+    const inMonth = periods.filter(x => x.date <= mo.end); const lastPer = inMonth[inMonth.length - 1];
+    mo.ev = lastPer && mo.end >= periods[0].date ? evOf(lastPer) : null;
+    if(mo.ev != null && periods.length && lastPer.date.slice(0,7) !== mo.key && mo.end > M.statusDate) mo.ev = null;
+  });
+  const pvNow = pvAt(M.statusDate);
+  const perRows = periods.map((per, i) => ({ per, ev: evOf(per), pv: pvAt(per.date), prev: i ? evOf(periods[i-1]) : 0 }));
+  return { hasAmt, BAC, months, pvNow, evNow, sv: evNow - pvNow, spi: pvNow > 0 ? evNow / pvNow : null, periods, perRows, w, tasks, pvAt, fcAt, lateAt, evOf };
+}
+const wonM = n => Math.round(n).toLocaleString("ko-KR");
+const pctTxt = (n, BAC) => (n / BAC * 100).toFixed(1) + "%";
+function renderEvm(M){
+  const E = evm(M), p = M.p, BAC = E.BAC, contract = num(p.contractAmount);
+  const money = n => E.hasAmt ? wonM(n) + "원" : pctTxt(n, BAC);
+  const claim = r => contract > 0 ? wonM(contract * r) + "원" : "–";
+  const spiCls = E.spi == null ? "" : E.spi >= 0.95 ? "good" : E.spi >= 0.85 ? "warn" : "bad";
+  const lastPer = E.perRows[E.perRows.length - 1];
+  const cards = `<div class="evm-cards">
+    <div class="kpi"><span class="k">총공사비 (BAC)</span><span class="v">${E.hasAmt ? wonM(BAC/1e6) + "백만" : "공기 가중"}</span><span class="s">${contract ? "도급 " + wonM(contract/1e6) + "백만 원" : "도급액은 설정 아래에서 입력"}</span></div>
+    <div class="kpi"><span class="k">계획 공정률 (PV)</span><span class="v">${pctTxt(E.pvNow, BAC)}</span><span class="s">${E.hasAmt ? wonM(E.pvNow) + "원 · " : ""}${esc(fmt(M.statusDate))} 기준</span></div>
+    <div class="kpi"><span class="k">실적 공정률 (EV)</span><span class="v">${pctTxt(E.evNow, BAC)}</span><span class="s">${E.hasAmt ? wonM(E.evNow) + "원" : "작업 진척률 기준"}</span></div>
+    <div class="kpi"><span class="k">일정 차이 SV · SPI</span><span class="v ${spiCls}">${E.spi == null ? "–" : E.spi.toFixed(2)}</span><span class="s">SV ${E.sv >= 0 ? "+" : ""}${E.hasAmt ? wonM(E.sv) + "원" : pctTxt(E.sv, BAC)}${E.spi != null ? (E.spi >= 1 ? " · 계획보다 빠름" : " · 계획보다 늦음") : ""}</span></div>
+    <div class="kpi"><span class="k">예상 준공 / 기준 준공</span><span class="v">${esc(fmt(M.finish))}</span><span class="s">${M.baseFinish ? "기준 " + esc(fmt(M.baseFinish)) + (M.projDelay ? ` · ${M.projDelay > 0 ? "+" : ""}${M.projDelay}일` : "") : "기준 공정 미설정"}</span></div>
+    <div class="kpi"><span class="k">기성 청구 예상 (누계)</span><span class="v">${claim(E.evNow / BAC)}</span><span class="s">도급액 × 실적 공정률</span></div></div>`;
+  // ---- S-curve
+  const mo = E.months, W = Math.max(560, mo.length * 64 + 70), H = 250, L = 52, T = 14, B = 34, ch = H - T - B;
+  const xOf = i => L + 28 + i * ((W - L - 40) / Math.max(1, mo.length - 1 || 1));
+  const yOf = v => T + ch - (v / BAC) * ch;
+  const path = (key, from = 0, to = mo.length - 1) => mo.slice(from, to + 1).map((m, j) => m[key] == null ? null : `${xOf(from + j).toFixed(1)},${yOf(m[key]).toFixed(1)}`).filter(Boolean).join(" ");
+  const nowIdx = mo.findIndex(m => m.end >= M.statusDate);
+  const evPts = mo.map((m, i) => m.ev == null ? null : [xOf(i), yOf(m.ev), m.ev]).filter(Boolean);
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="S-커브">`;
+  for(let g = 0; g <= 4; g++){ const v = BAC * g / 4, y = yOf(v); svg += `<line class="c-grid" x1="${L}" y1="${y}" x2="${W-8}" y2="${y}"/><text class="c-axis" x="${L-6}" y="${y+4}" text-anchor="end">${g*25}%</text>`; }
+  mo.forEach((m, i) => { const prev = i ? mo[i-1].pv : 0, inc = m.pv - prev, bh = inc / BAC * ch; svg += `<rect class="c-bar" x="${xOf(i)-9}" y="${T+ch-bh}" width="18" height="${Math.max(0,bh)}"><title>${m.key} 계획 금회 ${pctTxt(inc, BAC)}</title></rect><text class="c-axis" x="${xOf(i)}" y="${H-14}" text-anchor="middle">${m.key.slice(2).replace("-", ".")}</text>`; });
+  svg += `<polyline class="c-late" points="${path("late")}"/><polyline class="c-pv" points="${path("pv")}"/>`;
+  if(nowIdx >= 0) svg += `<polyline class="c-fc" points="${evPts.length ? `${evPts[evPts.length-1][0].toFixed(1)},${evPts[evPts.length-1][1].toFixed(1)} ` : ""}${path("fc", nowIdx)}"/>`;
+  if(evPts.length) svg += `<polyline class="c-ev" points="${evPts.map(q => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" ")}"/>` + evPts.map(q => `<circle class="c-evp" cx="${q[0]}" cy="${q[1]}" r="4"><title>실적 ${pctTxt(q[2], BAC)}</title></circle>`).join("");
+  if(nowIdx >= 0) svg += `<line class="c-now" x1="${xOf(nowIdx)}" y1="${T}" x2="${xOf(nowIdx)}" y2="${T+ch}"/>`;
+  svg += `</svg>`;
+  const legend = `<div class="legend" style="padding:8px 4px"><span><i class="sw" style="height:3px;border:0;background:var(--accent)"></i>계획 PV (${M.p.baseline ? "기준 공정" : "현재 일정"})</span><span><i class="sw" style="height:0;border:0;border-top:2px dashed var(--accent)"></i>만기 계획 (가장 늦은 일정)</span><span><i class="sw" style="height:3px;border:0;background:var(--crit)"></i>실적 EV (기성 회차)</span><span><i class="sw" style="height:0;border:0;border-top:2px dashed var(--prog)"></i>예상 (현재 일정)</span><span><i class="sw" style="background:var(--accent-soft)"></i>월별 계획 금회</span></div>`;
+  // ---- monthly table
+  const monthRows = mo.map((m, i) => { const pvInc = m.pv - (i ? mo[i-1].pv : 0); const evPrev = mo.slice(0, i).reverse().find(x => x.ev != null); const evInc = m.ev == null ? null : m.ev - (evPrev ? evPrev.ev : 0);
+    return `<tr class="${m.key === M.statusDate.slice(0,7) ? "cur" : ""}"><td class="mono">${m.key.replace("-", ".")}</td><td class="r num">${money(pvInc)}</td><td class="r num">${money(m.pv)}</td><td class="r num">${pctTxt(m.pv, BAC)}</td>
+      <td class="r num">${evInc == null ? "–" : money(evInc)}</td><td class="r num">${m.ev == null ? "–" : money(m.ev)}</td><td class="r num">${m.ev == null ? "–" : pctTxt(m.ev, BAC)}</td>
+      <td class="r num">${m.ev == null ? "–" : (m.ev - m.pv >= 0 ? "+" : "") + pctTxt(m.ev - m.pv, BAC)}</td>${contract ? `<td class="r num">${m.ev == null ? claim(m.pv / BAC) : claim(m.ev / BAC)}</td>` : ""}</tr>`; }).join("");
+  const perRows = E.perRows.map(r => `<tr data-period="${esc(r.per.id)}" style="cursor:pointer"><td>${esc(r.per.label || "")}</td><td class="num">${esc(fmtLong(r.per.date))}</td>
+      <td class="r num">${money(r.ev - r.prev)}</td><td class="r num">${money(r.ev)}</td><td class="r num">${pctTxt(r.ev, BAC)}</td><td class="r num">${pctTxt(r.pv, BAC)}</td>
+      <td class="r num">${r.pv > 0 ? (r.ev / r.pv).toFixed(2) : "–"}</td>${contract ? `<td class="r num">${claim((r.ev - r.prev) / BAC)}</td><td class="r num">${claim(r.ev / BAC)}</td>` : ""}<td>${esc(r.per.note || "")}</td></tr>`).join("");
+  return cards + `<div class="panel evm-chart">${svg}${legend}</div>
+    <div class="evm-sec"><h3>기성 회차</h3>${E.perRows.length ? `<div class="panel tbl-wrap"><table class="evt"><thead><tr><th>회차</th><th>기준일</th><th class="r">금회 기성</th><th class="r">누계 기성</th><th class="r">누계 기성률</th><th class="r">계획 공정률</th><th class="r">SPI</th>${contract ? `<th class="r">금회 청구(도급 기준)</th><th class="r">누계 청구</th>` : ""}<th>메모</th></tr></thead><tbody>${perRows}</tbody></table></div>`
+      : `<div class="panel empty" style="padding:20px">${state.canEdit ? "아직 기성 회차가 없습니다. 오른쪽 위 <b>진도 입력 (새 회차)</b>로 이번 기준일의 누계 진척률을 입력하세요." : "아직 입력된 기성 회차가 없습니다."}</div>`}</div>
+    <div class="evm-sec"><h3>월별 계획 대비 실적</h3><div class="panel tbl-wrap"><table class="evt"><thead><tr><th>월</th><th class="r">계획 금회</th><th class="r">계획 누계</th><th class="r">계획 %</th><th class="r">실적 금회</th><th class="r">실적 누계</th><th class="r">실적 %</th><th class="r">차이</th>${contract ? `<th class="r" title="실적이 있는 달은 실적, 없는 달은 계획 기준">청구 누계(도급)</th>` : ""}</tr></thead><tbody>${monthRows}</tbody></table></div>
+    <p class="note">계획은 ${M.p.baseline ? "저장한 기준 공정" : "현재 공정표(기준 공정을 저장하면 그 일정)"}의 작업 기간에 금액을 고르게 나눠 계산합니다. 실적은 기성 회차에 입력한 누계 진척률(또는 내역 수량) × 작업 금액입니다. ${E.hasAmt ? "" : "작업에 금액이 없어 공기(te) 가중 %로 계산했습니다. 내역서로 만든 프로젝트는 금액 기준으로 계산됩니다."}</p></div>
+    <div class="evm-sec"><h3>도급 금액</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="number" id="e-contract" step="1000000" value="${contract || ""}" placeholder="부가세 포함 도급 금액 (원)" style="max-width:260px" ${state.canEdit ? "" : "disabled"} aria-label="도급 금액">${state.canEdit ? `<button class="btn" id="e-contract-save">저장</button>` : ""}<span class="note">넣으면 기성률 × 도급액으로 청구 예상액을 보여 줍니다.</span></div></div>`;
+}
+/* ---- 진도 입력 창 ---- */
+function openPeriod(id){
+  const per = id ? periodsOf().find(x => x.id === id) : null;
+  const prev = periodsOf().filter(x => !per || x.date < per.date).pop() || null;
+  const M = state.M;
+  const pct = {}, qty = {};
+  M.order.forEach(tid => { const t = M.by.get(tid); pct[tid] = per ? num((per.pct || {})[tid]) : (prev ? periodPct(prev, tid) : t.prog); });
+  Object.assign(qty, per ? (per.qty || {}) : (prev ? (prev.qty || {}) : {}));
+  state.drawer = { kind:"period", id: per ? per.id : null, date: per ? per.date : localToday(), label: per ? per.label : `${periodsOf().length + 1}회 기성`, note: per ? per.note || "" : "",
+    pct, qty, prevId: prev ? prev.id : null, open: {}, sync: true, arm: false };
+  renderDrawer(); $("#drawer").classList.add("wide"); $("#drawer").hidden = false; $("#scrim").hidden = false;
+}
+function renderPeriodDrawer(){
+  const dr = state.drawer, M = state.M, E = evm(M), el = $("#drawer");
+  const prev = dr.prevId ? periodsOf().find(x => x.id === dr.prevId) : null;
+  const isLatest = !periodsOf().some(x => x.id !== dr.id && x.date > dr.date);
+  const rows = M.groups.map(g => `<tr class="grp"><td colspan="7">${esc(g.name)}</td></tr>` + g.items.map(x => {
+    const t = M.by.get(x.id); if(t.es == null) return "";
+    const lines = boqOf().filter(b => b.t === t.id && b.a > 0 && b.q > 0);
+    const qp = taskQtyPct(t.id, dr.qty), cur = qp != null ? qp : num(dr.pct[t.id]), pv = prev ? periodPct(prev, t.id) : 0;
+    const amt = E.w(t);
+    const main = `<tr><td class="mono">${esc(t.code)}</td><td>${esc(t.name)}${lines.length ? ` <button class="linkx" data-pdopen="${esc(t.id)}">${dr.open[t.id] ? "내역 닫기" : `내역 ${lines.length}줄 수량 입력`}</button>` : ""}</td>
+      <td class="r num">${E.hasAmt ? wonM(amt) : "–"}</td><td class="r num">${pv.toFixed(1)}%</td>
+      <td class="r"><input type="number" min="0" max="100" step="1" data-pdpct="${esc(t.id)}" value="${+cur.toFixed(1)}" ${qp != null ? "disabled title='내역 수량으로 계산'" : ""} aria-label="${esc(t.code)} 누계 진척률"></td>
+      <td class="r num">${(cur - pv).toFixed(1)}%</td><td class="r num">${E.hasAmt ? wonM(amt * (cur - pv) / 100) : "–"}</td></tr>`;
+    const sub = dr.open[t.id] ? lines.map(b => `<tr class="pd-boq"><td></td><td>└ ${esc(b.n)} <span style="color:var(--ink-3)">${esc(b.s || "")}</span></td><td class="r num">${wonM(b.a)}</td>
+      <td class="r num">${prev && prev.qty && prev.qty[b.r] != null ? fmtQty(num(prev.qty[b.r])) : "–"}</td>
+      <td class="r"><input type="number" min="0" step="any" data-pdqty="${b.r}" value="${dr.qty[b.r] ?? ""}" placeholder="누계" aria-label="${esc(b.n)} 누계 수량"> <span style="font-size:11px;color:var(--ink-3)">/ ${fmtQty(b.q)} ${esc(b.u || "")}</span></td><td colspan="2"></td></tr>`).join("") : "";
+    return main + sub; }).join("")).join("");
+  const evSum = E.tasks.reduce((s,t) => s + E.w(t) * (taskQtyPct(t.id, dr.qty) ?? num(dr.pct[t.id])) / 100, 0);
+  el.innerHTML = `<div class="d-head"><h2>${dr.id ? "기성 회차 수정" : "진도 입력 · 새 기성 회차"}</h2><button class="x" data-close aria-label="닫기">×</button></div>
+    <div class="d-body">
+      <div class="g3">
+        <div class="field"><label for="pd-label">회차</label><input type="text" id="pd-label" value="${esc(dr.label)}"></div>
+        <div class="field"><label for="pd-date">기준일 (진도 마감일)</label><input type="date" id="pd-date" value="${esc(dr.date)}"></div>
+        <div class="field"><label for="pd-note">메모</label><input type="text" id="pd-note" value="${esc(dr.note)}" placeholder="예: 1차 기성 청구"></div>
+      </div>
+      <p class="note">작업마다 <b>누계</b> 진척률을 넣습니다. 금회 = 누계 − 전회(${prev ? esc(prev.label) + " " + esc(fmt(prev.date)) : "없음"}). 내역이 연결된 작업은 ‘내역 수량 입력’을 눌러 누계 수량을 넣으면 진척률이 금액 가중으로 자동 계산됩니다.</p>
+      <div class="imp-sum"><span class="chip">누계 실적 <b id="pd-ev">${pctTxt(evSum, E.BAC)}</b></span><span class="chip">계획 <b>${pctTxt(E.pvAt(dr.date), E.BAC)}</b></span>${E.hasAmt ? `<span class="chip">누계 기성 <b style="font-size:13px" id="pd-evw">${wonM(evSum)}원</b></span>` : ""}</div>
+      <div class="imp-tbl pd-tbl"><table><thead><tr><th>코드</th><th>작업</th><th class="r">금액</th><th class="r">전회 누계</th><th class="r">누계 %</th><th class="r">금회</th><th class="r">금회 기성</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${isLatest ? `<label class="chk"><input type="checkbox" id="pd-sync" ${dr.sync ? "checked" : ""}> 공정표에도 반영 (진척률·실제 시작/완료일, 기준일을 이 날로)</label>` : `<p class="note">이전 회차라서 공정표에는 반영하지 않습니다.</p>`}
+      <div class="err" id="pd-err"></div>
+    </div>
+    <div class="d-foot"><div>${dr.id ? `<button class="btn danger ${dr.arm ? "armed" : ""}" id="pd-del">${dr.arm ? "한 번 더 누르면 삭제" : "회차 삭제"}</button>` : ""}</div>
+      <div style="display:flex;gap:8px"><button class="btn" data-close>취소</button><button class="btn primary" id="pd-save">저장</button></div></div>`;
+}
+function periodInput(e){
+  const dr = state.drawer; if(!dr || dr.kind !== "period") return false;
+  const t = e.target;
+  if(t.dataset.pdpct){ dr.pct[t.dataset.pdpct] = Math.min(100, Math.max(0, num(t.value))); }
+  else if(t.dataset.pdqty){ if(t.value === "") delete dr.qty[t.dataset.pdqty]; else dr.qty[t.dataset.pdqty] = num(t.value); }
+  else if(t.id === "pd-label") dr.label = t.value; else if(t.id === "pd-date") dr.date = t.value; else if(t.id === "pd-note") dr.note = t.value;
+  else if(t.id === "pd-sync") dr.sync = t.checked; else return false;
+  if(e.type === "change" && (t.dataset.pdqty || t.id === "pd-date")){ const sc = $(".d-body").scrollTop; renderPeriodDrawer(); $(".d-body").scrollTop = sc; }
+  else { const E = evm(state.M); const ev = E.tasks.reduce((s,k) => s + E.w(k) * (taskQtyPct(k.id, dr.qty) ?? num(dr.pct[k.id])) / 100, 0); const a = $("#pd-ev"); if(a) a.textContent = pctTxt(ev, E.BAC); const b = $("#pd-evw"); if(b) b.textContent = wonM(ev) + "원"; }
+  return true;
+}
+function periodClick(e){
+  const pr = e.target.closest("#view [data-period]"); if(pr){ openPeriod(pr.dataset.period); return true; }
+  if(e.target.closest("#addPeriod")){ openPeriod(null); return true; }
+  if(e.target.closest("#e-contract-save")){ const v = num($("#e-contract").value); commit(d => { d.project = { ...(d.project || {}), contractAmount: v }; }, "도급 금액을 저장했습니다"); return true; }
+  const dr = state.drawer; if(!dr || dr.kind !== "period") return false;
+  const op = e.target.closest("[data-pdopen]"); if(op){ dr.open[op.dataset.pdopen] = !dr.open[op.dataset.pdopen]; const sc = $(".d-body").scrollTop; renderPeriodDrawer(); $(".d-body").scrollTop = sc; return true; }
+  if(e.target.closest("#pd-save")){ savePeriod(); return true; }
+  if(e.target.closest("#pd-del")){ if(!dr.arm){ dr.arm = true; renderPeriodDrawer(); return true; }
+    commit(d => { d.periods = (d.periods || []).filter(x => x.id !== dr.id); }, "회차를 삭제했습니다").then(ok => { if(ok) closeDrawer(); }); return true; }
+  return false;
+}
+async function savePeriod(){
+  const dr = state.drawer, err = $("#pd-err"); err.textContent = "";
+  if(!isDate(dr.date)){ err.textContent = "기준일을 넣어 주세요."; return; }
+  if(periodsOf().some(x => x.id !== dr.id && x.date === dr.date)){ err.textContent = "같은 기준일의 회차가 이미 있습니다."; return; }
+  const M = state.M, id = dr.id || "pr" + Date.now().toString(36);
+  const pct = {}; M.order.forEach(tid => { const q = taskQtyPct(tid, dr.qty); pct[tid] = +(q != null ? q : num(dr.pct[tid])).toFixed(2); });
+  const per = { id, date: dr.date, label: dr.label.trim() || "기성", note: dr.note.trim(), pct, qty: { ...dr.qty } };
+  const isLatest = !periodsOf().some(x => x.id !== dr.id && x.date > dr.date);
+  const sync = isLatest && dr.sync;
+  const btn = $("#pd-save"); btn.disabled = true;
+  const ok = await commit(data => {
+    const L = data.periods || (data.periods = []); const i = L.findIndex(x => x.id === id); if(i >= 0) L[i] = per; else L.push(per);
+    if(sync){
+      (data.tasks || []).forEach(t => { const v = pct[t.id]; if(v == null) return;
+        t.progress = Math.round(v * 100) / 100;
+        if(v > 0 && !t.actualStart){ const st = M.by.get(t.id); t.actualStart = st && st.startDate && st.startDate <= dr.date ? st.startDate : dr.date; }
+        if(v >= 100 && !t.actualEnd) t.actualEnd = dr.date;
+      });
+      data.project = { ...(data.project || {}), statusDate: dr.date };
+    }
+  }, sync ? "회차를 저장하고 공정표에 반영했습니다" : "회차를 저장했습니다");
+  if(ok){ $("#drawer").classList.remove("wide"); closeDrawer(); } else if($("#pd-save")) $("#pd-save").disabled = false;
+}
+
+/* ---------- 자원 (인력·장비·자재) ----------
+   project.resources = [{ id, type:"노무"|"장비"|"자재"|"기타", name, unit, cost, limit(하루 한도), color }]
+   task.res = [{ rid, qty(작업 전체 투입량) }]  → 작업 기간에 고르게(수평균등부하) 나눕니다. */
+const RES_TYPES = ["노무","장비","자재","기타"];
+const RES_COLORS = ["#1D6A51","#2C64A4","#BF4E17","#7B4FB8","#A86A00","#2E8C8C","#B03A6F","#5E6F66","#4C7A2A","#8C5A3C"];
+const resOf = () => (state.data && state.data.project && state.data.project.resources) || [];
+function dailyLoad(M, late){
+  const load = new Map(), R = new Map(resOf().map(r => [r.id, r]));
+  M.order.forEach(id => { const t = M.by.get(id); if(!t.res || !t.res.length || t.es == null) return;
+    const s0 = late && t.status !== "done" ? t.ls : t.es, e0 = late && t.status !== "done" ? t.lf : t.ef, days = Math.max(1, e0 - s0);
+    t.res.forEach(x => { if(!R.has(x.rid) || !(num(x.qty) > 0)) return; const per = num(x.qty) / days;
+      for(let k = s0; k < s0 + days; k++){ const d = M.cal[Math.min(k, M.cal.length - 1)]; if(!load.has(d)) load.set(d, {}); const o = load.get(d); o[x.rid] = (o[x.rid] || 0) + per; } }); });
+  return load;
+}
+function periodKey(d, per){
+  if(per === "day") return d;
+  if(per === "month") return d.slice(0, 7);
+  const dt = D(d), wd = (dt.getUTCDay() + 6) % 7; return S(addDays(dt, -wd));          // 주: 월요일
+}
+function renderRes(M){
+  const R = resOf(), ed = state.canEdit, per = state.resPer || "week", val = state.resVal || "qty", types = state.resTypes || RES_TYPES;
+  const late = state.sched === "late";
+  const load = dailyLoad(M, late);
+  const shown = R.filter(r => types.includes(r.type || "노무"));
+  const keys = [...new Set([...load.keys()].sort().map(d => periodKey(d, per)))];
+  const agg = {}; const wdays = {};
+  [...load.entries()].forEach(([d, o]) => { const k = periodKey(d, per); wdays[k] = (wdays[k] || 0) + 1; Object.entries(o).forEach(([rid, q]) => { (agg[rid] ||= {})[k] = ((agg[rid] || {})[k] || 0) + q; }); });
+  const v = (r, q) => val === "amt" ? q * num(r.cost) : q;
+  const fmtV = n => val === "amt" ? wonM(n) : (Math.round(n * 10) / 10).toLocaleString("ko-KR");
+  const over = (r, k) => num(r.limit) > 0 && ((agg[r.id] || {})[k] || 0) > num(r.limit) * (wdays[k] || 1) + 1e-6;
+  // chart
+  const totals = keys.map(k => shown.reduce((s, r) => s + v(r, (agg[r.id] || {})[k] || 0), 0));
+  const maxT = Math.max(1, ...totals), bw = per === "day" ? 8 : per === "week" ? 22 : 44, gap = per === "day" ? 2 : 6, L = 56, T = 10, CH = 180, Bm = 36;
+  const W = Math.max(520, L + keys.length * (bw + gap) + 20), H = T + CH + Bm;
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="자원 히스토그램">`;
+  for(let g = 0; g <= 4; g++){ const y = T + CH - CH * g / 4; svg += `<line class="c-grid" x1="${L}" y1="${y}" x2="${W-6}" y2="${y}"/><text class="c-axis" x="${L-6}" y="${y+4}" text-anchor="end">${fmtV(maxT * g / 4)}</text>`; }
+  keys.forEach((k, i) => { let y = T + CH; const x = L + 8 + i * (bw + gap);
+    shown.forEach(r => { const q = v(r, (agg[r.id] || {})[k] || 0); if(!q) return; const h = q / maxT * CH; y -= h;
+      svg += `<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="${r.color || "#1D6A51"}" ${over(r, k) ? 'stroke="#B3261E" stroke-width="2"' : ""}><title>${esc(k)} ${esc(r.name)} ${fmtV(q)} ${val === "amt" ? "원" : esc(r.unit || "")}${over(r, k) ? " · 한도 초과" : ""}</title></rect>`; });
+    const lab = per === "month" ? k.slice(2).replace("-", ".") : (+k.slice(5,7)) + "/" + (+k.slice(8,10));
+    if(per !== "day" || i % 7 === 0) svg += `<text class="c-axis" x="${x + bw/2}" y="${T+CH+14}" text-anchor="middle">${lab}</text>`; });
+  svg += `</svg>`;
+  const legend = `<div class="legend" style="padding:8px 4px">${shown.map(r => `<span><span class="res-sw" style="background:${r.color}"></span>${esc(r.name)} (${esc(r.unit || "")})</span>`).join("")}<span style="color:var(--bad)">빨간 테두리 = 하루 한도 초과</span></div>`;
+  // table
+  const head = keys.map(k => `<th class="r">${per === "month" ? k.replace("-", ".") : (+k.slice(5,7)) + "/" + (+k.slice(8,10))}</th>`).join("");
+  const rows = shown.map(r => { const tot = keys.reduce((s, k) => s + ((agg[r.id] || {})[k] || 0), 0);
+    return `<tr><td><span class="res-sw" style="background:${r.color}"></span>${esc(r.name)}</td><td>${esc(r.unit || "")}</td>${keys.map(k => { const q = (agg[r.id] || {})[k] || 0; return `<td class="r num ${over(r, k) ? "over" : ""}">${q ? fmtV(v(r, q)) : ""}</td>`; }).join("")}<td class="r num"><b>${fmtV(v(r, tot))}</b></td><td class="r num">${wonM(tot * num(r.cost))}</td></tr>`; }).join("");
+  const totRow = `<tr class="grp"><td colspan="2">당기 계획 합계</td>${totals.map(x => `<td class="r num">${x ? fmtV(x) : ""}</td>`).join("")}<td class="r num">${fmtV(totals.reduce((a,b) => a+b, 0))}</td><td class="r num">${wonM(shown.reduce((s, r) => s + keys.reduce((a, k) => a + ((agg[r.id] || {})[k] || 0), 0) * num(r.cost), 0))}</td></tr>`;
+  // master
+  const links = M.order.map(id => M.by.get(id)).filter(t => t.res && t.res.length);
+  const mst = (state.resDraft ||= clone(R));
+  const master = `<div class="evm-sec"><h3>자원 목록</h3><div class="panel tbl-wrap"><table class="res-mst" style="min-width:640px"><thead><tr><th>구분</th><th>명칭</th><th>단위</th><th class="r">단가(원)</th><th class="r" title="하루에 쓸 수 있는 최대량. 넘으면 빨간색">하루 한도</th><th>색</th><th class="r">총 투입</th>${ed ? "<th></th>" : ""}</tr></thead><tbody>
+    ${mst.map((r, i) => { const tot = links.reduce((s, t) => s + t.res.filter(x => x.rid === r.id).reduce((a, x) => a + num(x.qty), 0), 0);
+      return ed ? `<tr data-ri="${i}"><td><select data-rf="type">${RES_TYPES.map(x => `<option ${x === (r.type || "노무") ? "selected" : ""}>${x}</option>`).join("")}</select></td><td><input data-rf="name" value="${esc(r.name)}"></td><td><input data-rf="unit" value="${esc(r.unit || "")}" style="width:60px"></td><td class="r"><input type="number" data-rf="cost" value="${num(r.cost) || ""}" style="width:110px"></td><td class="r"><input type="number" data-rf="limit" value="${num(r.limit) || ""}" style="width:70px"></td><td><input type="color" data-rf="color" value="${esc(r.color || "#1D6A51")}" style="width:40px;padding:0"></td><td class="r num">${fmtQty(tot)}</td><td><button class="x" data-rdel="${i}" aria-label="삭제">×</button></td></tr>`
+        : `<tr><td>${esc(r.type || "노무")}</td><td><span class="res-sw" style="background:${r.color}"></span>${esc(r.name)}</td><td>${esc(r.unit || "")}</td><td class="r num">${wonM(num(r.cost))}</td><td class="r num">${num(r.limit) || "–"}</td><td></td><td class="r num">${fmtQty(tot)}</td></tr>`; }).join("") || `<tr><td colspan="8" class="note">아직 등록된 자원이 없습니다.</td></tr>`}</tbody></table></div>
+    ${ed ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" id="r-add">+ 자원 추가</button><button class="btn primary" id="r-save">자원 목록 저장</button></div>
+    <details class="imp" style="margin-top:10px"><summary>엑셀에서 붙여넣기</summary><p class="note">엑셀에서 <b>구분 · 명칭 · 단위 · 단가</b> 순서의 열을 복사해 아래에 붙여 넣고 ‘추가’를 누르세요. 예) 노무 → 철근공 → MD → 230000</p>
+      <textarea id="r-paste" rows="4" style="width:100%" placeholder="노무	철근공	MD	230000"></textarea><button class="btn" id="r-paste-go">추가</button></details>
+    ${boqOf().some(x => x.l > 0) ? `<details class="imp"><summary>내역 노무비로 인력 자동 만들기</summary><p class="note">작업마다 연결된 내역의 노무비 ÷ 일당 = 투입 인일(MD)로 ‘현장 인력’ 자원을 만들고 작업에 넣습니다. 이미 있으면 수량만 다시 계산합니다.</p>
+      <label>일당 (원) <input type="number" id="r-wage" value="${num(state.resWage) || 220000}" step="10000" style="width:120px"></label> <button class="btn" id="r-auto">만들기</button></details>` : ""}` : ""}</div>`;
+  const linkRows = links.flatMap(t => t.res.map(x => { const r = R.find(y => y.id === x.rid); if(!r) return ""; const d = Math.max(1, t.ef - t.es);
+    return `<tr data-id="${esc(t.id)}" class="t"><td class="mono">${esc(t.code)}</td><td>${esc(t.name)}</td><td><span class="res-sw" style="background:${r.color}"></span>${esc(r.name)}</td><td class="r num">${fmtQty(num(x.qty))} ${esc(r.unit || "")}</td><td class="r num">${d}</td><td class="r num">${fmtQty(num(x.qty) / d)}</td><td class="r num">${wonM(num(x.qty) * num(r.cost))}</td></tr>`; })).join("");
+  return `<div class="res-ctl">
+      <span class="seg">${[["day","일"],["week","주"],["month","월"]].map(([k,l]) => `<button data-rper="${k}" class="${per===k?"on":""}">${l}</button>`).join("")}</span>
+      <span class="seg">${[["qty","수량"],["amt","금액"]].map(([k,l]) => `<button data-rval="${k}" class="${val===k?"on":""}">${l}</button>`).join("")}</span>
+      ${RES_TYPES.map(t => `<label><input type="checkbox" data-rtype="${t}" ${types.includes(t) ? "checked" : ""}> ${t}</label>`).join("")}
+      <span class="note">${late ? "만기 일정(가장 늦은 일정) 기준" : "조기 일정 기준"} · 간트 탭의 조기/만기 버튼으로 바꿉니다</span></div>
+    ${R.length ? `<div class="panel evm-chart">${svg}${legend}</div>
+    <div class="evm-sec"><h3>기간별 자원 소요량</h3><div class="panel tbl-wrap"><table class="evt" style="min-width:${Math.max(600, keys.length * 60 + 300)}px"><thead><tr><th>자원</th><th>단위</th>${head}<th class="r">합계</th><th class="r">금액</th></tr></thead><tbody>${rows}${totRow}</tbody></table></div></div>` : ""}
+    ${master}
+    <div class="evm-sec"><h3>작업별 투입</h3>${linkRows ? `<div class="panel tbl-wrap"><table class="evt"><thead><tr><th>코드</th><th>작업</th><th>자원</th><th class="r">총 투입</th><th class="r">공기</th><th class="r">하루 투입</th><th class="r">금액</th></tr></thead><tbody>${linkRows}</tbody></table></div>`
+      : `<p class="note">작업을 눌러 편집창의 <b>투입 자원</b>에서 자원과 총 투입량을 넣으면 여기와 그래프에 나타납니다. 간트에서 막대를 옮기면 그래프가 바로 다시 계산되어 인력 피크를 조정할 수 있습니다.</p>`}</div>`;
+}
+function resClick(e){
+  const pr = e.target.closest("[data-rper]"); if(pr){ state.resPer = pr.dataset.rper; render(); return true; }
+  const pv = e.target.closest("[data-rval]"); if(pv){ state.resVal = pv.dataset.rval; render(); return true; }
+  if(e.target.closest("#toggleRes")){ state.showRes = !state.showRes; render(); return true; }
+  const mst = state.resDraft;
+  if(e.target.closest("#r-add") && mst){ mst.push({ id: "r" + Date.now().toString(36), type:"노무", name:"", unit:"MD", cost:0, limit:0, color: RES_COLORS[mst.length % RES_COLORS.length] }); render(); return true; }
+  const rd = e.target.closest("[data-rdel]"); if(rd && mst){ mst.splice(Number(rd.dataset.rdel), 1); render(); return true; }
+  if(e.target.closest("#r-paste-go") && mst){
+    const lines = $("#r-paste").value.split(/\r?\n/).map(l => l.split("\t").map(x => x.trim())).filter(c => c.some(Boolean));
+    lines.forEach(c => { let [type, name, unit, cost] = c; if(!RES_TYPES.includes(type)){ cost = unit; unit = name; name = type; type = "노무"; }
+      if(name) mst.push({ id: "r" + Math.random().toString(36).slice(2,9), type, name, unit: unit || "MD", cost: toNum(cost), limit: 0, color: RES_COLORS[mst.length % RES_COLORS.length] }); });
+    render(); toast(`${lines.length}줄을 붙여 넣었습니다. ‘자원 목록 저장’을 눌러 주세요.`); return true; }
+  if(e.target.closest("#r-save") && mst){
+    if(mst.some(r => !String(r.name).trim())){ toast("자원 명칭이 비어 있는 줄이 있습니다."); return true; }
+    const keep = new Set(mst.map(r => r.id));
+    commit(d => { d.project = { ...(d.project || {}), resources: clone(mst) }; (d.tasks || []).forEach(t => { if(t.res) t.res = t.res.filter(x => keep.has(x.rid)); }); }, "자원 목록을 저장했습니다").then(ok => { if(ok) state.resDraft = null; render(); });
+    return true; }
+  if(e.target.closest("#r-auto")){
+    const wage = num($("#r-wage").value); if(!(wage > 0)){ toast("일당을 넣어 주세요."); return true; } state.resWage = wage;
+    const labor = {}; boqOf().forEach(x => { if(x.t && x.l > 0) labor[x.t] = (labor[x.t] || 0) + x.l; });
+    commit(d => { const p = d.project || (d.project = {}); const list = p.resources || (p.resources = []);
+      let crew = list.find(r => r.auto === "boqLabor"); if(!crew){ crew = { id: "r-crew", auto: "boqLabor", type:"노무", name:"현장 인력 (내역 노무비 환산)", unit:"MD", cost: wage, limit: 0, color:"#2C64A4" }; list.push(crew); } else crew.cost = wage;
+      (d.tasks || []).forEach(t => { const md = (labor[t.id] || 0) / wage; t.res = (t.res || []).filter(x => x.rid !== crew.id); if(md > 0) t.res.push({ rid: crew.id, qty: Math.round(md * 10) / 10 }); }); },
+      "내역 노무비로 현장 인력 투입량을 만들었습니다").then(() => { state.resDraft = null; render(); });
+    return true; }
+  return false;
+}
+function resInput(e){
+  const t = e.target, tr = t.closest && t.closest("[data-ri]");
+  if(tr && t.dataset.rf && state.resDraft){ const r = state.resDraft[Number(tr.dataset.ri)]; r[t.dataset.rf] = ["cost","limit"].includes(t.dataset.rf) ? num(t.value) : t.value; return true; }
+  if(t.dataset && t.dataset.rtype && e.type === "change"){ state.resTypes = [...document.querySelectorAll("[data-rtype]")].filter(x => x.checked).map(x => x.dataset.rtype); render(); return true; }
+  return false;
+}
+
 /* ---------- render ---------- */
 function renderWho(){
   const w = $("#who");
@@ -1318,6 +1726,8 @@ function render(){
   if(state.tab==="gantt"){ v.insertAdjacentHTML("beforeend", renderGantt(M)); const gr = $(".g-right"); if(gr) gr.scrollLeft = keepScroll; }
   else if(state.tab==="net") v.insertAdjacentHTML("beforeend", renderNet(M));
   else if(state.tab==="buy") v.insertAdjacentHTML("beforeend", renderPurchases(M));
+  else if(state.tab==="evm") v.insertAdjacentHTML("beforeend", renderEvm(M));
+  else if(state.tab==="res") v.insertAdjacentHTML("beforeend", renderRes(M));
   else v.insertAdjacentHTML("beforeend", renderList(M));
 }
 
@@ -1421,8 +1831,12 @@ function renderKpis(M){
 }
 function renderTools(){
   let h = "";
+  if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="일정 기준"><button data-sched="early" class="${state.sched!=="late"?"on":""}" title="가장 이른 일정(ES-EF)">조기</button><button data-sched="late" class="${state.sched==="late"?"on":""}" title="가장 늦은 일정(LS-LF): 늦어도 이때까지는 해야 함">만기</button></div>`;
   if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="확대">${[[5,"월"],[12,"주"],[24,"일"]].map(([z,l])=>`<button data-zoom="${z}" class="${state.zoom===z?"on":""}">${l}</button>`).join("")}</div>`;
+  if(state.tab==="gantt" && resOf().length) h += `<button class="btn ${state.showRes ? "primary" : ""}" id="toggleRes" title="간트 아래에 일별 노무 투입량을 같은 시간축으로 보여 줍니다">자원 보기</button>`;
+  if(["gantt","list","evm","net"].includes(state.tab)) h += `<button class="btn" id="openPrint" title="결재란·로고가 있는 공정표를 인쇄하거나 PDF로 저장">인쇄·PDF</button>`;
   if(state.canEdit && state.tab==="buy") h += `<button class="btn primary" id="addBuy">구매 항목 추가</button>`;
+  else if(state.canEdit && state.tab==="evm") h += `<button class="btn primary" id="addPeriod">진도 입력 (새 회차)</button>`;
   else if(state.canEdit && state.tab!=="set") h += `<button class="btn primary" id="addTask">작업 추가</button>`;
   $("#tools").innerHTML = h;
 }
@@ -1438,6 +1852,10 @@ const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border
   <span><i class="sw" style="background:var(--weather)"></i>작업불가(기상 등)</span>
   <span><i class="sw" style="width:2px;height:12px;background:var(--crit)"></i>기준일</span>
   <span><i class="sw" style="width:8px;height:8px;background:var(--prog);clip-path:polygon(0 0,100% 0,0 100%)"></i>착수 제한일</span>
+  <span><i class="sw" style="width:9px;height:9px;background:var(--accent-soft);border-color:var(--accent);transform:rotate(45deg)"></i>마일스톤</span>
+  <span><i class="sw" style="width:2px;height:12px;border:0;border-left:2px dashed #7B4FB8"></i>중간관리일</span>
+  <span style="color:var(--bad)">▲n 착수·종료 지연(기준 공정 대비)</span>
+  ${state.sched === "late" ? `<span style="color:var(--prog);font-weight:600">· 만기 일정(가장 늦은 일정) 보기 중</span>` : ""}
   <span><i class="sw" style="width:10px;height:7px;background:#7B4FB8;clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 전(발주 기한)</span>
   <span><i class="sw" style="width:10px;height:7px;background:var(--prog);clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 완료(발주일)</span>
   <span><i class="sw" style="width:10px;height:7px;background:var(--done);clip-path:polygon(0 0,100% 0,50% 100%)"></i>입고 완료</span>
@@ -1456,7 +1874,8 @@ function renderGantt(M){
   let first = M.p.startDate; buys.forEach(x => { if(markDate(x) < first) first = markDate(x); });
   const a0 = addDays(D(first), -3), a1 = addDays(D(end), 10);
   const nDays = Math.round((a1-a0)/864e5);
-  const W = nDays*px, H = HH + rows.length*RH;
+  const W = nDays*px, H0 = HH + rows.length*RH;
+  const RB = state.showRes && resOf().some(r => (r.type || "노무") === "노무") ? 96 : 0, H = H0 + RB;
   const X = s => Math.round((D(s)-a0)/864e5)*px;
   const off = new Map((M.p.offDays||[]).map(o=>[o.date,o]));
   let bg = "", hdr = "";
@@ -1494,19 +1913,21 @@ function renderGantt(M){
     if(r.g!=null){ grp += `<rect class="r-grp" x="0" y="${y}" width="${W}" height="${RH}"/>`; return; }
     const t = r.t; if(t.es==null) return;
     const cls = t.status==="done" ? "done" : t.crit ? "crit" : "";
-    const editable = state.canEdit && t.status !== "done";
+    const late = state.sched === "late" && t.status !== "done";
+    const sD = late ? t.lateStart : t.startDate, fD = late ? t.lateFinish : t.finishDate;
+    const editable = state.canEdit && t.status !== "done" && !late;
     let g = "";
     if(t.base){ const bx=X(t.base[0]), bw=Math.max(px, X(t.base[1])+px-bx); g += `<rect class="b-base" x="${bx}" y="${y+RH-8}" width="${bw}" height="4" rx="1"/>`; }
     if(t.dur===0 && t.ef===t.es){
-      const cx = X(t.startDate)+px/2, cy=y+RH/2-2;
-      g += `<path class="b-bg" d="M${cx} ${cy-7} L${cx+7} ${cy} L${cx} ${cy+7} L${cx-7} ${cy} Z"/>`;
+      const cx = X(sD)+px/2, cy=y+RH/2-2;
+      g += `<path class="b-bg" d="M${cx} ${cy-7} L${cx+7} ${cy} L${cx} ${cy+7} L${cx-7} ${cy} Z"/><text class="b-lbl" x="${cx+10}" y="${cy+4}">${esc(fmt(sD))}</text>`;
     } else {
-      const x = X(t.startDate), w = Math.max(px, X(t.finishDate)+px-x);
+      const x = X(sD), w = Math.max(px, X(fD)+px-x);
       g += `<rect class="b-bg" x="${x}" y="${y+6}" width="${w}" height="${RH-16}" rx="3"/>`;
       if(isDate(t.notBefore) && t.status==="wait") g += `<path class="b-pin" d="M${x} ${y+1} h6 l-6 6 z"/>`;
       if(t.prog>0) g += `<rect class="b-pg" x="${x}" y="${y+6}" width="${Math.max(2,w*t.prog/100)}" height="${RH-16}" rx="3"/>`;
       let lx = x + w + 6;
-      if(t.status!=="done" && t.float>0){ const fx = X(t.lateFinish)+px; g += `<line class="b-float" x1="${x+w+2}" y1="${y+RH/2-2}" x2="${fx}" y2="${y+RH/2-2}"/>`; lx = fx + 6; }
+      if(!late && t.status!=="done" && t.float>0){ const fx = X(t.lateFinish)+px; g += `<line class="b-float" x1="${x+w+2}" y1="${y+RH/2-2}" x2="${fx}" y2="${y+RH/2-2}"/>`; lx = fx + 6; }
       g += `<text class="b-lbl" x="${lx}" y="${y+RH/2+2}">${t.dur}일${t.prog>0&&t.prog<100?" · "+Math.round(t.prog)+"%":""}</text>`;
     }
     const tip = `${t.code} ${t.name}\n${fmt(t.startDate)} → ${fmt(t.finishDate)} (${t.dur}작업일)\n기대값 ${t.te.toFixed(1)}일 · 여유 ${t.float}일${isDate(t.notBefore)&&t.status==="wait"?`\n착수 제한 ${fmt(t.notBefore)} 이후`:""}${t.delay?`\n기준 대비 ${t.delay>0?"+":""}${t.delay}일`:""}${editable?(t.status==="prog"?"\n오른쪽 끝을 끌어 공기 조정":"\n끌어서 이동 · 양 끝을 끌어 기간 조정"):""}`;
@@ -1515,13 +1936,28 @@ function renderGantt(M){
   let marks = "";
   if(M.statusDate >= S(a0) && M.statusDate <= S(a1)){ const x = X(M.statusDate); marks += `<line class="l-today" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-today" x="${x+3}" y="${HH-8}">기준일</text>`; }
   if(isDate(M.p.targetDate)){ const x = X(M.p.targetDate)+px; marks += `<line class="l-target" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-target" x="${x+3}" y="${HH-8}">목표</text>`; }
+  (M.p.keyDates || []).forEach(k => { if(!isDate(k.date) || k.date < S(a0) || k.date > S(a1)) return; const x = X(k.date) + px/2;
+    marks += `<line class="l-key" x1="${x}" y1="20" x2="${x}" y2="${H}"/><rect class="r-key" x="${x+2}" y="20" width="${Math.min(160, 12 + String(k.label||"").length*11)}" height="13" rx="2" opacity=".85"/><text class="t-key" x="${x+4}" y="30">◆ ${esc(k.label||"")} ${esc(fmt(k.date).split(" ")[0])}</text>`; });
   const left = rows.map(r => r.g!=null
     ? `<div class="g-grp" title="${esc(r.g)}">${esc(r.g)}</div>`
-    : `<div class="g-row ${r.t.status==="done"?"done":""} ${r.t.crit?"crit":""}" data-id="${esc(r.t.id)}" title="${esc(r.t.code+" "+r.t.name)}"><span class="code">${esc(r.t.code)}</span><span class="nm">${esc(r.t.name)}</span></div>`).join("");
+    : `<div class="g-row ${r.t.status==="done"?"done":""} ${r.t.crit?"crit":""}" data-id="${esc(r.t.id)}" title="${esc(r.t.code+" "+r.t.name + (r.t.lamp ? " · " + r.t.lamp.label + " " + r.t.lamp.days + "일" : ""))}"><span class="code">${esc(r.t.code)}</span><span class="nm">${r.t.ms ? "◆ " : ""}${esc(r.t.name)}</span>${r.t.lamp && r.t.lamp.k !== "done" ? `<span class="lamp">▲${r.t.lamp.days}</span>` : ""}</div>`).join("");
+  let band = "";
+  if(RB){
+    const labor = resOf().filter(r => (r.type || "노무") === "노무"), load = dailyLoad(M, state.sched === "late");
+    const dayTot = d => labor.reduce((s, r) => s + ((load.get(d) || {})[r.id] || 0), 0);
+    let mx = 1; load.forEach((o, d) => { mx = Math.max(mx, dayTot(d)); });
+    const lim = labor.reduce((s, r) => s + num(r.limit), 0);
+    if(lim) mx = Math.max(mx, lim * 1.1);
+    band += `<rect x="0" y="${H0}" width="${W}" height="${RB}" fill="var(--surface-2)"/><line class="l-grid" x1="0" y1="${H0}" x2="${W}" y2="${H0}"/>`;
+    load.forEach((o, d) => { const x = X(d); let y = H0 + RB - 4;
+      labor.forEach(r => { const q = o[r.id] || 0; if(!q) return; const h = q / mx * (RB - 14); y -= h; band += `<rect x="${x+0.5}" y="${y}" width="${Math.max(1, px-1)}" height="${h}" fill="${r.color}"><title>${esc(fmt(d))} ${esc(r.name)} ${fmtQty(q)} ${esc(r.unit || "")}</title></rect>`; });
+      const tot = dayTot(d); if(lim && tot > lim + 1e-6) band += `<rect x="${x}" y="${H0+2}" width="${px}" height="3" fill="var(--bad)"><title>${esc(fmt(d))} 합계 ${fmtQty(tot)} · 한도 ${lim} 초과</title></rect>`; });
+    if(lim){ const y = H0 + RB - 4 - lim / mx * (RB - 14); band += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="var(--bad)" stroke-dasharray="4 3"/>`; }
+  }
   return `<div class="panel"><div class="gantt">
-    <div class="g-left"><div class="g-head">작업</div>${left}</div>
+    <div class="g-left"><div class="g-head">작업</div>${left}${RB ? `<div class="g-resl" style="height:${RB}px"><b>노무 투입</b><span>일별 합계 (최대 ${fmtQty(Math.max(0, ...[...dailyLoad(M, state.sched === "late").values()].map(o => resOf().filter(r => (r.type || "노무") === "노무").reduce((s, r) => s + (o[r.id] || 0), 0))))})</span><span style="color:var(--ink-3)">막대를 옮기면 바로 다시 계산</span></div>` : ""}</div>
     <div class="g-right"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="간트 차트">
-      ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${bars}${pos}${marks}</svg></div>
+      ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${bars}${pos}${band}${marks}</svg></div>
   </div>${legendHTML(false)}</div>`;
 }
 
@@ -1540,9 +1976,11 @@ function renderNet(M){
   let edges = "", nodes = "";
   valid.forEach(t => t._preds.forEach(pid => {
     const a = pos.get(pid), b = pos.get(t.id), pt = M.by.get(pid);
-    const crit = pt.crit && t.crit && pt.ef===t.es;
+    const crit = pt.crit && t.crit && t._con && t._con[pid] === t.es;
+    const r = relOf(t, pid);
     const x1=a.x+NW, y1=a.y+NH/2, x2=b.x, y2=b.y+NH/2, mx=(x1+x2)/2;
     edges += `<path class="e ${crit?"crit":""}" d="M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2-4} ${y2}" marker-end="url(#${crit?"ac":"an"})"/>`;
+    if(r.type !== "FS" || r.lag) edges += `<text class="e-lbl" x="${mx}" y="${(y1+y2)/2 - 4}" text-anchor="middle">${r.type}${r.lag ? (r.lag>0?"+":"") + r.lag : ""}</text>`;
   }));
   valid.forEach(t => {
     const {x,y} = pos.get(t.id);
@@ -1566,24 +2004,35 @@ function renderList(M){
   const hasBase = !!(M.p.baseline && M.p.baseline.items);
   const codeOf = id => (M.by.get(id)||{}).code || "?";
   let body = "";
+  const ed = state.canEdit, sel = state.sel || [];
+  const cols = (hasBase ? 15 : 14) + (ed ? 1 : 0);
   M.groups.forEach(g => {
-    body += `<tr class="grp"><td colspan="${hasBase?15:14}">${esc(g.name)}</td></tr>`;
+    body += `<tr class="grp"><td colspan="${cols}">${esc(g.name)}${ed ? (state.dupGroup === g.name
+      ? `<span class="grp-tools"><span class="dup-form">새 공종 이름 <input type="text" id="dup-name" value="${esc(g.name.replace(/^[A-Z]\.\s*/, ""))} (2동)"> 코드 머리글자 <input type="text" id="dup-letter" value="${esc(nextLetter())}" style="width:50px"> <button class="btn sm ok" data-dupgo="${esc(g.name)}">복제</button> <button class="btn sm" data-dupcancel>취소</button></span></span>`
+      : `<span class="grp-tools"><button class="linkx" data-dup="${esc(g.name)}" title="이 공종의 작업과 연결을 통째로 복제합니다 (동별 반복 공정)">공종 복제</button></span>`) : ""}</td></tr>`;
     g.items.forEach(x => {
       const t = M.by.get(x.id); if(t.es==null) return;
       const st = t.status==="done" ? `<span class="pill p-done">완료</span>` : t.status==="prog" ? `<span class="pill p-prog">진행 ${Math.round(t.prog)}%</span>` : `<span class="pill p-wait">대기</span>`;
-      body += `<tr class="t" data-id="${esc(t.id)}">
-        <td class="mono">${esc(t.code)}</td><td>${esc(t.name)} ${t.crit?`<span class="pill p-crit">주공정</span>`:""}</td>
+      const si = sel.indexOf(t.id);
+      body += `<tr class="t ${si >= 0 ? "sel" : ""}" data-id="${esc(t.id)}">
+        ${ed ? `<td class="ck"><input type="checkbox" data-sel="${esc(t.id)}" ${si >= 0 ? "checked" : ""} aria-label="${esc(t.code)} 선택" title="${si >= 0 ? (si+1) + "번째로 선택됨" : "선택"}"></td>` : ""}
+        <td class="mono">${esc(t.code)}${si >= 0 ? ` <span class="ord" style="font-size:11px;color:var(--prog)">#${si+1}</span>` : ""}</td><td>${t.ms ? `<span class="ms-mark">◆</span> ` : ""}${esc(t.name)} ${t.crit?`<span class="pill p-crit">주공정</span>`:""}${t.lamp ? ` <span class="pill p-lamp" title="기준 공정 대비">${t.lamp.label} ${t.lamp.days}일</span>` : ""}</td>
         <td class="r num">${num(t.o)}</td><td class="r num">${num(t.m)}</td><td class="r num">${num(t.p)}</td>
         <td class="r num"><b>${t.te.toFixed(1)}</b></td><td class="r num">${Math.sqrt(t.v).toFixed(2)}</td>
-        <td class="mono">${esc(t._preds.map(codeOf).join(", ")||"–")}</td>
+        <td class="mono">${esc(t._preds.map(pid => relTxt(codeOf(pid), relOf(t, pid))).join(", ")||"–")}</td>
         <td class="num">${esc(fmt(t.startDate))}</td><td class="num">${esc(fmt(t.finishDate))}</td>
         <td class="r num">${t.dur}</td><td class="r num">${t.status==="done"?"–":t.float}</td>
         ${hasBase?`<td class="r num ${t.delay>0?"late":t.delay<0?"early":""}">${t.delay==null?"–":(t.delay>0?"+":"")+t.delay}</td>`:""}
         <td>${st}</td><td>${esc(t.note||"")}</td></tr>`;
     });
   });
-  return `<div class="panel tbl-wrap"><table>
-    <thead><tr><th>코드</th><th>작업명</th><th class="r" title="낙관 기간">낙관 a</th><th class="r" title="최빈 기간">최빈 m</th><th class="r" title="비관 기간">비관 b</th>
+  const selbar = ed && sel.length ? `<div class="selbar"><b>${sel.length}개 선택</b> <span class="ord">${esc(sel.map(codeOf).join(" → "))}</span>
+      <button class="btn sm" data-selact="chain" title="선택한 순서대로 앞 작업이 끝나면 다음 작업이 시작하도록(FS) 연결합니다">순서대로 연결</button>
+      <input type="text" id="sel-group" list="sel-groups" placeholder="옮길 공종 이름"><datalist id="sel-groups">${M.groups.map(g => `<option value="${esc(g.name)}">`).join("")}</datalist><button class="btn sm" data-selact="group">공종 변경</button>
+      <button class="btn sm danger" data-selact="del">${state.selDelArm ? "한 번 더 누르면 삭제" : "선택 삭제"}</button>
+      <button class="btn sm" data-selact="clear">선택 해제</button></div>` : "";
+  return `${selbar}<div class="panel tbl-wrap"><table>
+    <thead><tr>${ed ? `<th class="ck" title="여러 작업 선택">선택</th>` : ""}<th>코드</th><th>작업명</th><th class="r" title="낙관 기간">낙관 a</th><th class="r" title="최빈 기간">최빈 m</th><th class="r" title="비관 기간">비관 b</th>
     <th class="r" title="(a+4m+b)/6">기대 te</th><th class="r" title="(b−a)/6">σ</th><th>선행작업</th><th>시작</th><th>완료</th><th class="r">공기</th><th class="r">여유</th>
     ${hasBase?`<th class="r" title="기준 공정 대비 완료일 변동(작업일)">지연</th>`:""}<th>상태</th><th>메모</th></tr></thead>
     <tbody>${body}</tbody></table></div>
@@ -1594,6 +2043,8 @@ function renderSettings(){
   const p = proj(); const dis = state.canEdit ? "" : "disabled";
   if(!state.draftOff) state.draftOff = (p.offDays||[]).map(o=>({...o}));
   const offs = [...state.draftOff].sort((a,b)=>a.date<b.date?-1:1);
+  if(!state.draftKey) state.draftKey = (p.keyDates||[]).map(k=>({...k}));
+  const keys = [...state.draftKey].sort((a,b)=>a.date<b.date?-1:1);
   const base = p.baseline;
   return `<div class="panel settings">
     <section>
@@ -1605,6 +2056,10 @@ function renderSettings(){
       </div>
       <div class="field"><label for="s-status">기준일</label><input type="date" id="s-status" value="${esc(p.statusDate||"")}" ${dis}><span class="hint">비워 두면 오늘 날짜로 계산합니다. 아직 시작하지 않은 작업은 기준일 이전으로 잡히지 않고 뒤로 밀립니다.</span></div>
       <label class="chk"><input type="checkbox" id="s-sat" ${p.workSaturday?"checked":""} ${dis}> 토요일 작업</label>
+      <h3 style="margin-top:24px">중간관리일</h3>
+      <p class="note" style="margin-top:0">착공, 골조 완료, 준공 검사처럼 꼭 지켜야 할 날짜입니다. 간트 눈금 위에 점선과 이름으로 표시됩니다.</p>
+      <div class="off-list">${keys.length ? keys.map(k=>`<div class="off-item" style="grid-template-columns:110px 1fr auto"><span class="num">${esc(fmt(k.date))}</span><span>◆ ${esc(k.label||"")}</span>${state.canEdit?`<button class="x" data-rmkey="${esc(k.date)}|${esc(k.label||"")}" aria-label="삭제">×</button>`:"<span></span>"}</div>`).join("") : `<div class="note">등록된 중간관리일이 없습니다.</div>`}</div>
+      ${state.canEdit ? `<div class="off-add"><input type="date" id="k-date" aria-label="중간관리일 날짜"><input type="text" id="k-label" placeholder="이름 (예: 골조 완료)" aria-label="중간관리일 이름"><button class="btn full" id="k-add">중간관리일 추가</button></div>` : ""}
       <h3 style="margin-top:24px">기준 공정</h3>
       <p class="note">${base ? `${fmtLong(base.savedAt)}에 저장한 기준 공정과 비교하고 있습니다 (당시 예상 준공 ${fmtLong(base.finish)}).` : "아직 기준 공정이 없습니다. 계획이 확정되면 저장해 두세요. 이후 간트 차트에 계획선이 표시되고 작업별 지연일이 계산됩니다."}</p>
       ${state.canEdit ? `<button class="btn" id="s-base">${base ? "현재 일정으로 기준 공정 다시 저장" : "현재 일정을 기준 공정으로 저장"}</button>` : ""}
@@ -1614,11 +2069,14 @@ function renderSettings(){
       <p class="note" style="margin-top:0">공휴일, 우천·강풍·한파 등으로 작업하지 못한 날을 추가하면 이후 일정이 자동으로 밀립니다.</p>
       <div class="off-list">${offs.length ? offs.map(o=>`<div class="off-item ${o.type==="weather"?"w":""}"><span class="num">${esc(fmt(o.date))}</span><span>${esc(o.reason||"")} <span style="color:var(--ink-3)">· ${o.type==="weather"?"기상":o.type==="etc"?"기타":"공휴일"}</span></span>${state.canEdit?`<button class="x" data-rmoff="${esc(o.date)}" aria-label="삭제">×</button>`:"<span></span>"}</div>`).join("") : `<div class="note">등록된 작업불가일이 없습니다.</div>`}</div>
       ${state.canEdit ? `<div class="off-add">
-        <input type="date" id="o-date" aria-label="날짜">
-        <select id="o-type" aria-label="구분"><option value="weather">우천·기상</option><option value="holiday">공휴일</option><option value="etc">기타</option></select>
-        <input type="text" id="o-reason" class="full" placeholder="사유 (예: 우천, 강풍 경보)">
+        <input type="date" id="o-date" aria-label="시작 날짜">
+        <input type="date" id="o-end" aria-label="끝 날짜 (기간 휴무일 때)" title="기간 휴무(장마·혹한기)면 끝 날짜도 넣으세요">
+        <select id="o-type" aria-label="구분"><option value="weather">우천·기상</option><option value="holiday">공휴일</option><option value="etc">기타·기간 휴무</option></select>
+        <input type="text" id="o-reason" placeholder="사유 (예: 우천, 장마 휴무)">
         <button class="btn full" id="o-add">작업불가일 추가</button>
-      </div>` : ""}
+        <button class="btn full" id="o-kr" title="2026~2028년 법정 공휴일·대체공휴일·선거일">법정 공휴일 한 번에 넣기 (2026~2028)</button>
+      </div>
+      <p class="note">끝 날짜를 함께 넣으면 그 기간 전체(예: 장마 7/1~7/20)가 한 번에 들어갑니다.</p>` : ""}
     </section>
     <section>
       <h3>이 프로젝트</h3>
@@ -1648,6 +2106,20 @@ function permSection(){
 }
 
 /* ---------- drawer ---------- */
+/* 코드 자동 부여: 공종의 머리글자 + 다음 번호 */
+function nextCode(group){
+  const all = tasksOf(), inG = all.filter(t => t.group === group);
+  const pick = list => { const cnt = {}; list.forEach(t => { const m = String(t.code).match(/^([A-Za-z가-힣]+)/); if(m) cnt[m[1]] = (cnt[m[1]] || 0) + 1; }); return Object.keys(cnt).sort((a,b) => cnt[b] - cnt[a])[0]; };
+  let L = pick(inG) || (String(group).match(/^([A-Za-z]+)[.\s]/) || [])[1] || nextLetter();
+  let n = 1; all.forEach(t => { const m = String(t.code).match(/^([A-Za-z가-힣]+)(\d+)$/); if(m && m[1] === L) n = Math.max(n, Number(m[2]) + 1); });
+  while(all.some(t => t.code === L + n)) n++;
+  return L + n;
+}
+function nextLetter(){
+  const used = new Set(tasksOf().map(t => (String(t.code).match(/^([A-Za-z]+)/) || [])[1]).filter(Boolean));
+  for(let i = 0; i < 26; i++){ const c = String.fromCharCode(65 + i); if(!used.has(c)) return c; }
+  return "Z";
+}
 function openTask(id){
   state.drawer = { id: id||null, arm:false };
   renderDrawer();
@@ -1659,6 +2131,8 @@ function renderDrawer(){
   const dr = state.drawer; if(!dr) return;
   if(dr.kind === "project"){ renderNewProject(); return; }
   if(dr.kind === "buy"){ renderBuyDrawer(); return; }
+  if(dr.kind === "period"){ renderPeriodDrawer(); return; }
+  if(dr.kind === "print"){ renderPrintDrawer(); return; }
   const M = state.M; const raw = dr.id ? tasksOf().find(t=>t.id===dr.id) : null;
   const t = dr.id && M ? M.by.get(dr.id) : null;
   const codeOf = id => (tasksOf().find(x=>x.id===id)||{}).code;
@@ -1674,7 +2148,8 @@ function renderDrawer(){
         <dt>공기</dt><dd class="num">${t.dur}작업일 (기대 ${t.te.toFixed(1)}일)</dd>
         <dt>3점 추정</dt><dd class="num">낙관 ${num(t.o)} · 최빈 ${num(t.m)} · 비관 ${num(t.p)}</dd>
         <dt>여유</dt><dd class="num">${t.status==="done"?"–":t.float+"일"}</dd>
-        <dt>선행</dt><dd class="mono">${esc(t._preds.map(codeOf).join(", ")||"–")}</dd>
+        <dt>선행</dt><dd class="mono">${esc(t._preds.map(pid => relTxt(codeOf(pid), relOf(t, pid))).join(", ")||"–")}</dd>
+        ${t.lamp ? `<dt>지연</dt><dd><span class="pill p-lamp">${t.lamp.label} ${t.lamp.days}일</span></dd>` : ""}
         <dt>후속</dt><dd class="mono">${esc(succs.join(", ")||"–")}</dd>
         ${isDate(t.notBefore)?`<dt>착수 제한</dt><dd class="num">${esc(fmt(t.notBefore))} 이후</dd>`:""}
         <dt>실제 시작</dt><dd class="num">${esc(fmt(t.actualStart))}</dd>
@@ -1693,33 +2168,230 @@ function renderDrawer(){
         <div class="field"><label for="f-group">공종</label><input type="text" id="f-group" list="f-groups" value="${esc(v.group)}" placeholder="예: C. 철골 골조"><datalist id="f-groups">${groups.map(g=>`<option value="${esc(g)}">`).join("")}</datalist></div>
       </div>
       <div class="field"><label for="f-name">작업명</label><input type="text" id="f-name" value="${esc(v.name)}"></div>
+      <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="f-ms" ${raw && num(v.o)+num(v.m)+num(v.p)===0 ? "checked" : ""}> 마일스톤 (공기 0일 · 착공, 골조 완료, 준공 같은 관리 시점)</label>
       <span class="flabel">기간 3점 추정 (작업일)</span>
-      <div class="g3" style="margin:4px 0">
+      <div class="g3" style="margin:4px 0" id="f-dur">
         <div class="field"><label for="f-o">낙관 a</label><input type="number" min="0" step="0.5" id="f-o" value="${esc(v.o)}"></div>
         <div class="field"><label for="f-m">최빈 m</label><input type="number" min="0" step="0.5" id="f-m" value="${esc(v.m)}"></div>
         <div class="field"><label for="f-p">비관 b</label><input type="number" min="0" step="0.5" id="f-p" value="${esc(v.p)}"></div>
       </div>
       <p class="note" id="f-te" style="margin:-4px 0 12px"></p>
-      <div class="field"><label for="f-preds">선행작업 코드</label><input type="text" id="f-preds" value="${esc((v.preds||[]).map(codeOf).filter(Boolean).join(", "))}" placeholder="예: B5, C1"><span class="hint">쉼표로 구분합니다. 이 작업들이 모두 끝나야 시작할 수 있습니다.</span></div>
+      <div class="field"><label for="f-preds">선행작업</label><input type="text" id="f-preds" value="${esc((v.preds||[]).filter(codeOf).map(pid => relTxt(codeOf(pid), relOf(v, pid))).join(", "))}" placeholder="예: B5, C1 SS+3, D2 FF-1">
+        <span class="hint">쉼표로 구분합니다. 코드만 쓰면 선행이 끝난 뒤 시작(FS)합니다. <b>SS</b>=같이 시작, <b>FF</b>=같이 끝남, <b>SF</b>=선행 시작 후 끝남, <b>+3</b>/<b>-2</b>=작업일 Lag. 예) <span class="mono">C1 SS+3</span> = C1 시작 3일 뒤 시작</span></div>
       <div class="field"><label for="f-nb">착수 제한일</label><input type="date" id="f-nb" value="${esc(v.notBefore||"")}"><span class="hint">이 날짜 전에는 시작하지 않습니다. 간트에서 막대를 끌면 자동으로 채워지고, 비우면 선행작업이 끝나는 대로 시작합니다.</span></div>
       <div class="g2">
         <div class="field"><label for="f-as">실제 시작일</label><input type="date" id="f-as" value="${esc(v.actualStart||"")}"></div>
         <div class="field"><label for="f-ae">실제 완료일</label><input type="date" id="f-ae" value="${esc(v.actualEnd||"")}"></div>
       </div>
       <div class="field"><label for="f-prog">진척률 <span id="f-progv" class="num">${num(v.progress)}%</span></label><input type="range" min="0" max="100" step="5" id="f-prog" value="${num(v.progress)}"><span class="hint">진행 중인 작업의 남은 기간을 계산하는 데 씁니다.</span></div>
+      ${resOf().length ? `<div class="field"><span class="flabel">투입 자원 (작업 전체 투입량 · 기간 동안 고르게 배분)</span><div class="dr-res" id="f-res"></div><div><button type="button" class="btn sm" id="f-res-add">+ 자원</button></div></div>` : ""}
       <div class="field"><label for="f-note">메모</label><textarea id="f-note">${esc(v.note||"")}</textarea></div>
       <div class="err" id="f-err"></div>
     </div>
     <div class="d-foot">
-      <div>${raw ? `<button class="btn danger ${dr.arm?"armed":""}" id="f-del">${dr.arm?"한 번 더 누르면 삭제":"삭제"}</button>` : ""}</div>
+      <div style="display:flex;gap:8px">${raw ? `<button class="btn danger ${dr.arm?"armed":""}" id="f-del">${dr.arm?"한 번 더 누르면 삭제":"삭제"}</button><button class="btn" id="f-dup" title="이 작업을 같은 공종에 복제합니다">복제</button>` : ""}</div>
       <div style="display:flex;gap:8px"><button class="btn" data-close>취소</button><button class="btn primary" id="f-save">저장</button></div>
     </div>`;
   updateTe();
+  if(!raw && dr.copy){ const c = dr.copy; [["f-name", c.name + " (복제)"], ["f-group", c.group], ["f-o", c.o], ["f-m", c.m], ["f-p", c.p], ["f-note", c.note || ""]].forEach(([k, val]) => { const el = $("#" + k); if(el) el.value = val; });
+    $("#f-preds").value = (c.preds || []).filter(codeOf).map(pid => relTxt(codeOf(pid), relOf(c, pid))).join(", "); $("#f-ms").checked = num(c.o)+num(c.m)+num(c.p) === 0; updateTe(); }
+  if(!raw && !$("#f-code").value){ $("#f-code").value = nextCode($("#f-group").value); dr.autoCode = $("#f-code").value; }
+  if(!dr.res) dr.res = clone((raw && raw.res) || (dr.copy && dr.copy.res) || []);
+  renderTaskRes();
+}
+function renderTaskRes(){
+  const box = $("#f-res"), dr = state.drawer; if(!box || !dr) return;
+  const R = resOf(), t = dr.id && state.M ? state.M.by.get(dr.id) : null, d = t && t.es != null ? Math.max(1, t.ef - t.es) : null;
+  box.innerHTML = dr.res.map((x, i) => { const r = R.find(y => y.id === x.rid);
+    return `<div class="rr" data-tri="${i}"><select data-trf="rid" aria-label="자원">${R.map(y => `<option value="${esc(y.id)}" ${y.id === x.rid ? "selected" : ""}>${esc(y.type || "노무")} · ${esc(y.name)}</option>`).join("")}</select>
+      <input type="number" min="0" step="any" data-trf="qty" value="${x.qty ?? ""}" aria-label="총 투입량"> <span style="font-size:12px;color:var(--ink-3);white-space:nowrap">${esc((r || {}).unit || "")}${d && num(x.qty) ? ` · 하루 ${fmtQty(num(x.qty)/d)}` : ""}</span>
+      <button type="button" class="x" data-trdel="${i}" aria-label="삭제">×</button></div>`; }).join("") || `<span class="note">없음</span>`;
+}
+/* "B5, C1 SS+3, D2 FF-1, A1+2" → [{task, type, lag}] */
+function parsePreds(text, all){
+  const byCode = new Map(all.map(t => [t.code, t]));
+  const out = [];
+  const one = tok => {
+    tok = tok.trim(); if(!tok) return true;
+    if(byCode.has(tok)){ out.push({ task: byCode.get(tok), type:"FS", lag:0 }); return true; }
+    const m = tok.match(/^(.+?)\s*(FS|SS|FF|SF)?\s*([+-]\s*\d+)?\s*(일)?$/i);
+    if(m && byCode.has(m[1].trim()) && (m[2] || m[3])){ out.push({ task: byCode.get(m[1].trim()), type: (m[2] || "FS").toUpperCase(), lag: m[3] ? Number(m[3].replace(/\s/g, "")) : 0 }); return true; }
+    return false;
+  };
+  for(const part of text.split(/[,;\n]+/)){
+    if(one(part)) continue;
+    const words = part.trim().split(/\s+/);          // 예전 방식: 띄어쓰기로 구분한 코드들
+    if(words.length > 1 && words.every(w => byCode.has(w))){ words.forEach(one); continue; }
+    return { error: `선행작업 ‘${part.trim()}’을(를) 알아볼 수 없습니다. 코드와 관계를 확인해 주세요 (예: C1 SS+3).` };
+  }
+  return { list: out };
 }
 function updateTe(){
   const box = $("#f-te"); if(!box) return;
+  const ms = $("#f-ms") && $("#f-ms").checked;
+  document.querySelectorAll("#f-dur input").forEach(i => i.disabled = ms);
+  if(ms){ box.textContent = "마일스톤은 공기 0일입니다. 간트에 ◆로 표시됩니다."; return; }
   const r = pert({ o:num($("#f-o").value), m:num($("#f-m").value), p:num($("#f-p").value) });
   box.textContent = r.te>0 ? `기대 공기 ${r.te.toFixed(2)}일 → 일정에 ${r.dur}작업일 반영 · σ ${Math.sqrt(r.v).toFixed(2)}일` : "세 값을 입력하면 기대 공기를 계산합니다.";
+}
+
+/* ---------- 여러 작업 선택 · 일괄 연결 · 복제 ---------- */
+function toggleSel(id){ const s = state.sel || (state.sel = []); const i = s.indexOf(id); if(i >= 0) s.splice(i, 1); else s.push(id); state.selDelArm = false; render(); }
+async function selAction(kind){
+  const ids = (state.sel || []).slice(); if(!ids.length) return;
+  const codeOf = id => (tasksOf().find(t => t.id === id) || {}).code;
+  if(kind === "clear"){ state.sel = []; render(); return; }
+  if(kind === "chain"){
+    if(ids.length < 2){ toast("두 개 이상 선택해 주세요."); return; }
+    const cand = tasksOf().map(t => ({ ...t, preds: [...(t.preds || [])] }));
+    for(let i = 1; i < ids.length; i++){ const t = cand.find(x => x.id === ids[i]); if(!t.preds.includes(ids[i-1])) t.preds.push(ids[i-1]); }
+    if(topo(cand).cyc.length){ toast("이 순서로 연결하면 선행작업이 순환합니다. 선택 순서를 확인해 주세요.", 5000); return; }
+    const ok = await commit(d => { for(let i = 1; i < ids.length; i++){ const t = (d.tasks || []).find(x => x.id === ids[i]); if(t){ t.preds = t.preds || []; if(!t.preds.includes(ids[i-1])) t.preds.push(ids[i-1]); } } }, `${ids.map(codeOf).join(" → ")} 순서로 연결했습니다`);
+    if(ok){ state.sel = []; render(); }
+    return;
+  }
+  if(kind === "group"){
+    const g = ($("#sel-group").value || "").trim(); if(!g){ toast("옮길 공종 이름을 넣어 주세요."); return; }
+    const base = Math.max(0, ...tasksOf().filter(t => t.group === g).map(t => num(t.order)), 0) || (Math.max(0, ...tasksOf().map(t => num(t.order))) + 100);
+    const ok = await commit(d => { ids.forEach((id, i) => { const t = (d.tasks || []).find(x => x.id === id); if(t){ t.group = g; t.order = base + (i + 1) / 100; } }); }, `${ids.length}개 작업을 ‘${g}’(으)로 옮겼습니다`);
+    if(ok){ state.sel = []; render(); }
+    return;
+  }
+  if(kind === "del"){
+    if(!state.selDelArm){ state.selDelArm = true; render(); return; }
+    const set = new Set(ids);
+    const ok = await commit(d => { d.tasks = (d.tasks || []).filter(t => !set.has(t.id)); d.tasks.forEach(t => { t.preds = (t.preds || []).filter(p => !set.has(p)); if(t.rel) ids.forEach(id => delete t.rel[id]); });
+      (d.purchases || []).forEach(p => { if(set.has(p.taskId)) p.taskId = ""; }); }, `${ids.length}개 작업을 삭제했습니다`);
+    if(ok){ state.sel = []; state.selDelArm = false; render(); }
+  }
+}
+async function duplicateGroup(group){
+  const name = ($("#dup-name").value || "").trim(), L = ($("#dup-letter").value || "").trim().toUpperCase();
+  if(!name || !/^[A-Z가-힣]+$/.test(L)){ toast("새 공종 이름과 코드 머리글자(영문)를 넣어 주세요."); return; }
+  const src = tasksOf().filter(t => t.group === group).sort((a,b) => num(a.order) - num(b.order));
+  const codes = new Set(tasksOf().map(t => t.code));
+  const map = {}; src.forEach(t => map[t.id] = uid());
+  const label = `${L}. ${name}`;
+  const maxOrd = Math.max(0, ...tasksOf().map(t => num(t.order)));
+  const copies = src.map((t, i) => {
+    let n = (String(t.code).match(/(\d+)$/) || [])[1] || String(i + 1), code = L + n; while(codes.has(code)) code += "'"; codes.add(code);
+    const preds = (t.preds || []).map(p => map[p] || p), rel = {};
+    Object.entries(t.rel || {}).forEach(([k, v]) => { rel[map[k] || k] = { ...v }; });
+    return { id: map[t.id], code, group: label, name: t.name, o: t.o, m: t.m, p: t.p, preds, rel, order: maxOrd + 100 + i, actualStart:"", actualEnd:"", progress:0, notBefore:"", note: t.note || "", amount: 0 };
+  });
+  const ok = await commit(d => { d.tasks = (d.tasks || []).concat(copies); }, `‘${group}’을(를) ‘${label}’(으)로 복제했습니다 (${copies.length}개 작업). 필요하면 선행작업을 조정하세요.`);
+  if(ok){ state.dupGroup = null; render(); }
+}
+
+/* ---------- 공정표 인쇄 · PDF ---------- */
+function printOpts(){ let o = {}; try{ o = JSON.parse(store.get("printOpts:" + state.pid, "") || store.get("printOpts", "") || "{}"); }catch{}
+  const M = state.M;
+  return { title: o.title || (proj().name || "") + " 공정표", sub: o.sub ?? "", sign: o.sign ?? "담당, 검토, 승인", logo: o.logo || "", paper: o.paper || "A3",
+    from: o.from || M.p.startDate, to: o.to || "", parts: o.parts || { gantt: true, list: false, curve: false }, company: o.company ?? "" }; }
+function savePrintOpts(o){ const s0 = JSON.stringify(o); store.set("printOpts:" + state.pid, s0); store.set("printOpts", JSON.stringify({ ...o, title: "", from: "", to: "" })); }
+function openPrint(){ state.drawer = { kind: "print", o: printOpts() }; renderDrawer(); $("#drawer").hidden = false; $("#scrim").hidden = false; }
+function renderPrintDrawer(){
+  const o = state.drawer.o, el = $("#drawer");
+  el.innerHTML = `<div class="d-head"><h2>공정표 인쇄 · PDF</h2><button class="x" data-close aria-label="닫기">×</button></div>
+    <div class="d-body">
+      <div class="field"><label for="pr-title">제목</label><input type="text" id="pr-title" value="${esc(o.title)}"></div>
+      <div class="field"><label for="pr-sub">부제 (현장명·발주처 등)</label><input type="text" id="pr-sub" value="${esc(o.sub)}" placeholder="예: 발주처 ○○농업회사법인"></div>
+      <div class="g2"><div class="field"><label for="pr-company">시공사</label><input type="text" id="pr-company" value="${esc(o.company)}" placeholder="예: (주)그린플러스"></div>
+        <div class="field"><label for="pr-sign">결재란 (쉼표로 구분, 비우면 없음)</label><input type="text" id="pr-sign" value="${esc(o.sign)}"></div></div>
+      <div class="field"><label for="pr-logo">회사 로고 (이미지 파일)</label><input type="file" id="pr-logo" accept="image/*">${o.logo ? `<span class="hint"><img src="${o.logo}" style="max-height:28px;vertical-align:middle"> <button class="linkx" id="pr-logo-x">로고 빼기</button></span>` : `<span class="hint">이 브라우저에 저장됩니다.</span>`}</div>
+      <div class="g3"><div class="field"><label for="pr-paper">용지</label><select id="pr-paper"><option value="A3" ${o.paper==="A3"?"selected":""}>A3 가로</option><option value="A4" ${o.paper==="A4"?"selected":""}>A4 가로</option></select></div>
+        <div class="field"><label for="pr-from">출력 시작일</label><input type="date" id="pr-from" value="${esc(o.from)}"></div>
+        <div class="field"><label for="pr-to">출력 끝일 (비우면 준공까지)</label><input type="date" id="pr-to" value="${esc(o.to)}"></div></div>
+      <span class="flabel">넣을 내용</span>
+      <div class="choice" style="margin-top:4px">
+        <label><input type="checkbox" id="pr-gantt" ${o.parts.gantt ? "checked" : ""}><span>간트 공정표<small>작업명·공기·시작·완료 + 막대, 주공정·진척·마일스톤·중간관리일·기준일·목표일</small></span></label>
+        <label><input type="checkbox" id="pr-list" ${o.parts.list ? "checked" : ""}><span>작업 목록표<small>3점 추정, 선행, 일정, 여유, 진척</small></span></label>
+        <label><input type="checkbox" id="pr-curve" ${o.parts.curve ? "checked" : ""}><span>기성 S-커브와 요약<small>계획 대비 실적, 회차별 기성</small></span></label>
+      </div>
+      <p class="note">미리보기에서 확인한 뒤 <b>인쇄</b>를 누르세요. 인쇄 창에서 대상을 ‘PDF로 저장’으로 고르면 PDF 파일이 됩니다. 용지 방향은 자동으로 가로가 됩니다.</p>
+    </div>
+    <div class="d-foot"><span></span><div style="display:flex;gap:8px"><button class="btn" data-close>닫기</button><button class="btn primary" id="pr-go">미리보기</button></div></div>`;
+}
+function readPrintForm(){
+  const o = state.drawer.o;
+  Object.assign(o, { title: $("#pr-title").value, sub: $("#pr-sub").value, company: $("#pr-company").value, sign: $("#pr-sign").value, paper: $("#pr-paper").value,
+    from: $("#pr-from").value, to: $("#pr-to").value, parts: { gantt: $("#pr-gantt").checked, list: $("#pr-list").checked, curve: $("#pr-curve").checked } });
+  return o;
+}
+function printHeader(o, M, page, pages){
+  const p = M.p, signs = String(o.sign || "").split(/[,，]/).map(x => x.trim()).filter(Boolean);
+  const sign = signs.length ? `<table class="sign"><tr><td class="lbl" rowspan="2">결재</td>${signs.map(x => `<td>${esc(x)}</td>`).join("")}</tr><tr class="box">${signs.map(() => "<td></td>").join("")}</tr></table>` : "";
+  return `<div class="ph">${o.logo ? `<img class="logo" src="${o.logo}" alt="">` : ""}<div class="tt"><h1>${esc(o.title)}</h1>${o.sub ? `<div class="sub">${esc(o.sub)}</div>` : ""}
+    <div class="info">공사명 ${esc(p.name || "")} · 착공 ${esc(fmtLong(p.startDate))} · 예상 준공 ${esc(fmtLong(M.finish))}${p.targetDate ? " · 목표 준공 " + esc(fmtLong(p.targetDate)) : ""} · 기준일 ${esc(fmtLong(M.statusDate))}${o.company ? " · 시공 " + esc(o.company) : ""}</div></div>${sign}</div>`;
+}
+const printFoot = (page, pages) => `<div class="pfoot"><span>범례: ■ 주공정 ■ 여유 있는 작업 ■ 완료 · 진한 부분 = 진척 · ◆ 마일스톤 · ┊ 중간관리일 · 빨간선 기준일 · 파란선 목표</span><span>출력 ${esc(fmtLong(localToday()))} · ${page} / ${pages}</span></div>`;
+function printGanttPages(o, M){
+  const unitsW = o.paper === "A3" ? 1500 : 1100, mmPer = (o.paper === "A3" ? 404 : 281) / unitsW, RH = 16, HH = 30;
+  const rowsPer = Math.floor(((o.paper === "A3" ? 281 : 194) - 52) / (RH * mmPer)) - 2;
+  const rows = []; M.groups.forEach(g => { rows.push({ g: g.name }); g.items.forEach(t => { const x = M.by.get(t.id); if(x.es != null) rows.push({ t: x }); }); });
+  const from = isDate(o.from) ? o.from : M.p.startDate;
+  let to = isDate(o.to) ? o.to : [M.finish, M.p.targetDate].filter(isDate).sort().pop();
+  const a0 = D(from), nDays = Math.max(7, dayCount(from, to) + 3);
+  const LW = 330, dayW = (unitsW - LW) / nDays, X = s => LW + dayCount(from, s) * dayW;
+  const clampX = x => Math.max(LW, Math.min(unitsW, x));
+  const chunks = []; for(let i = 0; i < rows.length; i += rowsPer) chunks.push(rows.slice(i, i + rowsPer));
+  const off = new Map((M.p.offDays || []).map(x => [x.date, x]));
+  return chunks.map((chunk, pi) => {
+    const H = HH + chunk.length * RH + 2;
+    let g = `<svg viewBox="0 0 ${unitsW} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Malgun Gothic, sans-serif">`;
+    g += `<rect x="0" y="0" width="${unitsW}" height="${HH}" fill="#E8EEE9"/>`;
+    [["코드",4],["작업명",40],["공기",236],["시작",262],["완료",296]].forEach(([t,x]) => g += `<text x="${x}" y="${HH-6}" font-size="9" font-weight="700" fill="#333">${t}</text>`);
+    for(let i = 0; i < nDays; i++){ const d = addDays(a0, i), sD = S(d), x = LW + i * dayW, w0 = d.getUTCDay();
+      if(off.has(sD) || w0 === 0 || (w0 === 6 && !M.p.workSaturday)) g += `<rect x="${x}" y="${HH}" width="${dayW}" height="${H-HH}" fill="${off.has(sD) && off.get(sD).type === "weather" ? "#F2E4CC" : "#EEF1EE"}"/>`;
+      if(d.getUTCDate() === 1 || i === 0) g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#999" stroke-width=".6"/><text x="${x+2}" y="11" font-size="9" font-weight="700" fill="#222">${d.getUTCFullYear()}.${d.getUTCMonth()+1}</text>`;
+      const step = dayW >= 9 ? 1 : dayW >= 3 ? 7 : 14;
+      if((step === 1 || w0 === 1) && (step !== 14 || Math.floor(i / 7) % 2 === 0)) g += `<text x="${x + (step === 1 ? dayW/2 : 1)}" y="${HH-6}" font-size="7" fill="#555" ${step === 1 ? 'text-anchor="middle"' : ""}>${d.getUTCDate()}</text>`;
+    }
+    chunk.forEach((r, i) => { const y = HH + i * RH;
+      if(r.g != null){ g += `<rect x="0" y="${y}" width="${unitsW}" height="${RH}" fill="#DDE8E1"/><text x="4" y="${y+11.5}" font-size="9" font-weight="700" fill="#1D4D3C">${esc(r.g)}</text>`; return; }
+      const t = r.t, crit = t.crit, done = t.status === "done";
+      g += `<line x1="0" y1="${y+RH}" x2="${unitsW}" y2="${y+RH}" stroke="#E2E6E3" stroke-width=".5"/>`;
+      const nm = t.name.length > 26 ? t.name.slice(0, 26) + "…" : t.name;
+      g += `<text x="4" y="${y+11}" font-size="8" fill="${crit ? "#BF4E17" : "#333"}" font-weight="${crit ? 700 : 400}">${esc(t.code)}</text><text x="40" y="${y+11}" font-size="8.5" fill="#111">${t.ms ? "◆ " : ""}${esc(nm)}</text>
+        <text x="252" y="${y+11}" font-size="8" fill="#333" text-anchor="end">${t.dur}</text><text x="262" y="${y+11}" font-size="8" fill="#333">${esc(fmt(t.startDate).split(" ")[0])}</text><text x="296" y="${y+11}" font-size="8" fill="#333">${esc(fmt(t.finishDate).split(" ")[0])}</text>`;
+      if(t.ms){ const cx = clampX(X(t.startDate) + dayW/2), cy = y + RH/2; g += `<path d="M${cx} ${cy-5} L${cx+5} ${cy} L${cx} ${cy+5} L${cx-5} ${cy} Z" fill="#1D6A51"/>`; return; }
+      const x1 = clampX(X(t.startDate)), x2 = clampX(X(t.finishDate) + dayW); if(x2 <= LW || x1 >= unitsW) return;
+      const fill = done ? "#C9D1CC" : crit ? "#F2B08C" : "#A9D5BF", dark = done ? "#8D9C95" : crit ? "#BF4E17" : "#1D6A51";
+      g += `<rect x="${x1}" y="${y+4}" width="${Math.max(1.5, x2-x1)}" height="${RH-8}" fill="${fill}" stroke="${dark}" stroke-width=".6"/>`;
+      if(t.prog > 0) g += `<rect x="${x1}" y="${y+4}" width="${Math.max(1, (x2-x1) * t.prog / 100)}" height="${RH-8}" fill="${dark}"/>`;
+      if(!done && t.float > 0){ const fx = clampX(X(t.lateFinish) + dayW); if(fx > x2) g += `<line x1="${x2}" y1="${y+RH/2}" x2="${fx}" y2="${y+RH/2}" stroke="#7A8881" stroke-width=".8" stroke-dasharray="2 2"/>`; }
+    });
+    g += `<line x1="${LW}" y1="0" x2="${LW}" y2="${H}" stroke="#555" stroke-width=".8"/>`;
+    const vline = (d, color, dash, label) => { if(!isDate(d) || d < from || d > to) return; const x = X(d) + dayW/2; g += `<line x1="${x}" y1="${HH}" x2="${x}" y2="${H}" stroke="${color}" stroke-width="1" ${dash ? `stroke-dasharray="${dash}"` : ""}/>${label ? `<text x="${x+2}" y="${HH+8}" font-size="7.5" font-weight="700" fill="${color}">${esc(label)}</text>` : ""}`; };
+    (M.p.keyDates || []).forEach(k => vline(k.date, "#7B4FB8", "3 2", "◆" + (k.label || "")));
+    vline(M.statusDate, "#C62828", "", "기준일"); vline(M.p.targetDate, "#2C64A4", "4 2", "목표");
+    g += `</svg>`;
+    return g;
+  });
+}
+function printListHtml(M){
+  const codeOf = id => (M.by.get(id) || {}).code || "?";
+  let b = ""; M.groups.forEach(g => { b += `<tr class="g"><td colspan="11">${esc(g.name)}</td></tr>`; g.items.forEach(x => { const t = M.by.get(x.id); if(t.es == null) return;
+    b += `<tr><td>${esc(t.code)}</td><td>${t.ms ? "◆ " : ""}${esc(t.name)}</td><td class="r">${num(t.o)}·${num(t.m)}·${num(t.p)}</td><td class="r">${t.te.toFixed(1)}</td><td>${esc(t._preds.map(pid => relTxt(codeOf(pid), relOf(t, pid))).join(", "))}</td>
+      <td>${esc(fmtLong(t.startDate))}</td><td>${esc(fmtLong(t.finishDate))}</td><td class="r">${t.dur}</td><td class="r">${t.status === "done" ? "-" : t.float}</td><td>${t.crit ? "주공정" : ""}</td><td class="r">${Math.round(t.prog)}%</td></tr>`; }); });
+  return `<table class="ptbl"><thead><tr><th>코드</th><th>작업명</th><th>a·m·b</th><th>te</th><th>선행</th><th>시작</th><th>완료</th><th>공기</th><th>여유</th><th>구분</th><th>진척</th></tr></thead><tbody>${b}</tbody></table>`;
+}
+function showPrintPreview(){
+  const o = readPrintForm(); savePrintOpts(o);
+  const M = state.M, pages = [];
+  if(o.parts.gantt) printGanttPages(o, M).forEach(svg => pages.push(svg));
+  if(o.parts.list) pages.push(printListHtml(M));
+  if(o.parts.curve){ const tmp = document.createElement("div"); tmp.innerHTML = renderEvm(M);
+    const svg = tmp.querySelector(".evm-chart svg"), cards = [...tmp.querySelectorAll(".evm-cards .kpi")].map(k => `<td><div style="font-size:7.5pt;color:#555">${esc(k.querySelector(".k").textContent)}</div><div style="font-size:12pt;font-weight:700">${esc(k.querySelector(".v").textContent)}</div><div style="font-size:7.5pt;color:#555">${esc((k.querySelector(".s")||{}).textContent || "")}</div></td>`).join("");
+    const per = tmp.querySelector(".evt"); if(per) per.classList.add("ptbl");
+    pages.push(`<table class="ptbl" style="margin-bottom:6px"><tr>${cards}</tr></table>${svg ? svg.outerHTML.replace(/class="c-([a-z]+)"/g, (m0, k) => `class="c-${k}" style="${({grid:"stroke:#ccc",pv:"fill:none;stroke:#1D6A51;stroke-width:2",late:"fill:none;stroke:#1D6A51;stroke-dasharray:4 4",fc:"fill:none;stroke:#2C64A4;stroke-width:2;stroke-dasharray:6 4",ev:"fill:none;stroke:#BF4E17;stroke-width:2.5",evp:"fill:#BF4E17",bar:"fill:#D3E7DD",axis:"fill:#555;font-size:10px",now:"stroke:#C62828;stroke-dasharray:2 3"})[k] || ""}"`) : ""}${per ? "<h3 style='font-size:10pt;margin:8px 0 4px'>기성 회차</h3>" + per.outerHTML : ""}`); }
+  if(!pages.length){ toast("넣을 내용을 하나 이상 골라 주세요."); return; }
+  let st = document.getElementById("printPageStyle"); if(!st){ st = document.createElement("style"); st.id = "printPageStyle"; document.head.appendChild(st); }
+  st.textContent = `@page{size:${o.paper} landscape;margin:6mm}`;
+  let pv = document.getElementById("printPreview"); if(!pv){ pv = document.createElement("div"); pv.id = "printPreview"; document.body.appendChild(pv); }
+  pv.innerHTML = `<div class="pv-bar"><button class="btn primary big" id="pv-print">인쇄 / PDF 저장</button><button class="btn big" id="pv-close">닫기</button></div>
+    <div id="printArea">${pages.map((body, i) => `<div class="pg ${o.paper}">${printHeader(o, M, i+1, pages.length)}${body}${printFoot(i+1, pages.length)}</div>`).join("")}</div>`;
+  pv.hidden = false; closeDrawer();
 }
 
 /* ---------- writes ---------- */
@@ -1734,7 +2406,8 @@ async function saveTask(){
   const err = $("#f-err"); err.textContent = "";
   const dr = state.drawer; const all = tasksOf();
   const code = $("#f-code").value.trim(), name = $("#f-name").value.trim(), group = $("#f-group").value.trim();
-  const o = num($("#f-o").value), m = num($("#f-m").value), p = num($("#f-p").value);
+  const isMs = $("#f-ms").checked;
+  const o = isMs ? 0 : num($("#f-o").value), m = isMs ? 0 : num($("#f-m").value), p = isMs ? 0 : num($("#f-p").value);
   const as = $("#f-as").value, ae = $("#f-ae").value;
   let progress = num($("#f-prog").value);
   if(!code || !name){ err.textContent = "코드와 작업명을 입력해 주세요."; return; }
@@ -1742,13 +2415,15 @@ async function saveTask(){
   if(o<0 || !(o<=m && m<=p)){ err.textContent = "기간은 낙관 ≤ 최빈 ≤ 비관 순서로 입력해 주세요."; return; }
   if(ae && !as){ err.textContent = "실제 완료일을 넣으려면 실제 시작일도 입력해 주세요."; return; }
   if(ae && as && ae < as){ err.textContent = "실제 완료일이 시작일보다 빠릅니다."; return; }
-  const codes = $("#f-preds").value.split(/[,\s]+/).map(s=>s.trim()).filter(Boolean);
-  const preds = [];
-  for(const c of codes){ const f = all.find(t=>t.code===c); if(!f){ err.textContent = `선행작업 코드 ${c}를 찾을 수 없습니다.`; return; } if(f.id===dr.id){ err.textContent = "자기 자신을 선행작업으로 지정할 수 없습니다."; return; } preds.push(f.id); }
+  const parsed = parsePreds($("#f-preds").value, all);
+  if(parsed.error){ err.textContent = parsed.error; return; }
+  const preds = [], rel = {};
+  for(const x of parsed.list){ if(x.task.id === dr.id){ err.textContent = "자기 자신을 선행작업으로 지정할 수 없습니다."; return; } if(preds.includes(x.task.id)) continue; preds.push(x.task.id); if(x.type !== "FS" || x.lag) rel[x.task.id] = { type: x.type, lag: x.lag }; }
   const id = dr.id || uid();
   if(topo(all.filter(t=>t.id!==id).map(t=>({...t})).concat([{ id, preds, order:0 }])).cyc.length){ err.textContent = "선행작업이 순환합니다. 후속작업을 선행으로 지정했는지 확인해 주세요."; return; }
   if(ae) progress = 100;
-  const fields = { code, name, group, o, m, p, preds, actualStart: as, actualEnd: ae, progress, notBefore: $("#f-nb").value, note: $("#f-note").value.trim() };
+  const fields = { code, name, group, o, m, p, preds, rel, actualStart: as, actualEnd: ae, progress, notBefore: $("#f-nb").value, note: $("#f-note").value.trim() };
+  if(dr.res) fields.res = dr.res.filter(x => x.rid && num(x.qty) > 0).map(x => ({ rid: x.rid, qty: num(x.qty) }));
   const btn = $("#f-save"); btn.disabled = true;
   const ok = await commit(data => {
     const list = data.tasks || (data.tasks = []);
@@ -1779,10 +2454,10 @@ function restoreSettingsForm(k){ $("#s-name").value=k.name; $("#s-start").value=
 async function saveProject(extra){
   const f = readSettingsForm(); const p = proj();
   const upd = { name: f.name.trim() || "온실 신축공사", startDate: f.start || p.startDate, targetDate: f.target || "", statusDate: f.status || "",
-    workSaturday: f.sat, offDays: state.draftOff || p.offDays || [], ...(extra||{}) };
+    workSaturday: f.sat, offDays: state.draftOff || p.offDays || [], keyDates: state.draftKey || p.keyDates || [], ...(extra||{}) };
   if(upd.targetDate && upd.targetDate < upd.startDate){ $("#s-err").textContent = "목표 준공일이 착공일보다 빠릅니다."; return false; }
   const ok = await commit(data => { data.project = { ...DEFAULT_PROJECT, ...(data.project||{}), ...upd }; }, "설정을 저장했습니다");
-  if(ok) state.draftOff = null;
+  if(ok){ state.draftOff = null; state.draftKey = null; }
   return ok;
 }
 function bindSettings(){
@@ -1797,11 +2472,30 @@ function bindSettings(){
   let baseArm = false;
   $("#s-save").onclick = () => saveProject();
   $("#o-add").onclick = () => {
-    const date = $("#o-date").value; if(!date){ $("#s-err").textContent = "작업불가일 날짜를 선택해 주세요."; return; }
-    const k = readSettingsForm();
-    state.draftOff = state.draftOff.filter(o=>o.date!==date).concat([{ date, type:$("#o-type").value, reason:$("#o-reason").value.trim() }]);
-    render(); restoreSettingsForm(k); $("#s-err").textContent = "추가했습니다. ‘설정 저장’을 눌러야 일정에 반영됩니다.";
+    const date = $("#o-date").value, end = $("#o-end").value; if(!date){ $("#s-err").textContent = "작업불가일 날짜를 선택해 주세요."; return; }
+    if(end && end < date){ $("#s-err").textContent = "끝 날짜가 시작 날짜보다 빠릅니다."; return; }
+    const days = []; for(let d = date; d <= (end || date) && days.length < 366; d = shiftDate(d, 1)) days.push(d);
+    const k = readSettingsForm(), type = $("#o-type").value, reason = $("#o-reason").value.trim();
+    state.draftOff = state.draftOff.filter(o => !days.includes(o.date)).concat(days.map(d => ({ date: d, type, reason })));
+    render(); restoreSettingsForm(k); $("#s-err").textContent = `${days.length}일을 추가했습니다. ‘설정 저장’을 눌러야 일정에 반영됩니다.`;
   };
+  $("#o-kr").onclick = () => {
+    const k = readSettingsForm(), have = new Set(state.draftOff.map(o => o.date));
+    const add = KR_HOLIDAYS.filter(([d]) => !have.has(d)).map(([date, reason]) => ({ date, type:"holiday", reason }));
+    state.draftOff = state.draftOff.concat(add);
+    render(); restoreSettingsForm(k); $("#s-err").textContent = `법정 공휴일 ${add.length}일을 추가했습니다(이미 있는 날은 제외). ‘설정 저장’을 눌러야 반영됩니다.`;
+  };
+  $("#k-add").onclick = () => {
+    const date = $("#k-date").value, label = $("#k-label").value.trim();
+    if(!date || !label){ $("#s-err").textContent = "중간관리일 날짜와 이름을 넣어 주세요."; return; }
+    const k = readSettingsForm(); state.draftKey = state.draftKey.concat([{ date, label }]);
+    render(); restoreSettingsForm(k); $("#s-err").textContent = "추가했습니다. ‘설정 저장’을 눌러야 반영됩니다.";
+  };
+  document.querySelectorAll("[data-rmkey]").forEach(b => b.onclick = () => {
+    const [d, l] = b.dataset.rmkey.split("|"); const k = readSettingsForm();
+    state.draftKey = state.draftKey.filter(x => !(x.date === d && (x.label||"") === l));
+    render(); restoreSettingsForm(k); $("#s-err").textContent = "삭제했습니다. ‘설정 저장’을 눌러야 반영됩니다.";
+  });
   document.querySelectorAll("[data-rmoff]").forEach(b => b.onclick = () => {
     const k = readSettingsForm();
     state.draftOff = state.draftOff.filter(o=>o.date!==b.dataset.rmoff);
@@ -1991,7 +2685,9 @@ async function applyGanttEdit(res){
 document.addEventListener("click", e => {
   if(state.suppressClick){ state.suppressClick = false; return; }
   const tab = e.target.closest("#tabs button");
-  if(tab){ state.tab = tab.dataset.tab; store.set("tab", state.tab); if(state.tab==="set") state.draftOff=null; render(); return; }
+  if(tab){ state.tab = tab.dataset.tab; store.set("tab", state.tab); if(state.tab==="set"){ state.draftOff=null; state.draftKey=null; } state.resDraft = null; render(); return; }
+  const sc = e.target.closest("[data-sched]");
+  if(sc){ state.sched = sc.dataset.sched; store.set("sched", state.sched); render(); return; }
   const z = e.target.closest("[data-zoom]");
   if(z){ state.zoom = Number(z.dataset.zoom); store.set("zoom", String(state.zoom)); render(); return; }
   if(e.target.closest("#login")){ login(); return; }
@@ -2006,6 +2702,21 @@ document.addEventListener("click", e => {
   if(e.target.closest("#addBuy") || e.target.closest("#addBuy2")){ openBuy(null); return; }
   if(e.target.closest("#buySample")){ e.target.closest("#buySample").disabled = true; insertSamplePurchases(); return; }
   if(splitEditorClick(e)) return;
+  if(e.target.closest("#openPrint")){ openPrint(); return; }
+  if(e.target.closest("#f-res-add") && state.drawer){ const R = resOf(); state.drawer.res.push({ rid: (R[0] || {}).id, qty: "" }); renderTaskRes(); return; }
+  const trd = e.target.closest("[data-trdel]"); if(trd && state.drawer){ state.drawer.res.splice(Number(trd.dataset.trdel), 1); renderTaskRes(); return; }
+  if(e.target.closest("#pr-go")){ showPrintPreview(); return; }
+  if(e.target.closest("#pr-logo-x")){ readPrintForm(); state.drawer.o.logo = ""; savePrintOpts(state.drawer.o); renderPrintDrawer(); return; }
+  if(e.target.closest("#pv-print")){ window.print(); return; }
+  if(e.target.closest("#pv-close")){ const pv = $("#printPreview"); if(pv) pv.remove(); return; }
+  const ck = e.target.closest("[data-sel]"); if(ck){ toggleSel(ck.dataset.sel); return; }
+  const sa = e.target.closest("[data-selact]"); if(sa){ selAction(sa.dataset.selact); return; }
+  const dg = e.target.closest("[data-dup]"); if(dg){ state.dupGroup = dg.dataset.dup; render(); return; }
+  if(e.target.closest("[data-dupcancel]")){ state.dupGroup = null; render(); return; }
+  const dgo = e.target.closest("[data-dupgo]"); if(dgo){ duplicateGroup(dgo.dataset.dupgo); return; }
+  if(e.target.closest("#f-dup")){ const src = tasksOf().find(t => t.id === state.drawer.id); if(src){ state.drawer = { id: null, arm: false, copy: src }; renderDrawer(); } return; }
+  if(periodClick(e)) return;
+  if(resClick(e)) return;
   if(e.target.closest("#b-save")){ saveBuy(); return; }
   if(e.target.closest("#b-del")){ deleteBuy(); return; }
   const qb = e.target.closest("[data-quick]");
@@ -2022,8 +2733,15 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("change", e => {
   if(e.target.id === "projSel") selectProject(e.target.value);
+  if(e.target.id === "f-ms") updateTe();
+  if(e.target.id === "f-group" && state.drawer && !state.drawer.id){ const c = $("#f-code"); if(c && (!c.value || c.value === state.drawer.autoCode)){ c.value = nextCode(e.target.value); state.drawer.autoCode = c.value; } }
+  if(e.target.id === "pr-logo" && e.target.files[0]){ const f = e.target.files[0]; if(f.size > 1500000){ toast("로고 파일이 너무 큽니다 (1.5MB 이하)."); return; }
+    const rd = new FileReader(); rd.onload = () => { readPrintForm(); state.drawer.o.logo = rd.result; savePrintOpts(state.drawer.o); renderPrintDrawer(); }; rd.readAsDataURL(f); return; }
   if(e.target.id === "b-task") updateBuyCalc();
   if(splitEditorEvent(e)) return;
+  if(periodInput(e)) return;
+  if(resInput(e)) return;
+  { const tr = e.target.closest && e.target.closest("[data-tri]"); if(tr && state.drawer && state.drawer.res){ const x = state.drawer.res[Number(tr.dataset.tri)]; x[e.target.dataset.trf] = e.target.dataset.trf === "qty" ? e.target.value : e.target.value; renderTaskRes(); return; } }
   const dr = state.drawer;
   if(dr && dr.kind === "project"){
     if(e.target.name === "np-kind"){ saveNpForm(); renderDrawer(); return; }
@@ -2047,9 +2765,9 @@ document.addEventListener("drop", e => {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(f) handleImportFile(f);
 });
 document.addEventListener("input", e => {
-  if(["f-o","f-m","f-p"].includes(e.target.id)) updateTe();
+  if(["f-o","f-m","f-p","f-ms"].includes(e.target.id)) updateTe();
   if(["b-task","b-lead","b-buf"].includes(e.target.id)) updateBuyCalc();
-  splitEditorEvent(e);
+  splitEditorEvent(e); periodInput(e); resInput(e);
   if(e.target.id==="f-prog") $("#f-progv").textContent = e.target.value + "%";
   if(state.drawer && state.drawer.arm && e.target.closest("#drawer")){ state.drawer.arm=false; const b=$("#f-del"); if(b){ b.classList.remove("armed"); b.textContent="삭제"; } }
 });
@@ -2121,7 +2839,7 @@ function onUser(user){
   }, () => { state.mode = "denied"; afterData(); });
 }
 async function boot(){
-  if(!["gantt","net","list","buy","set"].includes(state.tab)) state.tab = "gantt";
+  if(!["gantt","net","list","buy","evm","res","set"].includes(state.tab)) state.tab = "gantt";
   if(![5,12,24].includes(state.zoom)) state.zoom = 12;
   if(state.mode === "demo"){ state.projects = { main: sampleData(), vinyl: sampleVinyl() }; setCurrent(); afterData(); return; }
   render();
