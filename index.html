@@ -111,6 +111,12 @@ tr.lb.done td{color:var(--ink-3)}
 tr.lb input[type=number]{width:84px;padding:3px 6px;text-align:right}
 .mode-sel{width:auto;padding:2px 6px;font-size:12px;margin-left:8px}
 .team-in{width:150px;padding:2px 6px;font-size:12px}
+.vend-in{width:120px;padding:3px 6px;font-size:12px}
+.vend-in::placeholder{color:var(--ink-3)}
+.vend-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.vend-chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
+.vend-chips button.on{border-color:var(--accent);background:var(--accent-soft)}
+.vend-chips button b{font-family:var(--mono)}
 .meter.big{height:6px;width:90px;display:inline-block;vertical-align:middle;margin:0 6px}
 tr.bgrp td{background:var(--surface-2);font-size:13px;border-top:2px solid var(--line)}
 tr.bgrp .gsum{color:var(--ink-2);font-weight:400;margin-left:8px}
@@ -1275,6 +1281,7 @@ function laborProgress(M, doneOverride){
   res.lineFrac = lineFrac;
   return res;
 }
+const lineVendor = (x, L) => { L = L || laborOf(); return ((L.vendor || {})[x.r] || (L.team || {})[x.t] || "").trim(); };
 const isLabLine = x => !!x.t && (x.l > 0 || (x.e > 0 && !(x.m > 0)));   // 노무 줄, 또는 경비만 있는 줄
 const labKind = x => x.l > 0 && x.e > 0 ? "노무·경비" : x.l > 0 ? "노무" : "경비";
 function renderLabor(M){
@@ -1296,17 +1303,22 @@ function renderLabor(M){
   const overall = wsum ? allT.reduce((s, t) => s + num(t.amount) * ((P.get(t.id) || {}).pct ?? t.prog) / 100, 0) / wsum * 100 : 0;
   const byMode = { "직영": [0, 0], "외주": [0, 0] }; lines.forEach(x => { const t = M.by.get(x.t); if(!t) return; const m = modeOf(t); byMode[m][0] += x.l; byMode[m][1] += x.l * f(x); });
   const dirty = Object.keys(draft).length;
+  const vOwn = L.vendor || {}, vf = state.labVendor || "";
+  const vend = new Map(); lines.forEach(x => { const v = lineVendor(x, L) || "(업체 미지정)"; const o = vend.get(v) || [0, 0, 0]; o[0] += x.l + x.e; o[1] += (x.l + x.e) * f(x); o[2]++; vend.set(v, o); });
+  const vendChips = vend.size > 1 || !vend.has("(업체 미지정)") ? `<div class="vend-chips"><span class="note" style="align-self:center;margin:0">업체별 수행</span>${[...vend.entries()].sort((a, b) => b[1][0] - a[1][0]).map(([v, o]) =>
+      `<button data-lvf="${esc(v)}" class="${vf === v ? "on" : ""}" title="${o[2]}줄 · ${wonM(o[1])} / ${wonM(o[0])}원">${esc(v)} <b>${o[0] ? (o[1] / o[0] * 100).toFixed(0) : 0}%</b></button>`).join("")}${vf ? `<button data-lvf="">✕ 업체 거르기 해제</button>` : ""}</div>` : "";
+  const known = [...new Set([...Object.values(vOwn), ...Object.values(L.team || {}), ...purchasesOf().map(p => p.vendor)].map(v => String(v || "").trim()).filter(Boolean))].sort();
   let rows = "";
   keys.forEach(k => {
     const t = M.by.get(k); if(!t) return;
-    let list = groups.get(k).filter(x => !q || [x.n, x.s].some(v => String(v || "").toLowerCase().includes(q)));
+    let list = groups.get(k).filter(x => (!q || [x.n, x.s, lineVendor(x, L)].some(v => String(v || "").toLowerCase().includes(q))) && (!vf || (lineVendor(x, L) || "(업체 미지정)") === vf));
     if(filt === "todo") list = list.filter(x => f(x) < 1); else if(filt === "done") list = list.filter(x => f(x) >= 1);
     if(!list.length) return;
     const pr = P.get(k) || { pct: 0 }, mode = modeOf(t), closed = state.labClosed.has(k);
     const gl = groups.get(k), gLab = gl.reduce((s, x) => s + x.l + x.e, 0), gDone = gl.reduce((s, x) => s + (x.l + x.e) * f(x), 0);
     const allSel = list.every(x => sel.has(x.r));
     rows += `<tr class="bgrp">${ed ? `<td class="ck"><input type="checkbox" data-lgsel="${esc(k)}" ${allSel ? "checked" : ""} aria-label="이 작업 항목 모두 선택"></td>` : ""}
-      <td colspan="8"><button class="linkx" data-lgtoggle="${esc(k)}" style="text-decoration:none;font-size:13px">${closed ? "▸" : "▾"}</button>
+      <td colspan="9"><button class="linkx" data-lgtoggle="${esc(k)}" style="text-decoration:none;font-size:13px">${closed ? "▸" : "▾"}</button>
       <b><span class="mono" style="color:var(--ink-3)">${esc(t.code)}</span> ${esc(t.name)}</b>
       ${ed ? `<select class="mode-sel" data-lmode="${esc(k)}" aria-label="시공 방식"><option ${mode==="직영"?"selected":""}>직영</option><option ${mode==="외주"?"selected":""}>외주</option></select>
         <input class="team-in" data-lteam="${esc(k)}" value="${esc((L.team || {})[k] || "")}" placeholder="${mode === "외주" ? "시공 업체·팀" : "작업 반장"}" aria-label="업체·팀">`
@@ -1317,6 +1329,7 @@ function renderLabor(M){
       return `<tr class="lb ${fr >= 1 ? "done" : ""} ${sel.has(x.r) ? "sel" : ""}">${ed ? `<td class="ck"><input type="checkbox" data-lsel="${x.r}" ${sel.has(x.r) ? "checked" : ""} aria-label="${esc(x.n)} 선택"></td>` : ""}
         <td><b style="font-weight:600">${esc(x.n)}</b>${x.s ? `<div style="font-size:11.5px;color:var(--ink-3)">${esc(x.s)}</div>` : ""}</td>
         <td><span class="pill ${x.l > 0 ? "p-prog" : "p-po"}">${labKind(x)}</span></td>
+        <td>${ed ? `<input type="text" class="vend-in" data-lvend="${x.r}" value="${esc(vOwn[x.r] || "")}" placeholder="${esc((L.team || {})[x.t] || "업체")}" list="lab-vendors" aria-label="${esc(x.n)} 업체">` : esc(lineVendor(x, L) || "–")}</td>
         <td class="r num">${fmtQty(x.q)} ${esc(x.u || "")}</td><td class="r num" title="노무비 ${wonM(x.l)} · 경비 ${wonM(x.e)}">${wonM(x.l + x.e)}</td>
         <td class="r">${ed ? `<input type="number" min="0" step="any" data-lqty="${x.r}" value="${v ?? ""}" placeholder="0" aria-label="${esc(x.n)} 누계 수행 수량">` : `<span class="num">${v != null ? fmtQty(num(v)) : "–"}</span>`}</td>
         <td class="r num">${(fr * 100).toFixed(0)}%${follows(x) ? `<div style="font-size:10.5px;color:var(--ink-3);white-space:nowrap">작업 진도 따라감</div>` : ""}</td>
@@ -1326,7 +1339,8 @@ function renderLabor(M){
   const bulk = ed && sel.size ? `<div class="selbar bulk"><div class="row"><b>${sel.size}줄 선택</b>
       <button class="btn sm ok" data-lbk="done">완료 (100%)</button>
       <input type="number" id="lbk-pct" min="0" max="100" placeholder="%" style="width:70px"><button class="btn sm" data-lbk="pct">이 %로 지정</button>
-      <button class="btn sm" data-lbk="zero">미시공으로</button><button class="btn sm" data-lbk="clear">선택 해제</button></div></div>` : "";
+      <button class="btn sm" data-lbk="zero">미시공으로</button><button class="btn sm" data-lbk="clear">선택 해제</button></div>
+      <div class="row"><input type="text" id="lbk-vend" placeholder="업체 (비우면 지정 해제)" list="lab-vendors" style="max-width:220px"><button class="btn sm" data-lbk="vend">업체 지정</button></div></div>` : "";
   const saveBar = ed && dirty ? `<div class="selbar" style="border-color:var(--accent);background:var(--accent-soft)"><b>저장하지 않은 변경 ${dirty}줄</b>
       <label class="chk" style="margin:0"><input type="checkbox" id="lab-sync" ${state.labSync !== false ? "checked" : ""}> 공정표 진척률·실제 시작/완료일에도 반영</label>
       <button class="btn primary" id="lab-save">저장</button><button class="btn" id="lab-cancel">취소</button></div>` : "";
@@ -1337,23 +1351,28 @@ function renderLabor(M){
       <div class="kpi"><span class="k">시공 기준 전체 기성률</span><span class="v">${overall.toFixed(1)}%</span><span class="s">재료·경비 포함 (${(L.matRule || "install") === "receive" ? "입고 자재 포함" : "설치 기준"})</span></div></div>
     <div class="buy-tools">
       <select id="lab-filter" aria-label="거르기">${[["all","전체"],["todo","미완료"],["done","완료"]].map(([k2,l]) => `<option value="${k2}" ${filt===k2?"selected":""}>${l}</option>`).join("")}</select>
-      <input type="search" id="lab-search" value="${esc(state.labSearch || "")}" placeholder="품명·규격 검색" aria-label="검색">
+      <input type="search" id="lab-search" value="${esc(state.labSearch || "")}" placeholder="품명·규격·업체 검색" aria-label="검색">
       <button class="btn sm" data-lbk="openall">모두 펼치기</button><button class="btn sm" data-lbk="closeall">모두 접기</button>
       ${ed ? `<label class="chk" style="margin:0 0 0 auto"><input type="checkbox" id="lab-rule" ${(L.matRule || "install") === "receive" ? "checked" : ""}> 입고된 자재도 기성에 포함</label>` : ""}</div>
-    ${saveBar}${bulk}
-    <div class="panel tbl-wrap"><table style="min-width:860px"><thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>항목</th><th>분류</th><th class="r">수량</th><th class="r" title="노무비 + 경비">금액</th><th class="r">누계 수행 수량</th><th class="r">수행률</th><th>완료</th><th>수행일 · 내역</th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="9" class="note">조건에 맞는 항목이 없습니다.</td></tr>`}</tbody></table></div>
-    <p class="note">노무비가 있는 줄과 경비만 있는 줄을 보여 줍니다. 경비 줄은 따로 넣지 않으면 그 작업의 노무 진도를 따라가고, 수량이나 완료를 넣으면 그 값을 씁니다. 수행 수량(누계)을 넣거나 ‘완료’를 체크하면 그 작업의 진척률이 금액 가중으로 계산됩니다. 같은 작업의 재료비·경비 줄은 시공 진도를 따라갑니다(설치된 만큼). 직영·외주는 작업마다 바꿀 수 있고, 기본은 가설·기초·행잉거터 직영, 나머지 외주입니다. 기성 탭의 ‘시공 진도로 기성 회차 만들기’로 이 값을 기성 회차에 넣을 수 있습니다.</p>`;
+    ${vendChips}${saveBar}${bulk}
+    <datalist id="lab-vendors">${known.map(v => `<option value="${esc(v)}">`).join("")}</datalist>
+    <div class="panel tbl-wrap"><table style="min-width:980px"><thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>항목</th><th>분류</th><th title="비워 두면 작업의 업체·팀을 따릅니다">업체</th><th class="r">수량</th><th class="r" title="노무비 + 경비">금액</th><th class="r">누계 수행 수량</th><th class="r">수행률</th><th>완료</th><th>수행일 · 내역</th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="10" class="note">조건에 맞는 항목이 없습니다.</td></tr>`}</tbody></table></div>
+    <p class="note">한 작업을 여러 업체가 나눠 하면 줄마다 ‘업체’를 넣으세요(여러 줄은 선택 후 ‘업체 지정’). 비워 두면 작업 제목 줄의 업체·팀을 따릅니다. 노무비가 있는 줄과 경비만 있는 줄을 보여 줍니다. 경비 줄은 따로 넣지 않으면 그 작업의 노무 진도를 따라가고, 수량이나 완료를 넣으면 그 값을 씁니다. 수행 수량(누계)을 넣거나 ‘완료’를 체크하면 그 작업의 진척률이 금액 가중으로 계산됩니다. 같은 작업의 재료비·경비 줄은 시공 진도를 따라갑니다(설치된 만큼). 직영·외주는 작업마다 바꿀 수 있고, 기본은 가설·기초·행잉거터 직영, 나머지 외주입니다. 기성 탭의 ‘시공 진도로 기성 회차 만들기’로 이 값을 기성 회차에 넣을 수 있습니다.</p>`;
 }
 function laborClick(e){
   const ed = state.canEdit, draft = state.labDraft || (state.labDraft = {}), sel = state.labSel || (state.labSel = new Set());
   const line = r => boqOf().find(x => x.r === Number(r));
+  const vfb = e.target.closest("[data-lvf]"); if(vfb){ const v = vfb.dataset.lvf; state.labVendor = state.labVendor === v ? "" : v; state.labClosed = new Set(); render(); return true; }
   const tg = e.target.closest("[data-lgtoggle]"); if(tg){ const c = state.labClosed || (state.labClosed = new Set()); const k = tg.dataset.lgtoggle; c.has(k) ? c.delete(k) : c.add(k); render(); return true; }
   const lb = e.target.closest("[data-lbk]");
   if(lb){ const k = lb.dataset.lbk, ids = [...sel];
     if(k === "openall"){ state.labClosed = new Set(); render(); return true; }
     if(k === "closeall"){ state.labClosed = new Set(boqOf().filter(isLabLine).map(x => x.t)); render(); return true; }
     if(k === "clear"){ sel.clear(); render(); return true; }
+    if(k === "vend"){ if(!ed || !ids.length) return true; const v = $("#lbk-vend").value.trim();
+      commit(d => { const L = d.labor || (d.labor = {}), V = L.vendor || (L.vendor = {}); ids.forEach(r => { if(v) V[r] = v; else delete V[r]; }); },
+        v ? `${ids.length}줄에 업체 ‘${v}’를 지정했습니다` : `${ids.length}줄의 업체 지정을 해제했습니다`).then(ok => { if(ok){ sel.clear(); render(); } }); return true; }
     if(k === "done") ids.forEach(r => { const x = line(r); if(x) draft[r] = x.q || 1; });
     if(k === "zero") ids.forEach(r => { draft[r] = 0; });
     if(k === "pct"){ const p = Math.min(100, Math.max(0, num($("#lbk-pct").value))); ids.forEach(r => { const x = line(r); if(x) draft[r] = +(((x.q || 1) * p / 100).toFixed(3)); }); }
@@ -1374,6 +1393,8 @@ function laborInput(e){
   if(t.dataset && t.dataset.lqty){ const d = state.labDraft || (state.labDraft = {}); d[t.dataset.lqty] = t.value === "" ? 0 : num(t.value); if(e.type === "change") render(); return true; }
   if(e.type !== "change") return false;
   if(t.dataset && t.dataset.lmode){ const k = t.dataset.lmode; commit(d => { const L = d.labor || (d.labor = {}); (L.mode || (L.mode = {}))[k] = t.value; }, `시공 방식을 ‘${t.value}’(으)로 바꿨습니다`); return true; }
+  if(t.dataset && t.dataset.lvend){ const r = t.dataset.lvend, v = t.value.trim();
+    commit(d => { const L = d.labor || (d.labor = {}), V = L.vendor || (L.vendor = {}); if(v) V[r] = v; else delete V[r]; }, v ? `업체를 ‘${v}’(으)로 저장했습니다` : "줄 업체 지정을 해제했습니다"); return true; }
   if(t.dataset && t.dataset.lteam){ const k = t.dataset.lteam; commit(d => { const L = d.labor || (d.labor = {}); (L.team || (L.team = {}))[k] = t.value.trim(); }, "업체·팀을 저장했습니다"); return true; }
   if(t.id === "lab-rule"){ commit(d => { const L = d.labor || (d.labor = {}); L.matRule = t.checked ? "receive" : "install"; }, t.checked ? "입고된 자재도 기성에 포함합니다" : "설치(시공) 기준으로 계산합니다"); return true; }
   if(t.id === "lab-filter"){ state.labFilter = t.value; state.labClosed = null; render(); return true; }
@@ -2045,7 +2066,7 @@ async function exportClaimXlsx(M, perId){
         L.s.forEach((z, s) => { const c = 6 + s * 9;
           put(ws, R, c, z.q, { nf: QF });
           [[x.m, z.m], [x.l, z.l], [x.e, z.e], [tot, z.a]].forEach(([u, a], j) => { put(ws, R, c + 1 + j * 2, up(u)); put(ws, R, c + 2 + j * 2, a); }); });
-        put(ws, R, NC, x.r ? `내역 ${x.r}행` : "", { size: 8, h: "center" }); R++; });
+        put(ws, R, NC, [lineVendor(x), x.r ? `내역 ${x.r}행` : ""].filter(Boolean).join(" · "), { size: 8, h: "center" }); R++; });
       sumRow("[ 합           계 ]", t.sum, null); });
     sumRow("[ 총           계 ]", T0, FILL_T);
     ws.views = [{ state: "frozen", xSplit: 5, ySplit: 5 }]; setup(ws, 8, "1:5"); }
