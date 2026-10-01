@@ -121,6 +121,15 @@ table.vdt tr.tot td{background:var(--accent-soft);font-weight:700}
 .vd-pay input[type=number]{width:130px;text-align:right}
 .vd-pay input[type=date]{width:150px}
 .neg{color:var(--crit)}
+table.vdt input.vcon{width:130px;padding:3px 6px;text-align:right;font-size:12.5px}
+table.vdt tr.vh td{background:var(--surface-2);padding-top:6px;padding-bottom:8px}
+.payh{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.payh .pc{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 8px;font-size:12px;white-space:nowrap}
+.payh .pc b{font-family:var(--mono)}
+.payh .pc .x2{border:0;background:none;color:var(--ink-3);cursor:pointer;padding:0 0 0 4px;font-size:12px}
+.payf{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.payf input{padding:4px 6px;font-size:12.5px}
+.payf input[type=number]{width:140px;text-align:right}
 .vend-in::placeholder{color:var(--ink-3)}
 .vend-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .vend-chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
@@ -2128,29 +2137,41 @@ function renderVendors(M){
   const sum = k => list.reduce((a, o) => a + o[k], 0);
   const T = { contract: sum("contract"), payable: sum("payable"), paid: sum("paid"), unpaid: sum("unpaid"), tot: sum("tot"), done: sum("done") };
   const cards = `<div class="evm-cards">
-    <div class="kpi"><span class="k">업체</span><span class="v">${list.length}곳</span><span class="s">계약 등록 ${list.filter(o => o.contract).length}곳</span></div>
-    <div class="kpi"><span class="k">계약 총액</span><span class="v">${w(T.contract / 1e6)}백만</span><span class="s">${w(T.contract)}원</span></div>
-    <div class="kpi"><span class="k">기성 기준 지급 가능액</span><span class="v">${w(T.payable / 1e6)}백만</span><span class="s">${T.contract ? pct(T.payable / T.contract) + " · 계약 × 업체별 기성률" : "계약금액을 넣으면 계산됩니다"}</span></div>
+    <div class="kpi"><span class="k">업체</span><span class="v">${list.length}곳</span><span class="s">발주금액 입력 ${list.filter(o => o.contract).length}곳</span></div>
+    <div class="kpi"><span class="k">업체 발주금액 합계</span><span class="v">${w(T.contract / 1e6)}백만</span><span class="s">${w(T.contract)}원</span></div>
+    <div class="kpi"><span class="k">기성 기준 지급 가능액</span><span class="v">${w(T.payable / 1e6)}백만</span><span class="s">${T.contract ? pct(T.payable / T.contract) + " · 발주금액 × 업체별 기성률" : "업체 발주금액을 넣으면 계산됩니다"}</span></div>
     <div class="kpi"><span class="k">지급 누계</span><span class="v">${w(T.paid / 1e6)}백만</span><span class="s">${w(T.paid)}원</span></div>
     <div class="kpi"><span class="k">미지급 (지급 가능 − 지급)</span><span class="v ${T.unpaid < 0 ? "bad" : ""}">${w(T.unpaid / 1e6)}백만</span><span class="s">${T.unpaid < 0 ? "기성보다 많이 지급됨" : w(T.unpaid) + "원"}</span></div></div>`;
   if(!list.length) return cards + `<div class="panel empty"><h2>업체가 없습니다</h2><p>구매 일정이나 시공 진도에서 항목에 업체를 넣으면 여기에 모입니다.${ed ? " 아래 ‘업체 추가’로 먼저 등록해도 됩니다." : ""}</p>${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}</div>`;
-  const rows = list.map(o => `<tr data-vendor="${esc(o.name)}">
+  const payList = o => ((o.reg && o.reg.payments) || []).slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const rows = list.map(o => { const pays = payList(o), open = state.vPayOpen === o.name;
+    const main = `<tr data-vendor="${esc(o.name)}">
       <td><b>${esc(o.name)}</b>${o.reg && o.reg.person ? `<div style="font-size:11.5px;color:var(--ink-3)">${esc(o.reg.person)}${o.reg.phone ? " · " + esc(o.reg.phone) : ""}</div>` : ""}</td>
       <td><span class="pill ${o.kind === "자재" ? "p-po" : "p-prog"}">${o.kind}</span></td>
-      <td class="r num">${o.contract ? w(o.contract) : `<span class="note">${ed ? "미입력" : "–"}</span>`}</td>
+      <td class="r num">${ed ? `<input type="number" class="vcon" min="0" step="1000000" data-vcon="${esc(o.name)}" value="${o.contract || ""}" placeholder="발주금액 입력" aria-label="${esc(o.name)} 발주금액">` : o.contract ? w(o.contract) : "–"}</td>
       <td class="r num">${w(o.tot)}<div style="font-size:11px;color:var(--ink-3)">${o.buys.length ? `자재 ${o.buys.length}건` : ""}${o.buys.length && o.labs.length ? " · " : ""}${o.labs.length ? `시공 ${o.labs.length}줄` : ""}</div></td>
       <td class="r num">${w(o.done)}</td>
       <td class="r num">${pct(o.rate)}${o.noAmt ? `<div style="font-size:11px;color:var(--warn,#A86A00)" title="금액이 없는 항목은 기성률에 들어가지 않습니다">금액 없음 ${o.noAmt}건</div>` : ""}<span class="meter big"><i style="width:${(o.rate * 100).toFixed(1)}%"></i></span></td>
       <td class="r num">${o.contract ? w(o.payable) : "–"}</td>
-      <td class="r num">${o.paid ? w(o.paid) : "–"}${o.lastPay ? `<div style="font-size:11px;color:var(--ink-3)">최근 ${esc(fmtLong(o.lastPay))}</div>` : ""}</td>
+      <td class="r num">${o.paid ? w(o.paid) : "–"}${pays.length ? `<div style="font-size:11px;color:var(--ink-3)">${pays.length}회 지급</div>` : ""}</td>
       <td class="r num ${o.unpaid < 0 ? "neg" : ""}">${o.contract ? w(o.unpaid) : "–"}</td>
-      <td class="r num">${o.contract ? w(o.contract - o.paid) : "–"}</td></tr>`).join("");
-  const foot = `<tr class="tot"><td>합계</td><td></td><td class="r num">${w(T.contract)}</td><td class="r num">${w(T.tot)}</td><td class="r num">${w(T.done)}</td><td class="r num">${T.tot ? pct(T.done / T.tot) : "–"}</td><td class="r num">${w(T.payable)}</td><td class="r num">${w(T.paid)}</td><td class="r num">${w(T.unpaid)}</td><td class="r num">${w(T.contract - T.paid)}</td></tr>`;
+      <td class="r num">${o.contract ? w(o.contract - o.paid) : "–"}</td>
+      <td>${ed ? `<button class="btn sm" data-vpadd="${esc(o.name)}">${open ? "닫기" : "지급 추가"}</button>` : ""}</td></tr>`;
+    const hist = pays.length ? `<tr class="vh"><td></td><td colspan="10"><div class="payh"><span class="note" style="margin:0">지급 내역</span>${pays.map((x, k) =>
+        `<span class="pc">${k + 1}차 · ${esc(fmtLong(x.date))} · <b>${w(num(x.amount))}원</b>${x.note ? ` · ${esc(x.note)}` : ""}${ed ? `<button class="x2" data-vpx="${esc(o.name)}" data-vpid="${esc(x.id)}" title="이 지급 내역 삭제" aria-label="${k + 1}차 지급 삭제">✕</button>` : ""}</span>`).join("")}</div></td></tr>` : "";
+    const form = open ? `<tr class="vh"><td></td><td colspan="10"><div class="payf"><b style="font-size:12.5px">${pays.length + 1}차 지급</b>
+        <input type="date" id="vp-date" value="${localToday()}" aria-label="지급일">
+        <input type="number" id="vp-amt" min="0" step="10000" value="${o.contract && o.unpaid > 0 ? o.unpaid : ""}" placeholder="지급액 (원)" aria-label="지급액">
+        <input type="text" id="vp-note" value="${pays.length + 1}차 기성 지급" style="width:200px" aria-label="메모">
+        <button class="btn sm primary" id="vp-save" data-vname="${esc(o.name)}">기록</button><button class="btn sm" data-vpadd="${esc(o.name)}">취소</button>
+        ${o.contract && o.unpaid > 0 ? `<span class="note" style="margin:0">미지급 ${w(o.unpaid)}원을 채워 두었습니다</span>` : ""}</div></td></tr>` : "";
+    return main + hist + form; }).join("");
+  const foot = `<tr class="tot"><td>합계</td><td></td><td class="r num">${w(T.contract)}</td><td class="r num">${w(T.tot)}</td><td class="r num">${w(T.done)}</td><td class="r num">${T.tot ? pct(T.done / T.tot) : "–"}</td><td class="r num">${w(T.payable)}</td><td class="r num">${w(T.paid)}</td><td class="r num">${w(T.unpaid)}</td><td class="r num">${w(T.contract - T.paid)}</td><td></td></tr>`;
   return cards + `<div class="buy-tools">${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}
       ${none.n ? `<span class="note" style="margin:0">업체가 지정되지 않은 항목 ${none.n}건 · ${w(none.a)}원 (구매 일정·시공 진도에서 업체를 넣으면 여기에 더해집니다)</span>` : ""}</div>
-    <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r">계약금액</th><th class="r" title="구매 일정 + 시공 진도에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="계약금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="계약금액 − 지급 누계">계약 잔액</th></tr></thead>
+    <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r" title="이 업체에 발주(계약)한 금액">업체 발주금액</th><th class="r" title="구매 일정 + 시공 진도에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="업체 발주금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="업체 발주금액 − 지급 누계">발주 잔액</th><th></th></tr></thead>
     <tbody>${rows}${foot}</tbody></table></div>
-    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 금액은 구매 항목의 금액(내역서로 만든 프로젝트는 자동)을 쓰고, 금액이 없는 항목은 기성률에 들어가지 않습니다. 업체를 눌러 담당 항목에서 금액을 바로 넣을 수 있습니다. 지급 가능액 = 계약금액 × 기성률. 업체를 누르면 계약금액·연락처·지급 내역을 넣고 담당 항목을 볼 수 있습니다.</p>`;
+    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 금액은 구매 항목의 금액(내역서로 만든 프로젝트는 자동)을 쓰고, 금액이 없는 항목은 기성률에 들어가지 않습니다. 업체를 눌러 담당 항목에서 금액을 바로 넣을 수 있습니다. 지급 가능액 = 업체 발주금액 × 기성률. ‘지급 추가’로 지급할 때마다 1차·2차… 내역이 쌓입니다. 업체 이름을 누르면 연락처·지급 내역 수정과 담당 항목을 볼 수 있습니다.</p>`;
 }
 function openVendor(name){
   const reg = name ? vendorsOf().find(v => String(v.name).trim() === name) : null;
@@ -2177,7 +2198,7 @@ function renderVendorDrawer(){
     <div class="d-body">
       <div class="g3">
         <div class="field"><label for="v-name">업체 이름</label><input type="text" id="v-name" value="${esc(dr.name)}" ${ro}></div>
-        <div class="field"><label for="v-contract">계약금액 (원)</label><input type="number" id="v-contract" step="1000000" min="0" value="${dr.contract}" placeholder="예: 500000000" ${ro}></div>
+        <div class="field"><label for="v-contract">업체 발주금액 (원)</label><input type="number" id="v-contract" step="1000000" min="0" value="${dr.contract}" placeholder="예: 500000000" ${ro}></div>
         <div class="field"><label for="v-person">담당자</label><input type="text" id="v-person" value="${esc(dr.person)}" ${ro}></div>
         <div class="field"><label for="v-phone">연락처</label><input type="text" id="v-phone" value="${esc(dr.phone)}" ${ro}></div>
         <div class="field"><label for="v-email">이메일</label><input type="email" id="v-email" value="${esc(dr.email)}" ${ro}></div>
@@ -2204,6 +2225,11 @@ function renderVendorDrawer(){
       <div style="display:flex;gap:8px"><button class="btn" data-close>${ed ? "취소" : "닫기"}</button>${ed ? `<button class="btn primary" id="v-save">저장</button>` : ""}</div></div>`;
 }
 function vendorInput(e){
+  const t0 = e.target;
+  if(t0.dataset && t0.dataset.vcon){ if(e.type !== "change") return true; const n = t0.dataset.vcon, v = Math.max(0, Math.round(num(t0.value)));
+    commit(d => { const V = d.vendors || (d.vendors = []); let r = V.find(x => String(x.name).trim() === n); if(!r){ r = { id: "v" + Date.now().toString(36), name: n, contract: 0, person: "", phone: "", email: "", note: "", payments: [] }; V.push(r); } r.contract = v; },
+      `${n} 발주금액을 ${wonM(v)}원으로 저장했습니다`); return true; }
+  if(t0.closest && t0.closest("#view .payf")) return true;
   const dr = state.drawer; if(!dr || dr.kind !== "vendor") return false;
   const t = e.target, F = { "v-name": "name", "v-contract": "contract", "v-person": "person", "v-phone": "phone", "v-email": "email", "v-note": "note" };
   if(F[t.id]){ dr[F[t.id]] = t.value; if(e.type === "change" && (t.id === "v-name" || t.id === "v-contract")){ const sc = $(".d-body").scrollTop; renderVendorDrawer(); $(".d-body").scrollTop = sc; } return true; }
@@ -2215,6 +2241,12 @@ function vendorInput(e){
   return false;
 }
 function vendorClick(e){
+  const pa = e.target.closest("#view [data-vpadd]"); if(pa){ const n = pa.dataset.vpadd; state.vPayOpen = state.vPayOpen === n ? null : n; render(); const a = $("#vp-amt"); if(a) a.focus(); return true; }
+  if(e.target.closest("#view #vp-save")){ addVendorPayment(e.target.closest("#vp-save")); return true; }
+  const px = e.target.closest("#view [data-vpx]"); if(px){ const n = px.dataset.vpx, pid = px.dataset.vpid;
+    if(px.dataset.arm !== "1"){ px.dataset.arm = "1"; px.textContent = "삭제?"; px.style.color = "var(--crit)"; return true; }
+    commit(d => { const v = (d.vendors || []).find(x => String(x.name).trim() === n); if(v) v.payments = (v.payments || []).filter(x => x.id !== pid); }, "지급 내역을 삭제했습니다"); return true; }
+  if(e.target.closest("#view .vcon, #view .payf")) return true;
   const row = e.target.closest("#view [data-vendor]"); if(row){ openVendor(row.dataset.vendor); return true; }
   if(e.target.closest("#addVendor")){ openVendor(""); return true; }
   const dr = state.drawer; if(!dr || dr.kind !== "vendor") return false;
@@ -2229,6 +2261,16 @@ function vendorClick(e){
   if(e.target.closest("#v-del")){ if(!dr.arm){ dr.arm = true; redraw(); return true; }
     commit(d => { d.vendors = (d.vendors || []).filter(v => v.id !== dr.id); }, "업체 등록(계약·지급 내역)을 삭제했습니다. 항목의 업체 지정은 그대로입니다.").then(ok => { if(ok) closeDrawer(); }); return true; }
   return false;
+}
+async function addVendorPayment(btn){
+  const n = btn.dataset.vname, date = $("#vp-date").value, amount = Math.round(num($("#vp-amt").value)), note = $("#vp-note").value.trim();
+  if(!isDate(date)){ toast("지급일을 넣어 주세요."); return; }
+  if(!(amount > 0)){ toast("지급액을 넣어 주세요."); $("#vp-amt").focus(); return; }
+  btn.disabled = true;
+  const ok = await commit(d => { const V = d.vendors || (d.vendors = []); let r = V.find(x => String(x.name).trim() === n);
+    if(!r){ r = { id: "v" + Date.now().toString(36), name: n, contract: 0, person: "", phone: "", email: "", note: "", payments: [] }; V.push(r); }
+    (r.payments || (r.payments = [])).push({ id: "pay" + Date.now().toString(36), date, amount, note }); }, `${n}에 ${wonM(amount)}원 지급을 기록했습니다`);
+  if(ok){ state.vPayOpen = null; render(); } else btn.disabled = false;
 }
 async function saveVendor(){
   const dr = state.drawer, err = $("#v-err"); err.textContent = "";
