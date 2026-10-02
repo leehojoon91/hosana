@@ -121,6 +121,48 @@ table.vdt tr.tot td{background:var(--accent-soft);font-weight:700}
 .vd-pay input[type=number]{width:130px;text-align:right}
 .vd-pay input[type=date]{width:150px}
 .neg{color:var(--crit)}
+.dz-subs{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.dz-subs button[role=tab]{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.dz-subs button[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.dz-blks{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.dz-blks button{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.dz-blks button i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.dz-blks button.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.dz-side select{padding:5px 7px}
+.dz-plan .cell{cursor:pointer}
+.dz-plan .dz-movable{cursor:move}
+.dz-plan.floor line,.dz-plan.floor text,.dz-plan.floor circle,.dz-plan.floor rect:not(.cell):not(.ghost){pointer-events:none}
+.dz-plan .ghost{fill:transparent;stroke:#1E88E5;stroke-opacity:.45;stroke-width:1;stroke-dasharray:4 4;vector-effect:non-scaling-stroke;cursor:copy}
+.dz-plan .ghost:hover{fill:rgba(30,136,229,.14)}
+.dz-plan g.dragging{opacity:.75}
+.dz-plan .cell:hover{fill:rgba(29,106,81,.22)}
+.dz{display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start}
+@media (max-width:900px){ .dz{grid-template-columns:1fr} }
+.dz-side{padding:12px}
+.dz-side h3{font-size:13.5px;margin:4px 0 8px}
+.dz-side .g2 .field{margin-bottom:8px}
+.dz-side .field label{font-size:11.5px}
+.dz-side input{padding:5px 7px}
+.dz-tools{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.dz-tools button{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;color:var(--ink)}
+.dz-tools button i{width:14px;height:4px;border-radius:2px;display:inline-block}
+.dz-tools button.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.dz-main{min-width:0}
+.dz-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+.dz-canvas{width:100%;height:560px;display:block;background:#EEF2F4;border-radius:10px;cursor:grab;touch-action:none}
+.dz-canvas.pick{cursor:crosshair}
+.dz-wrap{position:relative}
+.dz-tip{position:absolute;pointer-events:none;background:rgba(20,30,26,.88);color:#fff;font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(12px,-28px)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .dz-canvas{background:#1A2226} }
+.dz-plan{width:100%;height:auto;max-height:640px;display:block;background:var(--surface);border-radius:10px}
+.dz-plan .hit{stroke:transparent;fill:transparent;cursor:pointer}
+.dz-plan .hit:hover{stroke:rgba(29,106,81,.25);fill:rgba(29,106,81,.12)}
+.dz-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-top:6px}
+.dz-legend i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-right:4px;vertical-align:middle}
+table.dzt{min-width:640px;font-size:12.5px}
+table.dzt td.r,table.dzt th.r{text-align:right}
+table.dzt tr.tot td{background:var(--accent-soft);font-weight:700}
+table.dzt input{padding:3px 6px;font-size:12.5px}
 .dy-bar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
 .dy-bar .field{margin:0}
 .dy-bar input[type=date]{width:160px} .dy-bar input[type=text]{width:180px}
@@ -477,6 +519,7 @@ textarea{resize:vertical;min-height:60px}
   <section class="kpis" id="kpis" aria-label="공정 요약"></section>
   <div class="bar-row" id="navrow">
     <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="design">설계도</button>
       <button role="tab" data-tab="gantt">간트 차트</button>
       <button role="tab" data-tab="net">PERT 네트워크</button>
       <button role="tab" data-tab="list">작업 목록</button>
@@ -2521,6 +2564,605 @@ function printDaily(M){
     <div id="printArea">${pages.map(b => `<div class="pg P4">${b}</div>`).join("")}</div>`;
   pv.hidden = false;
 }
+/* ---------- 설계도 : 벤로형 온실 ----------
+   세부 탭: 평면도(동 블록·스팬·칸·영역) → 철골(평면에 맞춰 자동 배치 + 클릭으로 넣고 빼기) → 알루미늄 → 피복
+   여러 동(블록)을 맞붙여 한 도면으로: 본동 · 확장동 · 관리동 … 동마다 격자(스팬·칸)와 형식이 다를 수 있습니다.
+   좌표(mm): x = 폭(스팬) 방향, y = 길이(칸) 방향, z = 높이.  동마다 스팬 선 = Y1…, 칸 선 = X1…
+   data.design = { blocks:[{ id, name, code, kind:"venlo"|"gable", spans, bays, off, x, y(동 원점 mm), 높이 값, 부재 키 배열 }], specs }
+   평면에서 동을 끌어 옮기면 다른 동 가장자리에 자석처럼 붙습니다. 바깥 줄 칸을 모두 빼면 스팬·칸 목록에서도 빠지고, 바깥 점선 칸을 누르면 늘어납니다. */
+const DZ_KINDS = { venlo: "벤로형 온실", gable: "관리동 (철골 박공)" };
+const DZ_PARAMS = {
+  venlo: [["gutterZ", "거터 높이 (mm)"], ["module", "지붕 폭 (mm)"], ["ridgeH", "지붕 높이 (거터~용마루)"], ["trussD", "트러스 춤 (mm)"], ["mpH", "미니기둥 높이 (mm)"], ["panels", "트러스 칸 수 (8m당)"], ["kneeL", "보강재 길이 (mm)"]],
+  gable: [["gutterZ", "처마 높이 (mm)"], ["ridgeH", "지붕 높이 (처마~용마루)"], ["module", "전후면 샛기둥 간격 (mm)"], ["rpurSp", "지붕 퍼린 간격 (mm)"], ["panels", "트러스 칸 수 (8m당)"], ["kneeL", "보강재 길이 (mm)"]] };
+const DZ_TYPES = {
+  col:    { n: "기둥", c: "#C0392B", w: 2.4, layer: "S-COLUMN", aci: 1 },
+  wcol:   { n: "샛기둥 (측벽·전후면)", c: "#E0675A", w: 1.6, layer: "S-POST", aci: 1 },
+  chord:  { n: "트러스 상·하현재", c: "#7E57C2", w: 2.0, layer: "S-TRUSS", aci: 6 },
+  web:    { n: "트러스 웹재", c: "#A88BD8", w: 0.9, layer: "S-TRUSS-WEB", aci: 6 },
+  mp:     { n: "미니기둥", c: "#16A085", w: 2.0, layer: "S-MINIPOST", aci: 4 },
+  gutter: { n: "거터", c: "#5D6D7E", w: 2.2, layer: "S-GUTTER", aci: 8 },
+  rpur:   { n: "지붕 퍼린 (관리동)", c: "#8D6E63", w: 1.4, layer: "S-ROOF-PURLIN", aci: 32 },
+  girt:   { n: "퍼린 (측벽·전후면 띠장)", c: "#9E9D24", w: 1.4, layer: "S-PURLIN", aci: 2 },
+  knee:   { n: "보강재 (방풍 보강)", c: "#E67E22", w: 1.6, layer: "S-KNEE", aci: 30 },
+  hbr:    { n: "수평 브레싱", c: "#C9A227", w: 1.0, layer: "S-BRACE-H", aci: 2 },
+  vbr:    { n: "수직 브레싱 (측벽·내부)", c: "#D4AC0D", w: 1.0, layer: "S-BRACE-V", aci: 2 },
+  ebr:    { n: "전후면 브레싱", c: "#F39C12", w: 1.0, layer: "S-BRACE-END", aci: 40 },
+  roof:   { n: "지붕 (참고선)", c: "#9FC5D9", w: 0.6, layer: "A-ROOF", aci: 5, ref: true } };
+const DZ_SPEC = { col: ["□-125×125×3.2", 12.2], wcol: ["□-100×100×2.3", 7.0], chord: ["□-50×50×2.3", 3.4], web: ["□-30×30×1.6", 1.4], mp: ["□-75×75×2.3", 5.2],
+  gutter: ["거터 2.0t", 9.5], rpur: ["C-100×50×20×2.3", 4.1], girt: ["C-100×50×20×2.3", 4.1], knee: ["□-50×50×2.3", 3.4], hbr: ["환봉 Ø12", 0.89], vbr: ["환봉 Ø12", 0.89], ebr: ["환봉 Ø12", 0.89], roof: ["알루미늄 (참고)", 0] };
+const DZ_TOOLS = [["col", "기둥"], ["truss", "트러스"], ["mp", "미니기둥"], ["knee", "보강재"], ["hbr", "수평 브레싱"], ["vbr", "수직 브레싱"], ["ebr", "전후면 브레싱"], ["girt", "퍼린"]];
+const DZ_TOOL_COLOR = { col: "col", truss: "chord", mp: "mp", knee: "knee", hbr: "hbr", vbr: "vbr", ebr: "ebr", girt: "girt" };
+const DZ_ARR = { col: "rmCol", truss: "rmTr", mp: "rmMp", knee: "kb", hbr: "hb", vbr: "vb", ebr: "eb", girt: "noGirt" };
+const DZ_SUBS = [["plan", "평면도"], ["steel", "철골"], ["alu", "알루미늄"], ["cover", "피복"]];
+const DZ_SIDES = { R: "오른쪽", L: "왼쪽", F: "앞쪽 (X1 쪽)", B: "뒤쪽" };
+const DZ_BLK_COLORS = ["#1D6A51", "#2C64A4", "#BF4E17", "#7B4FB8", "#A86A00", "#2E8C8C"];
+/* "8000*11, 4000" → [8000 ×11, 4000] */
+function dzList(txt, defv){
+  const out = [];
+  String(txt || "").split(/[,\s]+/).filter(Boolean).forEach(tok => { const m = tok.match(/^(\d+(?:\.\d+)?)(?:[*xX×](\d+))?$/); if(!m) return;
+    const v = +m[1], n = m[2] ? Math.min(200, +m[2]) : 1; if(v >= 100) for(let k = 0; k < n; k++) out.push(v); });
+  return out.length ? out.slice(0, 200) : [defv];
+}
+const dzListTxt = arr => { const out = []; arr.forEach(v => { const l = out[out.length - 1]; if(l && l[0] === v) l[1]++; else out.push([v, 1]); }); return out.map(([v, n]) => n > 1 ? `${v}*${n}` : String(v)).join(", "); };
+function dzGrid(B){
+  const sw = dzList(B.spans, 8000), bh = dzList(B.bays, 4500), xs = [0], ys = [0];
+  sw.forEach(w => xs.push(xs[xs.length - 1] + w)); bh.forEach(h => ys.push(ys[ys.length - 1] + h));
+  const ns = sw.length, nb = bh.length, off = new Set(B.off || []);
+  const inc = (s, j) => s >= 0 && j >= 0 && s < ns && j < nb && !off.has(`${s}:${j}`);
+  return { sw, bh, xs, ys, ns, nb, W: xs[ns], Lg: ys[nb], inc,
+    colOn: (i, j) => inc(i - 1, j - 1) || inc(i, j - 1) || inc(i - 1, j) || inc(i, j),
+    rowOn: (s, j) => inc(s, j - 1) || inc(s, j),
+    lineOn: (i, j) => inc(i - 1, j) || inc(i, j),
+    vEdge: (i, j) => inc(i - 1, j) !== inc(i, j),
+    hEdge: (s, j) => inc(s, j - 1) !== inc(s, j) };
+}
+const dzBlkArea = g => { let a = 0; for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++) if(g.inc(s, j)) a += g.sw[s] * g.bh[j]; return a / 1e6; };
+function dzDefaultBraces(B){
+  const g = dzGrid(B), nb = g.nb, bays = [...new Set((nb <= 3 ? [0, nb - 1] : [1, Math.round(nb * 0.3), Math.round(nb * 0.7) - 1, nb - 2]).filter(j => j >= 0 && j < nb))];
+  const hb = [], vb = [], eb = [];
+  bays.forEach(j => { for(let s = 0; s < g.ns; s++) if(g.inc(s, j)) hb.push(`${s}:${j}`); for(let i = 0; i <= g.ns; i++) if(g.vEdge(i, j)) vb.push(`${i}:${j}`); });
+  for(let j = 0; j <= nb; j++){ let run = [];
+    const flush = () => { if(run.length) [run[0], run[Math.floor(run.length / 2)], run[run.length - 1]].forEach(s => eb.push(`h:${s}:${j}`)); run = []; };
+    for(let s = 0; s < g.ns; s++){ if(g.hEdge(s, j)) run.push(s); else flush(); } flush(); }
+  return { hb: [...new Set(hb)], vb: [...new Set(vb)], eb: [...new Set(eb)] };
+}
+function dzBlockNew(kind, o = {}){
+  const B = { id: "b" + Math.random().toString(36).slice(2, 7), name: kind === "gable" ? "관리동" : "본동", code: "A", kind,
+    spans: kind === "gable" ? "6000*2" : "8000*11", bays: kind === "gable" ? "4500*2" : "4500*19", off: [], x: 0, y: 0,
+    girts: kind === "gable" ? "1300, 2600" : "1750, 3500, 5250", sideMid: true, endMid: true, roof: true, kb: [], rmCol: [], rmTr: [], rmMp: [], noGirt: [] };
+  Object.assign(B, kind === "gable" ? { gutterZ: 4000, ridgeH: 1200, module: 3000, rpurSp: 1000, trussD: 0, mpH: 0, panels: 8, kneeL: 800 }
+                                    : { gutterZ: 5800, module: 4000, ridgeH: 1000, trussD: 500, mpH: 300, panels: 8, kneeL: 800 }, o);
+  return Object.assign(B, dzDefaultBraces(B), o.hb ? { hb: o.hb } : {});
+}
+const dzNew = () => ({ blocks: [dzBlockNew("venlo")], specs: {} });
+function dzSample(){   // 본동 8m×11 · 4.5m×19 + 확장동 9.6m×2 · 4.5m×2 + 관리동 6m×2
+  const A = dzBlockNew("venlo", { name: "본동", code: "A", spans: "8000*11", bays: "4500*19" });
+  const Bk = dzBlockNew("venlo", { name: "확장동", code: "B", spans: "9600*2", bays: "4500*2", x: 88000, y: 0 });
+  const C = dzBlockNew("gable", { name: "관리동", code: "C", spans: "6000*2", bays: "4500*2", x: 0, y: -9000 });
+  return { blocks: [A, Bk, C], specs: {} };
+}
+function dzMigrate(D){
+  if(!D.blocks){   // 예전: 한 동짜리 → blocks[0]
+    const B = { ...D }; delete B.specs; delete B.blocks;
+    if(!B.spans){ B.spans = `${B.spanW || 8000}*${B.nSpan || 11}`; B.bays = `${B.bay || 4500}*${B.nBay || 19}`; }
+    if(!B.module) B.module = (B.spanW || 8000) / (B.roofN || 2);
+    const g = dzGrid(B);
+    B.eb = (B.eb || []).map(k => /^[FB]:/.test(k) ? `h:${k.split(":")[1]}:${k[0] === "F" ? 0 : g.nb}` : k);
+    const ng = []; (B.noGirt || []).forEach(k => { if(k === "L") for(let j = 0; j < g.nb; j++) ng.push(`v:0:${j}`); else if(k === "R") for(let j = 0; j < g.nb; j++) ng.push(`v:${g.ns}:${j}`);
+      else if(k === "F") for(let s = 0; s < g.ns; s++) ng.push(`h:${s}:0`); else if(k === "B") for(let s = 0; s < g.ns; s++) ng.push(`h:${s}:${g.nb}`); else ng.push(k); });
+    B.noGirt = ng; ["spanW", "nSpan", "bay", "nBay", "roofN", "type"].forEach(k => delete B[k]);
+    D = { blocks: [{ ...dzBlockNew("venlo"), ...B, id: "b1", name: "본동", code: "A", kind: "venlo", x: 0, y: 0 }], specs: D.specs || {} };
+  }
+  if(D.blocks.some(B => B.x == null || B.y == null)){   // 예전: 붙일 동·방향 → 좌표
+    const pos = []; D.blocks.forEach((B, bi) => { const g = dzGrid(B); let ox = 0, oy = 0;
+      if(bi > 0){ const at = B.at || {}, ti = D.blocks.findIndex((x, k) => k < bi && x.id === at.to), t = pos[ti >= 0 ? ti : 0], sh = num(at.shift), end = at.align === "end", side = at.side || "R";
+        if(side === "R" || side === "L"){ ox = side === "R" ? t.ox + t.g.W : t.ox - g.W; oy = (end ? t.oy + t.g.Lg - g.Lg : t.oy) + sh; }
+        else { oy = side === "B" ? t.oy + t.g.Lg : t.oy - g.Lg; ox = (end ? t.ox + t.g.W - g.W : t.ox) + sh; } }
+      pos.push({ ox, oy, g }); });
+    D.blocks.forEach((B, bi) => { if(B.x == null || B.y == null){ B.x = pos[bi].ox; B.y = pos[bi].oy; } delete B.at; });
+  }
+  D.blocks = D.blocks.map(B => ({ ...dzBlockNew(B.kind || "venlo"), ...B }));
+  D.specs = D.specs || {};
+  return D;
+}
+function dzDraft(){
+  if(!state.dz || state.dz.pid !== state.pid){ const src = state.data && state.data.design; state.dz = { pid: state.pid, D: src ? dzMigrate(clone(src)) : dzNew(), dirty: !src }; }
+  const D = state.dz.D; if(!(state.dzBlk >= 0 && state.dzBlk < D.blocks.length)) state.dzBlk = 0;
+  return state.dz;
+}
+/* 동 위치 = 저장한 좌표 */
+const dzLayout = D => D.blocks.map(B => ({ ox: num(B.x), oy: num(B.y), g: dzGrid(B) }));
+/* 부재 키의 격자 번호 옮기기 (앞·왼쪽에 줄을 넣거나 뺄 때) */
+const DZ_KEYARR = ["off", "rmCol", "kb", "rmTr", "rmMp", "hb", "vb", "eb", "noGirt"];
+function dzShiftKeys(B, dx, dy){
+  DZ_KEYARR.forEach(a => { B[a] = (B[a] || []).map(k => { const p = k.split(":"), xi = /^[vh]$/.test(p[0]) ? 1 : 0, yi = p.length - 1;
+    const nx = Number(p[xi]) + dx, ny = Number(p[yi]) + dy; if(nx < 0 || ny < 0) return null; p[xi] = String(nx); p[yi] = String(ny); return p.join(":"); }).filter(Boolean); });
+}
+/* 바깥 줄이 모두 빠졌으면 스팬·칸 목록에서도 빼기 (원점은 그대로 두어 남은 칸이 제자리) */
+function dzTrim(B){
+  for(let guard = 0; guard < 400; guard++){
+    const g = dzGrid(B), colOff = s => { for(let j = 0; j < g.nb; j++) if(g.inc(s, j)) return false; return true; }, rowOff = j => { for(let s = 0; s < g.ns; s++) if(g.inc(s, j)) return false; return true; };
+    if(g.ns > 1 && colOff(g.ns - 1)){ B.spans = dzListTxt(g.sw.slice(0, -1)); B.off = (B.off || []).filter(k => Number(k.split(":")[0]) < g.ns - 1); continue; }
+    if(g.ns > 1 && colOff(0)){ B.spans = dzListTxt(g.sw.slice(1)); B.x = num(B.x) + g.sw[0]; dzShiftKeys(B, -1, 0); continue; }
+    if(g.nb > 1 && rowOff(g.nb - 1)){ B.bays = dzListTxt(g.bh.slice(0, -1)); B.off = (B.off || []).filter(k => Number(k.split(":")[1]) < g.nb - 1); continue; }
+    if(g.nb > 1 && rowOff(0)){ B.bays = dzListTxt(g.bh.slice(1)); B.y = num(B.y) + g.bh[0]; dzShiftKeys(B, 0, -1); continue; }
+    break;
+  }
+}
+/* 바깥 점선 칸 누르기: 그쪽으로 스팬·칸 하나 늘리고 누른 칸만 넣음 */
+function dzGrow(B, s, j){
+  const g = dzGrid(B), off = new Set(B.off || []);
+  if(s < 0 || s >= g.ns){ const w = s < 0 ? g.sw[0] : g.sw[g.ns - 1];
+    if(s < 0){ B.spans = dzListTxt([w, ...g.sw]); B.x = num(B.x) - w; dzShiftKeys(B, 1, 0); s = 0; } else { B.spans = dzListTxt([...g.sw, w]); s = g.ns; }
+    const o2 = new Set(B.off || []); for(let jj = 0; jj < g.nb; jj++) if(jj !== j) o2.add(`${s}:${jj}`); B.off = [...o2]; return; }
+  if(j < 0 || j >= g.nb){ const h = j < 0 ? g.bh[0] : g.bh[g.nb - 1];
+    if(j < 0){ B.bays = dzListTxt([h, ...g.bh]); B.y = num(B.y) - h; dzShiftKeys(B, 0, 1); j = 0; } else { B.bays = dzListTxt([...g.bh, h]); j = g.nb; }
+    const o2 = new Set(B.off || []); for(let ss = 0; ss < g.ns; ss++) if(ss !== s) o2.add(`${ss}:${j}`); B.off = [...o2]; }
+  void off;
+}
+/* 한 동의 부재 (전체 좌표) */
+function dzBuildBlock(B, ox, oy, g, bi){
+  const { sw, bh, xs, ys, ns, nb, inc } = g, L = [], add = (t, a, b) => L.push({ t, bi, a: [a[0] + ox, a[1] + oy, a[2]], b: [b[0] + ox, b[1] + oy, b[2]] });
+  const gz = B.gutterZ, has = (a, k) => (B[a] || []).includes(k), venlo = B.kind !== "gable";
+  const zt = venlo ? gz - B.mpH : gz, zb = venlo ? zt - B.trussD : gz;
+  const Rof = s => Math.max(1, Math.round(sw[s] / Math.max(500, B.module || 4000))), modOf = s => sw[s] / Rof(s);
+  let trussN = 0;
+  for(let i = 0; i <= ns; i++) for(let j = 0; j <= nb; j++) if(g.colOn(i, j) && !has("rmCol", `${i}:${j}`)) add("col", [xs[i], ys[j], 0], [xs[i], ys[j], gz]);
+  if(B.sideMid) for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++) if(g.vEdge(i, j)) add("wcol", [xs[i], ys[j] + bh[j] / 2, 0], [xs[i], ys[j] + bh[j] / 2, gz]);
+  const ridgeAt = (s, x) => { const h = B.ridgeH, x0 = xs[s], S = sw[s], t = (x - x0) / S; return gz + h * (1 - Math.abs(t * 2 - 1)); };   // 박공 지붕 높이
+  if(B.endMid) for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++) if(g.hEdge(s, j)) for(let m = 1; m < Rof(s); m++){ const x = xs[s] + m * modOf(s); add("wcol", [x, ys[j], 0], [x, ys[j], venlo ? gz : ridgeAt(s, x)]); }
+  for(let j = 0; j <= nb; j++) for(let s = 0; s < ns; s++){ if(!g.rowOn(s, j)) continue;
+    const y = ys[j], x0 = xs[s], S = sw[s], P = Math.max(2, Math.round(B.panels * S / 8000 / 2) * 2), px = S / P;
+    if(!has("rmTr", `${s}:${j}`)){ trussN++;
+      if(venlo){ add("chord", [x0, y, zt], [x0 + S, y, zt]); add("chord", [x0, y, zb], [x0 + S, y, zb]);
+        add("web", [x0, y, zb], [x0, y, zt]); add("web", [x0 + S, y, zb], [x0 + S, y, zt]);
+        for(let k = 0; k < P; k++){ const a = x0 + k * px, b = a + px; if(k % 2 === 0) add("web", [a, y, zb], [b, y, zt]); else add("web", [a, y, zt], [b, y, zb]); } }
+      else { const xm = x0 + S / 2, zr = gz + B.ridgeH;      // 박공 트러스
+        add("chord", [x0, y, gz], [x0 + S, y, gz]); add("chord", [x0, y, gz], [xm, y, zr]); add("chord", [xm, y, zr], [x0 + S, y, gz]);
+        for(let k = 1; k < P; k++){ const x = x0 + k * px; add("web", [x, y, gz], [x, y, ridgeAt(s, x)]);
+          if(k < P / 2) add("web", [x, y, gz], [x - px, y, ridgeAt(s, x - px)]); else if(k > P / 2) add("web", [x, y, gz], [x + px, y, ridgeAt(s, x + px)]); } } }
+    if(venlo) for(let m = 1; m < Rof(s); m++) if(!has("rmMp", `${s}:${m}:${j}`)) add("mp", [x0 + m * modOf(s), y, zt], [x0 + m * modOf(s), y, gz]);
+  }
+  const runs = (t, x, z, on) => { let st = -1; for(let j = 0; j <= nb; j++){ const o = j < nb && on(j); if(o && st < 0) st = j; if(!o && st >= 0){ add(t, [x, ys[st], z], [x, ys[j], z]); st = -1; } } };
+  if(venlo){
+    for(let i = 0; i <= ns; i++) runs("gutter", xs[i], gz, j => g.lineOn(i, j));
+    for(let s = 0; s < ns; s++) for(let m = 1; m < Rof(s); m++) runs("gutter", xs[s] + m * modOf(s), gz, j => inc(s, j));
+    if(B.roof) for(let s = 0; s < ns; s++){ const R = Rof(s), md = modOf(s), zr = gz + B.ridgeH;
+      for(let m = 0; m < R; m++){ const xa = xs[s] + m * md, xr = xa + md / 2, xb = xa + md;
+        for(let j = 0; j < nb; j++) if(inc(s, j)) add("roof", [xr, ys[j], zr], [xr, ys[j + 1], zr]);
+        for(let j = 0; j <= nb; j++) if(g.rowOn(s, j)){ add("roof", [xa, ys[j], gz], [xr, ys[j], zr]); add("roof", [xr, ys[j], zr], [xb, ys[j], gz]); } } }
+  } else {   // 지붕 퍼린: 처마·용마루 포함, 간격마다
+    for(let s = 0; s < ns; s++){ const S = sw[s], n = Math.max(1, Math.round(S / 2 / Math.max(300, B.rpurSp || 1000)));
+      const xsP = new Set(); for(let k = 0; k <= n; k++){ xsP.add(xs[s] + S / 2 * k / n); xsP.add(xs[s] + S - S / 2 * k / n); }
+      [...xsP].forEach(x => runs("rpur", x, ridgeAt(s, x), j => inc(s, j))); }
+  }
+  const hs = String(B.girts || "").split(/[,\s]+/).map(Number).filter(h => h > 0 && h < gz);
+  hs.forEach(h => { for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++) if(g.vEdge(i, j) && !has("noGirt", `v:${i}:${j}`)) add("girt", [xs[i], ys[j], h], [xs[i], ys[j + 1], h]);
+    for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++) if(g.hEdge(s, j) && !has("noGirt", `h:${s}:${j}`)) add("girt", [xs[s], ys[j], h], [xs[s + 1], ys[j], h]); });
+  (B.kb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(!(i <= ns && j <= nb && g.colOn(i, j))) return; const k0 = B.kneeL;
+    [[-1, i - 1], [1, i]].forEach(([dir, s]) => { if(s < 0 || s >= ns || !g.rowOn(s, j) || has("rmTr", `${s}:${j}`)) return; add("knee", [xs[i], ys[j], zb - k0], [xs[i] + dir * k0, ys[j], zb]); }); });
+  (B.hb || []).forEach(k => { const [s, j] = k.split(":").map(Number); if(!inc(s, j)) return;
+    add("hbr", [xs[s], ys[j], zt], [xs[s + 1], ys[j + 1], zt]); add("hbr", [xs[s + 1], ys[j], zt], [xs[s], ys[j + 1], zt]); });
+  const z0 = 300;
+  (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(!(i <= ns && j < nb && g.lineOn(i, j))) return;
+    add("vbr", [xs[i], ys[j], z0], [xs[i], ys[j + 1], zb]); add("vbr", [xs[i], ys[j + 1], z0], [xs[i], ys[j], zb]); });
+  (B.eb || []).forEach(k => { const [, sp, jj] = k.split(":"), s = Number(sp), j = Number(jj); if(!(s < ns && j <= nb && g.hEdge(s, j))) return;
+    add("ebr", [xs[s], ys[j], z0], [xs[s + 1], ys[j], zb]); add("ebr", [xs[s + 1], ys[j], z0], [xs[s], ys[j], zb]); });
+  return { B, bi, g, ox, oy, L, gz, zt, zb, Rof, modOf, hs, trussN, venlo, X: xs.map(x => x + ox), Y: ys.map(y => y + oy), ridgeH: B.ridgeH };
+}
+/* 전체: 동마다 만들고 겹치는 부재(맞붙은 벽의 기둥 등)는 하나만 */
+function dzBuild(D){
+  const pos = dzLayout(D), blocks = D.blocks.map((B, bi) => dzBuildBlock(B, pos[bi].ox, pos[bi].oy, pos[bi].g, bi));
+  const seen = new Set(), L = [], r = v => Math.round(v);
+  blocks.forEach(b => b.L.forEach(m => { const p = [r(m.a[0]), r(m.a[1]), r(m.a[2])].join(), q = [r(m.b[0]), r(m.b[1]), r(m.b[2])].join(), k = m.t + "|" + (p < q ? p + "|" + q : q + "|" + p);
+    if(seen.has(k)) return; seen.add(k); L.push(m); }));
+  const minX = Math.min(...blocks.map(b => b.ox)), minY = Math.min(...blocks.map(b => b.oy)), maxX = Math.max(...blocks.map(b => b.ox + b.g.W)), maxY = Math.max(...blocks.map(b => b.oy + b.g.Lg));
+  const topZ = Math.max(...blocks.map(b => b.gz + b.ridgeH));
+  return { L, blocks, minX, minY, maxX, maxY, W: maxX - minX, Lg: maxY - minY, topZ, trussN: blocks.reduce((a, b) => a + b.trussN, 0), area: blocks.reduce((a, b) => a + dzBlkArea(b.g), 0) };
+}
+const dzLen = m => Math.hypot(m.b[0] - m.a[0], m.b[1] - m.a[1], m.b[2] - m.a[2]);
+function dzBom(D, G){
+  const sp = t => ({ name: (D.specs[t] && D.specs[t][0]) || DZ_SPEC[t][0], kg: num(D.specs[t] && D.specs[t][1] != null ? D.specs[t][1] : DZ_SPEC[t][1]) });
+  const rows = Object.keys(DZ_TYPES).map(t => { const ms = G.L.filter(m => m.t === t), len = ms.reduce((a, m) => a + dzLen(m), 0) / 1000, S0 = sp(t);
+    return { t, n: DZ_TYPES[t].n, spec: S0.name, kgm: S0.kg, cnt: ms.length, len, kg: DZ_TYPES[t].ref ? 0 : len * S0.kg, ref: !!DZ_TYPES[t].ref }; }).filter(r => r.cnt);
+  const byBlk = D.blocks.map((B, bi) => ({ name: B.name, kg: G.L.filter(m => m.bi === bi && !DZ_TYPES[m.t].ref).reduce((a, m) => a + dzLen(m) / 1000 * sp(m.t).kg, 0), area: dzBlkArea(G.blocks[bi].g) }));
+  return { rows, kg: rows.reduce((a, r) => a + r.kg, 0), trussN: G.trussN, byBlk };
+}
+function renderDesign(){
+  const Z = dzDraft(), D = Z.D, G = dzBuild(D), ed = state.canEdit, sub = state.dzSub || "plan";
+  const subs = `<div class="dz-subs" role="tablist">${DZ_SUBS.map(([k, l]) => `<button role="tab" data-dzsub="${k}" aria-selected="${sub === k}">${l}</button>`).join("")}
+    <span class="note" style="margin:0 0 0 auto">${D.blocks.length}개 동 · 전체 ${fmtQty(G.W / 1000)}m × ${fmtQty(G.Lg / 1000)}m · ${wonM(G.area)}㎡</span>
+    ${ed ? `<button class="btn primary sm" id="dz-save">${Z.dirty ? "설계 저장 *" : "저장됨"}</button>` : ""}</div>`;
+  let body;
+  if(sub === "plan") body = dzPlanTab(D, G, ed);
+  else if(sub === "steel") body = dzSteelTab(D, G, ed, Z);
+  else body = dzSoonTab(sub, D, G);
+  return subs + body;
+}
+const dzBlkChips = (D, cur) => `<div class="dz-blks">${D.blocks.map((B, bi) => `<button data-dzblk="${bi}" class="${bi === cur ? "on" : ""}"><i style="background:${DZ_BLK_COLORS[bi % DZ_BLK_COLORS.length]}"></i>${esc(B.code)} · ${esc(B.name)}</button>`).join("")}</div>`;
+/* ---- 평면도 ---- */
+function dzPlanTab(D, G, ed){
+  const bi = state.dzBlk, B = D.blocks[bi], Gb = G.blocks[bi], g = Gb.g, ro = ed ? "" : "disabled";
+  const offN = (B.off || []).filter(k => { const [s, j] = k.split(":").map(Number); return s < g.ns && j < g.nb; }).length;
+  const others = D.blocks.map((x, k) => [x, k]).filter(([, k]) => k !== bi);
+  const pos = `<div class="g2"><div class="field"><label for="dzb-x">X 위치 (mm)</label><input type="number" id="dzb-x" data-dzxy="x" step="500" value="${num(B.x)}" ${ro}></div>
+      <div class="field"><label for="dzb-y">Y 위치 (mm)</label><input type="number" id="dzb-y" data-dzxy="y" step="500" value="${num(B.y)}" ${ro}></div></div>
+    ${ed && others.length ? `<div class="field"><label>다른 동에 붙이기</label><div style="display:flex;gap:4px;flex-wrap:wrap"><select id="dz-snapto" style="max-width:130px">${others.map(([x, k]) => `<option value="${k}">${esc(x.code)} · ${esc(x.name)}</option>`).join("")}</select>
+      ${Object.entries({ R: "오른쪽", L: "왼쪽", F: "앞", B: "뒤" }).map(([k, l]) => `<button class="btn sm" data-dzsnap="${k}">${l}</button>`).join("")}</div></div>` : ""}
+    <p class="note">평면에서 동을 <b>끌어서</b> 옮길 수 있고, 다른 동 가장자리에 가까이 가면 붙습니다. 멀리 끌면 떨어집니다.</p>`;
+  const side = `<div class="panel dz-side">
+      <h3>동 (블록)</h3>${dzBlkChips(D, bi)}
+      ${ed ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn sm" data-dzadd="venlo">+ 온실동</button><button class="btn sm" data-dzadd="gable">+ 관리동</button><button class="btn sm" id="dz-sample" title="본동 8m×11 · 4.5m×19 + 확장동 9.6m×2 · 4.5m×2 + 관리동 6m×2">예시 구성</button></div>` : ""}
+      <div class="g2"><div class="field"><label for="dzb-name">이름</label><input type="text" id="dzb-name" data-dzb="name" value="${esc(B.name)}" ${ro}></div>
+        <div class="field"><label for="dzb-code">기호</label><input type="text" id="dzb-code" data-dzb="code" value="${esc(B.code)}" maxlength="3" ${ro}></div></div>
+      <div class="field"><label for="dzb-kind">형식</label><select id="dzb-kind" data-dzb="kind" ${ro}>${Object.entries(DZ_KINDS).map(([k, l]) => `<option value="${k}" ${B.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="field"><label for="dzp-spans">스팬 (폭 방향, mm)</label><input type="text" id="dzp-spans" data-dzp="spans" value="${esc(B.spans)}" ${ro}>
+        <span class="hint">8000*11 = 8m 11연동 · 섞으면 8000*10, 4000</span></div>
+      <div class="field"><label for="dzp-bays">칸 (길이 방향, mm)</label><input type="text" id="dzp-bays" data-dzp="bays" value="${esc(B.bays)}" ${ro}>
+        <span class="hint">4500*19 · 섞으면 4575, 4500*17, 4575</span></div>
+      <h3 style="margin-top:6px">위치</h3>${pos}
+      <div class="note" style="line-height:1.7">${esc(B.name)}: ${fmtQty(g.W / 1000)}m × ${fmtQty(g.Lg / 1000)}m = <b>${wonM(dzBlkArea(g))}㎡</b>${offN ? ` · 뺀 칸 ${offN}개` : ""}<br>전체: ${wonM(G.area)}㎡ (${wonM(G.area / 3.3058)}평)</div>
+      ${ed ? `<p class="note">칸을 누르면 빼거나 넣습니다. 바깥 줄을 모두 빼면 스팬·칸에서도 빠지고, 동 둘레의 <b>점선 칸</b>을 누르면 그쪽으로 스팬·칸이 늘어납니다.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="dz-allin">이 동 빈 칸 모두 넣기</button>${bi > 0 ? `<button class="btn sm danger" id="dz-blkdel">이 동 삭제</button>` : ""}</div>` : ""}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><button class="btn" id="dz-dxfp">평면도 DXF</button></div>
+      <p class="note" style="margin-top:6px">평면을 바꾸면 ‘철골’ 탭이 이 평면에 맞춰 다시 그려집니다.</p></div>`;
+  return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${dzFloorSvg(D, G, ed)}</div></div>`;
+}
+function dzFloorSvg(D, G, ed){
+  const cur = state.dzBlk, all = G.blocks.flatMap(b => [...b.g.sw, ...b.g.bh]), base = Math.min(...all), fs = Math.max(base * 0.24, Math.max(G.W, G.Lg) * 0.016), pad = Math.max(Math.max(...all) * 1.4, fs * 7), cs = base * 0.06;
+  const gp = Math.max(...all);
+  let o = `<svg class="dz-plan floor" viewBox="${G.minX - pad - gp} ${G.minY - pad - gp} ${G.W + pad * 2 + gp * 2} ${G.Lg + pad * 2 + gp * 2}" xmlns="http://www.w3.org/2000/svg">`;
+  const ln = (x1, y1, x2, y2, c, w, extra = "") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" ${extra}/>`;
+  const tx = (x, y, t, anchor = "middle", size = fs, color = "#3E4A50", extra = "") => `<text x="${x}" y="${y}" font-size="${size}" text-anchor="${anchor}" fill="${color}" ${extra}>${t}</text>`;
+  G.blocks.forEach(b => { const { g, X, Y, bi } = b, colr = DZ_BLK_COLORS[bi % DZ_BLK_COLORS.length], on1 = bi === cur;
+    o += `<g data-dzg="${bi}" class="${ed ? "dz-movable" : ""}">`;
+    if(ed && on1){   // 둘레 점선 칸: 누르면 스팬·칸 늘리기
+      const ghost = (x, y, w, h, s, j) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="ghost" data-dzgrow="${bi}|${s}:${j}"><title>여기에 ${s < 0 || s >= g.ns ? "스팬" : "칸"} 늘리기</title></rect>`;
+      for(let j = 0; j < g.nb; j++){ o += ghost(X[0] - g.sw[0], Y[j], g.sw[0], g.bh[j], -1, j) + ghost(X[g.ns], Y[j], g.sw[g.ns - 1], g.bh[j], g.ns, j); }
+      for(let s2 = 0; s2 < g.ns; s2++){ o += ghost(X[s2], Y[0] - g.bh[0], g.sw[s2], g.bh[0], s2, -1) + ghost(X[s2], Y[g.nb], g.sw[s2], g.bh[g.nb - 1], s2, g.nb); } }
+    for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++){ const on = g.inc(s, j);
+      o += `<rect x="${X[s]}" y="${Y[j]}" width="${g.sw[s]}" height="${g.bh[j]}" fill="${on ? colr : "#888"}" fill-opacity="${on ? (on1 ? 0.16 : 0.08) : 0.05}" stroke="${on ? colr : "#999"}" stroke-opacity=".35" stroke-width="0.6" vector-effect="non-scaling-stroke" ${on ? "" : 'stroke-dasharray="3 3"'}${ed ? ` class="cell" data-dzcell="${bi}|${s}:${j}"` : ""}/>`; }
+    for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vEdge(i, j)) o += ln(X[i], Y[j], X[i], Y[j + 1], "#1B2B24", 2.6);
+    for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hEdge(s, j)) o += ln(X[s], Y[j], X[s + 1], Y[j], "#1B2B24", 2.6);
+    for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j)) o += `<rect x="${X[i] - cs}" y="${Y[j] - cs}" width="${cs * 2}" height="${cs * 2}" fill="#C0392B"/>`;
+    o += tx((X[0] + X[g.ns]) / 2, (Y[0] + Y[g.nb]) / 2, `${esc(b.B.code)} · ${esc(b.B.name)}`, "middle", fs * 1.3, colr, 'font-weight="700" opacity=".85" pointer-events="none"');
+    o += `</g>`;
+  });
+  // 선택한 동: 축 · 치수
+  const b = G.blocks[cur], { g, X, Y } = b, code = D.blocks.length > 1 ? b.B.code + "-" : "";
+  X.forEach((x, i) => { o += ln(x, b.oy - pad * 0.25, x, b.oy + g.Lg + pad * 0.1, "#9AA5AB", 0.6, 'stroke-dasharray="8 4 2 4"') + tx(x, b.oy - pad * 0.3, code + "Y" + (i + 1), "middle", fs * 0.75); });
+  Y.forEach((y, j) => { o += ln(b.ox - pad * 0.25, y, b.ox + g.W + pad * 0.1, y, "#9AA5AB", 0.6, 'stroke-dasharray="8 4 2 4"') + tx(b.ox - pad * 0.3, y + fs * 0.3, code + "X" + (j + 1), "end", fs * 0.75); });
+  const dy = G.maxY + pad * 0.3, dx = G.maxX + pad * 0.3;
+  for(let s = 0; s < g.ns; s++){ o += ln(X[s], dy, X[s + 1], dy, "#56636A", 0.8) + ln(X[s], dy - fs * 0.4, X[s], dy + fs * 0.4, "#56636A", 0.8); if(g.sw[s] * 4 > base) o += tx((X[s] + X[s + 1]) / 2, dy - fs * 0.35, fmtQty(g.sw[s]), "middle", fs * 0.7); }
+  o += ln(X[g.ns], dy - fs * 0.4, X[g.ns], dy + fs * 0.4, "#56636A", 0.8) + tx((X[0] + X[g.ns]) / 2, dy + fs * 1.2, `${esc(b.B.name)} 폭 ${fmtQty(g.W)}`, "middle", fs * 0.85, "#1B2B24");
+  for(let j = 0; j < g.nb; j++){ o += ln(dx, Y[j], dx, Y[j + 1], "#56636A", 0.8) + ln(dx - fs * 0.4, Y[j], dx + fs * 0.4, Y[j], "#56636A", 0.8) + tx(dx + fs * 0.5, (Y[j] + Y[j + 1]) / 2 + fs * 0.25, fmtQty(g.bh[j]), "start", fs * 0.6); }
+  o += ln(dx - fs * 0.4, Y[g.nb], dx + fs * 0.4, Y[g.nb], "#56636A", 0.8);
+  const ty = G.maxY + pad * 0.75; o += ln(G.minX, ty, G.maxX, ty, "#56636A", 0.8) + tx((G.minX + G.maxX) / 2, ty + fs * 1.1, `전체 폭 ${fmtQty(G.W)}`, "middle", fs * 0.85, "#1B2B24");
+  return o + `</svg>`;
+}
+/* ---- 철골 ---- */
+function dzSteelTab(D, G, ed, Z){
+  const bi = state.dzBlk, B = D.blocks[bi], ro = ed ? "" : "disabled", view = state.dzView || "3d", tool = state.dzTool || "hbr", bom = dzBom(D, G);
+  const params = DZ_PARAMS[B.kind === "gable" ? "gable" : "venlo"].map(([k, label]) => `<div class="field"><label for="dzp-${k}">${label}</label><input type="number" id="dzp-${k}" data-dzp="${k}" value="${num(B[k])}" ${ro}></div>`).join("");
+  const side = `<div class="panel dz-side">
+      <h3>동 선택</h3>${dzBlkChips(D, bi)}
+      <h3>${esc(B.name)} · ${DZ_KINDS[B.kind] || ""}</h3><div class="g2">${params}</div>
+      <div class="field"><label for="dzp-girts">벽 퍼린 높이 (mm, 쉼표로)</label><input type="text" id="dzp-girts" data-dzp="girts" value="${esc(B.girts)}" ${ro}></div>
+      <label class="chk"><input type="checkbox" data-dzc="sideMid" ${B.sideMid ? "checked" : ""} ${ro}> 측벽 샛기둥 (칸 중앙)</label>
+      <label class="chk"><input type="checkbox" data-dzc="endMid" ${B.endMid ? "checked" : ""} ${ro}> 전후면 샛기둥</label>
+      ${B.kind !== "gable" ? `<label class="chk"><input type="checkbox" data-dzc="roof" ${B.roof ? "checked" : ""}> 지붕 참고선 보기·출력</label>` : ""}
+      <div class="note" style="margin:8px 0">평면: ${esc(B.spans)} / ${esc(B.bays)} (‘평면도’ 탭에서 바꿈)<br>${bom.byBlk.map(x => `${esc(x.name)} ${wonM(x.kg / 100) / 10}톤`).join(" · ")}<br>전체 트러스 ${bom.trussN}개 · 강재 약 <b>${wonM(bom.kg / 100) / 10}톤</b> (${wonM(bom.kg / Math.max(1, G.area) * 10) / 10}kg/㎡)</div>
+      ${ed ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="dz-defbrace" title="이 동의 브레싱을 기본 위치(양 끝과 중간 칸, 바깥 벽)로 다시 놓습니다">브레싱 기본 배치</button><button class="btn sm" id="dz-reset" title="이 동에서 뺀 부재·보강재를 모두 되돌립니다">부재 초기화</button></div>` : ""}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><button class="btn" id="dz-dxf3">3D DXF</button><button class="btn" id="dz-dxf2">철골 평면 DXF</button></div>
+      <p class="note" style="margin-top:6px">DXF는 모든 동을 한 도면에 넣습니다 (mm, 부재별 레이어). 맞붙은 벽의 같은 부재는 하나만 넣습니다.</p></div>`;
+  const tabs = `<div class="dz-tabs">${[["3d", "3D 보기"], ["plan", "평면 편집"], ["bom", "물량표"]].map(([k, l]) => `<button class="btn sm ${view === k ? "primary" : ""}" data-dzview="${k}">${l}</button>`).join("")}
+      ${view === "3d" ? `<span class="note" style="margin:0 0 0 auto">끌기: 회전 · Shift+끌기: 이동 · 휠: 확대</span>${[["iso", "등각"], ["front", "정면"], ["side", "측면"], ["top", "평면"]].map(([k, l]) => `<button class="btn sm" data-dzcam="${k}">${l}</button>`).join("")}` : ""}</div>`;
+  const legend = `<div class="dz-legend">${Object.entries(DZ_TYPES).filter(([t]) => G.L.some(m => m.t === t)).map(([t, x]) => `<span><i style="background:${x.c}"></i>${x.n}</span>`).join("")}</div>`;
+  const tip = { col: "기둥 자리를 눌러 빼거나 다시 넣습니다.", truss: "트러스(가로선)를 눌러 빼거나 다시 넣습니다.", mp: "미니기둥 점을 눌러 빼거나 넣습니다 (벤로 동).", knee: "기둥을 눌러 보강재를 붙이거나 뗍니다 (양쪽 트러스 하현으로).", hbr: "칸(사각형)을 눌러 수평 브레싱 X를 넣거나 뺍니다.", vbr: "스팬 선의 칸 구간(세로선)을 눌러 수직 브레싱을 넣거나 뺍니다.", ebr: "전후면 벽(가로 바깥선)의 스팬 구간을 눌러 브레싱을 넣거나 뺍니다.", girt: "바깥 벽 구간을 눌러 그 구간의 퍼린을 넣거나 뺍니다. 동끼리 맞붙은 벽의 퍼린도 여기서 뺄 수 있습니다." };
+  const t3 = state.dz3Tool || "";
+  let main;
+  if(view === "3d") main = `<div class="dz-tools"><button data-dz3tool="" class="${t3 ? "" : "on"}">🖐 보기만</button>${DZ_TOOLS.map(([k, l]) => `<button data-dz3tool="${k}" class="${t3 === k ? "on" : ""}" ${ed ? "" : "disabled"}><i style="background:${DZ_TYPES[DZ_TOOL_COLOR[k]].c}"></i>${l}</button>`).join("")}</div>
+      ${t3 ? `<p class="note" style="margin:0 0 6px">점선 = 넣을 수 있는 자리, 실선 = 지금 있는 부재. 마우스를 올려 강조되면 클릭해서 넣거나 뺍니다. 끌면 여전히 회전합니다.</p>` : ""}
+      <div class="dz-wrap"><canvas class="dz-canvas ${t3 ? "pick" : ""}" id="dz-cv"></canvas><div class="dz-tip" id="dz-tip" hidden></div></div>${legend}`;
+  else if(view === "plan") main = `<div class="dz-tools">${DZ_TOOLS.map(([k, l]) => `<button data-dztool="${k}" class="${tool === k ? "on" : ""}"><i style="background:${DZ_TYPES[DZ_TOOL_COLOR[k]].c}"></i>${l}</button>`).join("")}</div>
+      <p class="note" style="margin:0 0 6px">${tip[tool]}${ed ? "" : " (보기 전용)"}</p>${dzPlanSvg(D, G, tool, ed)}`;
+  else main = dzBomHtml(D, bom, ed);
+  return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${tabs}${main}</div></div>`;
+}
+function dzSoonTab(sub, D, G){
+  const info = { alu: ["알루미늄", ["지붕 바 (유리 지지 알루미늄 바)", "용마루·거터 알루미늄 프로파일", "천창(개폐창) 프레임 · 랙 구동부", "측창 · 출입문 프레임", "물량표 (길이·개수·kg) → 구매 일정"]],
+    cover: ["피복", ["지붕 유리 (판 크기·매수 자동 계산)", "측벽·전후면 피복 (유리 / 폴리카보네이트 / 필름)", "천창 피복 면적", "보온·차광 커튼 면적", "피복 면적·자재 물량표"]] }[sub];
+  return `<div class="panel" style="padding:20px"><h2 style="font-size:16px;margin:0 0 6px">${info[0]} <span class="pill p-wait">준비 중</span></h2>
+    <p class="note">이 탭은 앞으로 하나씩 만들어 갑니다. 평면도(${D.blocks.map(B => `${esc(B.name)} ${esc(B.spans)} / ${esc(B.bays)}`).join(" · ")}, ${wonM(G.area)}㎡)와 철골 골격을 바탕으로 계산하게 됩니다.</p>
+    <ul style="margin:8px 0 0 18px;line-height:1.9;font-size:13px">${info[1].map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+}
+function dzBomHtml(D, bom, ed){
+  const rows = bom.rows.map(r => `<tr><td>${esc(r.n)}</td>
+      <td>${ed ? `<input type="text" data-dzspec="${r.t}" data-dzsf="0" value="${esc(r.spec)}" style="width:170px">` : esc(r.spec)}</td>
+      <td class="r num">${r.cnt}</td><td class="r num">${fmtQty(Math.round(r.len * 10) / 10)}</td>
+      <td class="r">${ed && !r.ref ? `<input type="number" step="0.01" data-dzspec="${r.t}" data-dzsf="1" value="${r.kgm}" style="width:80px;text-align:right">` : r.kgm}</td>
+      <td class="r num">${r.ref ? "–" : wonM(r.kg)}</td></tr>`).join("");
+  const blk = bom.byBlk.map(x => `<tr><td colspan="2">${esc(x.name)}</td><td></td><td class="r num">${wonM(x.area)}㎡</td><td class="r num">${x.area ? (x.kg / x.area).toFixed(1) + " kg/㎡" : ""}</td><td class="r num">${wonM(x.kg)}</td></tr>`).join("");
+  return `<div class="tbl-wrap"><table class="dzt"><thead><tr><th>부재</th><th>규격</th><th class="r">개수</th><th class="r">총 길이 (m)</th><th class="r">단위중량 (kg/m)</th><th class="r">중량 (kg)</th></tr></thead>
+    <tbody>${rows}<tr class="tot"><td>합계</td><td>트러스 ${bom.trussN}개</td><td></td><td></td><td></td><td class="r num">${wonM(bom.kg)}</td></tr>
+    ${D.blocks.length > 1 ? `<tr><td colspan="6" style="font-weight:600;padding-top:10px">동별</td></tr>${blk}` : ""}</tbody></table></div>
+    <p class="note">개수는 부재 토막 수(트러스는 현재·웹재 낱개)입니다. 규격과 단위중량은 고칠 수 있고, 설계 저장 시 함께 저장됩니다. 지붕 참고선은 중량에 넣지 않습니다.</p>`;
+}
+function dzPlanSvg(D, G, tool, ed){
+  const all = G.blocks.flatMap(b => [...b.g.sw, ...b.g.bh]), base = Math.min(...all), pad = Math.max(...all) * 0.9, T = DZ_TYPES, cur = state.dzBlk;
+  const cs = base * 0.09, fs = Math.max(base * 0.28, Math.max(G.W, G.Lg) * 0.014), hw = base * 0.22;
+  let o = `<svg class="dz-plan" viewBox="${G.minX - pad} ${G.minY - pad} ${G.W + pad * 2} ${G.Lg + pad * 2}" xmlns="http://www.w3.org/2000/svg">`;
+  const ln = (x1, y1, x2, y2, c, w, extra = "") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" ${extra}/>`;
+  const hit = (k, shape) => shape.replace(/\/>$/, ` class="hit" data-dzhit="${k}"/>`);
+  G.L.forEach(m => { if(m.t === "gutter" || m.t === "rpur") o += ln(m.a[0], m.a[1], m.b[0], m.b[1], T[m.t].c, 1, 'opacity=".5"'); });
+  G.blocks.forEach(b => { const { g, X, Y, B, bi } = b, has = (a, k) => (B[a] || []).includes(k), code = D.blocks.length > 1 ? B.code + "-" : "";
+    for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++) if(!g.inc(s, j)) o += `<rect x="${X[s]}" y="${Y[j]}" width="${g.sw[s]}" height="${g.bh[j]}" fill="rgba(120,120,120,.08)"/>`;
+    if(bi === cur){ X.forEach((x, i) => { o += ln(x, b.oy - pad * 0.5, x, b.oy + g.Lg + pad * 0.2, "#9AA5AB", 0.6, 'stroke-dasharray="6 4"') + `<text x="${x}" y="${b.oy - pad * 0.56}" font-size="${fs}" text-anchor="middle" fill="#56636A">${code}Y${i + 1}</text>`; });
+      Y.forEach((y, j) => { o += ln(b.ox - pad * 0.5, y, b.ox + g.W + pad * 0.2, y, "#9AA5AB", 0.6, 'stroke-dasharray="6 4"') + `<text x="${b.ox - pad * 0.56}" y="${y + fs * 0.35}" font-size="${fs}" text-anchor="end" fill="#56636A">${code}X${j + 1}</text>`; }); }
+    (B.hb || []).forEach(k => { const [s, j] = k.split(":").map(Number); if(g.inc(s, j)) o += ln(X[s], Y[j], X[s + 1], Y[j + 1], T.hbr.c, 1.4) + ln(X[s + 1], Y[j], X[s], Y[j + 1], T.hbr.c, 1.4); });
+    for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!g.rowOn(s, j)) continue; const off = has("rmTr", `${s}:${j}`); o += ln(X[s], Y[j], X[s + 1], Y[j], off ? "#C0392B" : T.chord.c, off ? 1 : 2.4, off ? 'stroke-dasharray="4 4" opacity=".5"' : ""); }
+    (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(i <= g.ns && j < g.nb && g.lineOn(i, j)) o += ln(X[i] + cs * 0.9, Y[j] + g.bh[j] * 0.1, X[i] + cs * 0.9, Y[j + 1] - g.bh[j] * 0.1, T.vbr.c, 4); });
+    (B.eb || []).forEach(k => { const [, sp, jj] = k.split(":"), s = Number(sp), j = Number(jj); if(s < g.ns && j <= g.nb && g.hEdge(s, j)){ const out = g.inc(s, j) ? -1 : 1; o += ln(X[s] + g.sw[s] * 0.08, Y[j] + out * cs * 1.2, X[s + 1] - g.sw[s] * 0.08, Y[j] + out * cs * 1.2, T.ebr.c, 4); } });
+    const d = cs * 2.4;
+    for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vEdge(i, j) && !has("noGirt", `v:${i}:${j}`)){ const out = g.inc(i, j) ? -1 : 1; o += ln(X[i] + out * d, Y[j], X[i] + out * d, Y[j + 1], T.girt.c, 2); }
+    for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hEdge(s, j) && !has("noGirt", `h:${s}:${j}`)){ const out = g.inc(s, j) ? -1 : 1; o += ln(X[s], Y[j] + out * d, X[s + 1], Y[j] + out * d, T.girt.c, 2); }
+    if(b.venlo) for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!g.rowOn(s, j)) continue; for(let m = 1; m < b.Rof(s); m++){ const off = has("rmMp", `${s}:${m}:${j}`); o += `<circle cx="${X[s] + m * b.modOf(s)}" cy="${Y[j]}" r="${cs * 0.45}" fill="${off ? "none" : T.mp.c}" stroke="${T.mp.c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'opacity=".5"' : ""}/>`; } }
+    for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++){ if(!g.colOn(i, j)) continue; const off = has("rmCol", `${i}:${j}`), kn = has("kb", `${i}:${j}`);
+      o += `<rect x="${X[i] - cs / 2}" y="${Y[j] - cs / 2}" width="${cs}" height="${cs}" fill="${off ? "none" : T.col.c}" stroke="${T.col.c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'stroke-dasharray="3 3"' : ""}/>`;
+      if(kn) o += `<circle cx="${X[i]}" cy="${Y[j]}" r="${cs * 1.05}" fill="none" stroke="${T.knee.c}" stroke-width="2" vector-effect="non-scaling-stroke"/>`; }
+    if(ed){ const p = bi + "|";
+      if(tool === "col" || tool === "knee") for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j)) o += hit(p + `${i}:${j}`, `<circle cx="${X[i]}" cy="${Y[j]}" r="${cs * 1.6}"/>`);
+      if(tool === "truss") for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++) if(g.rowOn(s, j)) o += hit(p + `${s}:${j}`, `<rect x="${X[s] + cs}" y="${Y[j] - hw / 2}" width="${g.sw[s] - cs * 2}" height="${hw}"/>`);
+      if(tool === "mp" && b.venlo) for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++) if(g.rowOn(s, j)) for(let m = 1; m < b.Rof(s); m++) o += hit(p + `${s}:${m}:${j}`, `<circle cx="${X[s] + m * b.modOf(s)}" cy="${Y[j]}" r="${cs * 1.4}"/>`);
+      if(tool === "hbr") for(let j = 0; j < g.nb; j++) for(let s = 0; s < g.ns; s++) if(g.inc(s, j)) o += hit(p + `${s}:${j}`, `<rect x="${X[s] + cs}" y="${Y[j] + cs}" width="${g.sw[s] - cs * 2}" height="${g.bh[j] - cs * 2}"/>`);
+      if(tool === "vbr") for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.lineOn(i, j)) o += hit(p + `${i}:${j}`, `<rect x="${X[i] - hw / 2}" y="${Y[j] + cs}" width="${hw}" height="${g.bh[j] - cs * 2}"/>`);
+      if(tool === "ebr") for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hEdge(s, j)) o += hit(p + `h:${s}:${j}`, `<rect x="${X[s] + cs}" y="${Y[j] - hw}" width="${g.sw[s] - cs * 2}" height="${hw * 2}"/>`);
+      if(tool === "girt"){ for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vEdge(i, j)) o += hit(p + `v:${i}:${j}`, `<rect x="${X[i] - hw}" y="${Y[j]}" width="${hw * 2}" height="${g.bh[j]}"/>`);
+        for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hEdge(s, j)) o += hit(p + `h:${s}:${j}`, `<rect x="${X[s]}" y="${Y[j] - hw}" width="${g.sw[s]}" height="${hw * 2}"/>`); } }
+  });
+  G.L.forEach(m => { if(m.t === "wcol") o += `<rect x="${m.a[0] - cs * 0.35}" y="${m.a[1] - cs * 0.35}" width="${cs * 0.7}" height="${cs * 0.7}" fill="${T.wcol.c}" pointer-events="none"/>`; });
+  return o + `</svg>`;
+}
+/* 3D에서 누를 수 있는 자리: { k:"동|키", segs, on, label } */
+function dzSlots(D, G, tool){
+  const out = [];
+  G.blocks.forEach(b => { const { g, X, Y, B, bi } = b, gz = b.gz, zt = b.zt, zb = b.zb, z0 = 300, has = (a, k) => (B[a] || []).includes(k), p = bi + "|";
+    const pre = D.blocks.length > 1 ? B.name + " " : "", nX = j => "X" + (j + 1), nY = i => "Y" + (i + 1), ns = g.ns, nb = g.nb;
+    if(tool === "col" || tool === "knee") for(let i = 0; i <= ns; i++) for(let j = 0; j <= nb; j++){ if(!g.colOn(i, j)) continue; const k = `${i}:${j}`;
+      out.push({ k: p + k, on: tool === "col" ? !has("rmCol", k) : has("kb", k), segs: [tool === "col" ? [[X[i], Y[j], 0], [X[i], Y[j], gz]] : [[X[i], Y[j], zb - B.kneeL], [X[i], Y[j], zb]]], label: `${pre}${nY(i)} · ${nX(j)} ${tool === "col" ? "기둥" : "보강재"}` }); }
+    if(tool === "truss") for(let j = 0; j <= nb; j++) for(let s = 0; s < ns; s++){ if(!g.rowOn(s, j)) continue; const k = `${s}:${j}`, zm = b.venlo ? (zt + zb) / 2 : gz + B.ridgeH / 2;
+      const segs = b.venlo ? [[[X[s], Y[j], zt], [X[s + 1], Y[j], zt]], [[X[s], Y[j], zb], [X[s + 1], Y[j], zb]], [[X[s], Y[j], zm], [X[s + 1], Y[j], zm]]]
+        : [[[X[s], Y[j], gz], [X[s + 1], Y[j], gz]], [[X[s], Y[j], gz], [(X[s] + X[s + 1]) / 2, Y[j], gz + B.ridgeH]], [[(X[s] + X[s + 1]) / 2, Y[j], gz + B.ridgeH], [X[s + 1], Y[j], gz]]];
+      out.push({ k: p + k, on: !has("rmTr", k), segs, label: `${pre}트러스 ${nY(s)}–${nY(s + 1)} · ${nX(j)}` }); }
+    if(tool === "mp" && b.venlo) for(let j = 0; j <= nb; j++) for(let s = 0; s < ns; s++){ if(!g.rowOn(s, j)) continue; for(let m = 1; m < b.Rof(s); m++){ const k = `${s}:${m}:${j}`, x = X[s] + m * b.modOf(s);
+      out.push({ k: p + k, on: !has("rmMp", k), segs: [[[x, Y[j], zt], [x, Y[j], gz]]], label: `${pre}미니기둥 ${nY(s)}+${m} · ${nX(j)}` }); } }
+    if(tool === "hbr") for(let j = 0; j < nb; j++) for(let s = 0; s < ns; s++){ if(!g.inc(s, j)) continue; const k = `${s}:${j}`;
+      out.push({ k: p + k, on: has("hb", k), segs: [[[X[s], Y[j], zt], [X[s + 1], Y[j + 1], zt]], [[X[s + 1], Y[j], zt], [X[s], Y[j + 1], zt]]], label: `${pre}수평 브레싱 ${nY(s)}–${nY(s + 1)} · ${nX(j)}–${nX(j + 1)}` }); }
+    if(tool === "vbr") for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++){ if(!g.lineOn(i, j)) continue; const k = `${i}:${j}`;
+      out.push({ k: p + k, on: has("vb", k), segs: [[[X[i], Y[j], z0], [X[i], Y[j + 1], zb]], [[X[i], Y[j + 1], z0], [X[i], Y[j], zb]]], label: `${pre}수직 브레싱 ${nY(i)} 줄 · ${nX(j)}–${nX(j + 1)}` }); }
+    if(tool === "ebr") for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++){ if(!g.hEdge(s, j)) continue; const k = `h:${s}:${j}`;
+      out.push({ k: p + k, on: has("eb", k), segs: [[[X[s], Y[j], z0], [X[s + 1], Y[j], zb]], [[X[s + 1], Y[j], z0], [X[s], Y[j], zb]]], label: `${pre}전후면 브레싱 ${nX(j)} 벽 · ${nY(s)}–${nY(s + 1)}` }); }
+    if(tool === "girt"){ const hs = b.hs.length ? b.hs : [gz / 2];
+      for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++) if(g.vEdge(i, j)){ const k = `v:${i}:${j}`; out.push({ k: p + k, on: !has("noGirt", k), segs: hs.map(h => [[X[i], Y[j], h], [X[i], Y[j + 1], h]]), label: `${pre}측벽 퍼린 ${nY(i)} 줄 · ${nX(j)}–${nX(j + 1)}` }); }
+      for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++) if(g.hEdge(s, j)){ const k = `h:${s}:${j}`; out.push({ k: p + k, on: !has("noGirt", k), segs: hs.map(h => [[X[s], Y[j], h], [X[s + 1], Y[j], h]]), label: `${pre}전후면 퍼린 ${nX(j)} 벽 · ${nY(s)}–${nY(s + 1)}` }); } }
+  });
+  return out;
+}
+/* ---- 3D 보기 (캔버스, 직교 투영) ---- */
+const DZ_CAMS = { iso: [-0.62, 0.62], front: [0, 0.02], side: [-Math.PI / 2, 0.02], top: [0, Math.PI / 2 - 0.001] };
+function dzAfter(){
+  dzFloorDrag();
+  const cv = $("#dz-cv"); if(!cv) return;
+  const cam = state.dzCam || (state.dzCam = { yaw: DZ_CAMS.iso[0], pitch: DZ_CAMS.iso[1], zoom: 1, px: 0, py: 0 });
+  const draw = () => dzDraw(cv, cam);
+  let drag = null, raf = 0;
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const tip = $("#dz-tip");
+  const hover = e => { if(!state.dz3Tool || !state.canEdit){ cam.hover = null; return; } const [mx, my] = pos(e), h = dzPick(cv, mx, my);
+    const k = h ? h.k : null; if(k !== (cam.hover && cam.hover.k)){ cam.hover = h; cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }
+    if(tip){ if(h){ tip.hidden = false; tip.style.left = mx + "px"; tip.style.top = my + "px"; tip.textContent = `${h.label} · 클릭: ${h.on ? "빼기" : "넣기"}`; } else tip.hidden = true; } };
+  cv.onpointerdown = e => { drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, pan: e.shiftKey || e.button === 2, moved: 0 }; cv.setPointerCapture(e.pointerId); };
+  cv.onpointermove = e => { if(!drag){ hover(e); return; } const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0)); if(drag.moved < 4) return;
+    cv.style.cursor = "grabbing"; if(tip) tip.hidden = true;
+    if(drag.pan){ cam.px += dx; cam.py += dy; } else { cam.yaw += dx * 0.008; cam.pitch = Math.max(-0.2, Math.min(Math.PI / 2 - 0.001, cam.pitch + dy * 0.006)); } cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); };
+  cv.onpointerup = e => { const d0 = drag; drag = null; cv.style.cursor = "";
+    if(d0 && d0.moved < 4 && state.dz3Tool && state.canEdit && e.button === 0){ const [mx, my] = pos(e), h = dzPick(cv, mx, my);
+      if(h){ cam.hover = null; dzToggle(DZ_ARR[state.dz3Tool], h.k); toast(`${h.label} ${h.on ? "뺐습니다" : "넣었습니다"}`, 1600); } } };
+  cv.onpointerleave = () => { if(!drag){ cam.hover = null; if(tip) tip.hidden = true; draw(); } };
+  cv.oncontextmenu = e => e.preventDefault();
+  cv.onwheel = e => { e.preventDefault(); const k = Math.exp(-e.deltaY * 0.0012); cam.zoom = Math.max(0.2, Math.min(30, cam.zoom * k)); draw(); };
+  draw();
+  if(!dzAfter.ro && window.ResizeObserver){ dzAfter.ro = new ResizeObserver(() => { const c = $("#dz-cv"); if(c && state.dzCam) dzDraw(c, state.dzCam); }); }
+  if(dzAfter.ro){ dzAfter.ro.disconnect(); dzAfter.ro.observe(cv); }
+}
+/* 평면도: 동 끌기 + 가장자리 자석 */
+function dzFloorDrag(){
+  const svg = document.querySelector(".dz-plan.floor"); if(!svg || !state.canEdit) return;
+  const toSvg = e => { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+  svg.onpointerdown = e => { const gEl = e.target.closest("[data-dzg]"); if(!gEl || e.button !== 0) return;
+    const bi = Number(gEl.dataset.dzg), D = dzDraft().D, B = D.blocks[bi], G = dzBuild(D), me0 = G.blocks[bi], p0 = toSvg(e);
+    const pxmm = 1 / (svg.getScreenCTM().a || 1), thr = Math.max(1200, 14 * pxmm), W = me0.g.W, H = me0.g.Lg;
+    const others = G.blocks.filter(b => b.bi !== bi), cx = [], cy = [];
+    others.forEach(o => { const ox = o.ox, oy = o.oy, ow = o.g.W, oh = o.g.Lg; cx.push(ox, ox + ow, ox - W, ox + ow - W); cy.push(oy, oy + oh, oy - H, oy + oh - H); });
+    const st = { sx: e.clientX, sy: e.clientY, moved: false, nx: num(B.x), ny: num(B.y), snap: false };
+    const near = (v, list) => { let best = null, bd = thr; list.forEach(c => { const d = Math.abs(c - v); if(d < bd){ bd = d; best = c; } }); return best; };
+    const mv = ev => { if(!st.moved && Math.hypot(ev.clientX - st.sx, ev.clientY - st.sy) < 5) return; st.moved = true; gEl.classList.add("dragging");
+      const p = toSvg(ev); let nx = num(B.x) + (p.x - p0.x), ny = num(B.y) + (p.y - p0.y);
+      const sx = near(nx, cx), sy = near(ny, cy); st.snap = sx != null || sy != null;
+      nx = sx != null ? sx : Math.round(nx / 100) * 100; ny = sy != null ? sy : Math.round(ny / 100) * 100; st.nx = nx; st.ny = ny;
+      gEl.setAttribute("transform", `translate(${nx - num(B.x)} ${ny - num(B.y)})`); };
+    const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up);
+      if(!st.moved) return; state.suppressClick = true; setTimeout(() => { state.suppressClick = false; }, 0);
+      const hit = others.find(o => st.nx < o.ox + o.g.W - 1 && st.nx + W > o.ox + 1 && st.ny < o.oy + o.g.Lg - 1 && st.ny + H > o.oy + 1);
+      const touch = others.find(o => (Math.abs(st.nx - (o.ox + o.g.W)) < 1 || Math.abs(st.nx + W - o.ox) < 1) && st.ny < o.oy + o.g.Lg && st.ny + H > o.oy || (Math.abs(st.ny - (o.oy + o.g.Lg)) < 1 || Math.abs(st.ny + H - o.oy) < 1) && st.nx < o.ox + o.g.W && st.nx + W > o.ox);
+      state.dzBlk = bi; dzSet(D2 => { D2.blocks[bi].x = st.nx; D2.blocks[bi].y = st.ny; });
+      toast(hit ? `⚠ ${B.name} · ${hit.B.name} 겹침 — 조금 더 옮겨 주세요` : touch ? `${B.name} → ${touch.B.name}에 붙임` : `${B.name} 위치 X ${st.nx}, Y ${st.ny} (떨어짐)`, 2400); };
+    window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); };
+}
+function dzDraw(cv, cam){
+  const Z = dzDraft(), D = Z.D, G = dzBuild(D), dpr = window.devicePixelRatio || 1, Wc = cv.clientWidth, Hc = cv.clientHeight;
+  if(!Wc) return;
+  cv.width = Wc * dpr; cv.height = Hc * dpr; const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, Wc, Hc);
+  const cx = (G.minX + G.maxX) / 2, cy = (G.minY + G.maxY) / 2, cz = G.topZ / 2, cyw = Math.cos(cam.yaw), syw = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), spt = Math.sin(cam.pitch);
+  const pr = p => { const x = p[0] - cx, y = p[1] - cy, z = p[2] - cz; const X1 = x * cyw - y * syw, Y1 = x * syw + y * cyw; return [X1, -(z * cp + Y1 * spt), Y1 * cp - z * spt]; };
+  const corners = []; [G.minX, G.maxX].forEach(x => [G.minY, G.maxY].forEach(y => [0, G.topZ].forEach(z => corners.push(pr([x, y, z])))));
+  const bw = Math.max(...corners.map(q => q[0])) - Math.min(...corners.map(q => q[0])), bh = Math.max(...corners.map(q => q[1])) - Math.min(...corners.map(q => q[1]));
+  const sc = Math.min((Wc - 40) / (bw || 1), (Hc - 40) / (bh || 1)) * cam.zoom, ox = Wc / 2 + cam.px, oy = Hc / 2 + cam.py;
+  const S2 = p => { const q = pr(p); return [ox + q[0] * sc, oy + q[1] * sc, q[2]]; };
+  const order = ["roof", "gutter", "rpur", "girt", "web", "chord", "hbr", "vbr", "ebr", "knee", "mp", "wcol", "col"];
+  const thin = Math.min(1, Math.max(0.45, sc * 60));
+  order.forEach(t => { const T = DZ_TYPES[t]; c.strokeStyle = T.c; c.lineWidth = T.w * thin; c.globalAlpha = t === "roof" ? 0.55 : 1; c.beginPath();
+    G.L.forEach(m => { if(m.t !== t) return; if(t === "roof" && !D.blocks[m.bi].roof) return; const a = S2(m.a), b = S2(m.b); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }); c.stroke(); });
+  c.globalAlpha = 1;
+  const tool = state.canEdit ? state.dz3Tool : "";
+  cv._S2 = S2; cv._slots = tool ? dzSlots(D, G, tool) : [];
+  if(tool){ const col = DZ_TYPES[DZ_TOOL_COLOR[tool]].c; c.setLineDash([5, 4]); c.strokeStyle = col; c.globalAlpha = 0.45; c.lineWidth = 1.2; c.beginPath();
+    cv._slots.forEach(sl => { if(sl.on) return; sl.segs.slice(0, tool === "truss" ? 2 : undefined).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); }); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+    const h = cam.hover && cv._slots.find(x => x.k === cam.hover.k);
+    if(h){ c.strokeStyle = h.on ? "#E53935" : "#1E88E5"; c.lineWidth = 5; c.globalAlpha = 0.85; c.lineCap = "round"; c.beginPath();
+      h.segs.slice(0, tool === "truss" ? 2 : undefined).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); c.stroke(); c.globalAlpha = 1; c.lineCap = "butt"; } }
+  c.fillStyle = "#56636A"; c.font = "11px sans-serif"; c.textAlign = "center";
+  const b = G.blocks[state.dzBlk] || G.blocks[0], code = D.blocks.length > 1 ? b.B.code + "-" : "", off = Math.max(...b.g.sw) * 0.35, offy = Math.max(...b.g.bh) * 0.6;
+  b.Y.forEach((y, j) => { const p = S2([b.ox - off, y, 0]); c.fillText(code + "X" + (j + 1), p[0], p[1]); });
+  b.X.forEach((x, i) => { const p = S2([x, b.oy - offy, 0]); c.fillText(code + "Y" + (i + 1), p[0], p[1]); });
+  if(D.blocks.length > 1){ c.font = "bold 12px sans-serif"; G.blocks.forEach(x => { const p = S2([x.ox + x.g.W / 2, x.oy + x.g.Lg / 2, x.gz + x.ridgeH + 600]); c.fillStyle = DZ_BLK_COLORS[x.bi % DZ_BLK_COLORS.length]; c.fillText(`${x.B.code} · ${x.B.name}`, p[0], p[1]); }); }
+}
+/* 화면 좌표에서 가장 가까운 자리 (8px 안, 겹치면 앞쪽) */
+function dzPick(cv, mx, my){
+  const S2 = cv._S2, list = cv._slots || []; if(!S2 || !list.length) return null;
+  const dseg = (p, q) => { const vx = q[0] - p[0], vy = q[1] - p[1], L2 = vx * vx + vy * vy; let t = L2 ? ((mx - p[0]) * vx + (my - p[1]) * vy) / L2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(mx - p[0] - t * vx, my - p[1] - t * vy); };
+  let best = null, bd = 8, bz = Infinity;
+  list.forEach(sl => sl.segs.forEach(([a, b]) => { const p = S2(a), q = S2(b), d = dseg(p, q), z = (p[2] + q[2]) / 2;
+    if(d > 8) return; if(!best || d < bd - 2.5 || (Math.abs(d - bd) <= 2.5 && z < bz)){ bd = d; bz = z; best = sl; } }));
+  return best;
+}
+/* ---- 입력 · 클릭 ---- */
+function dzSet(fn){ const Z = dzDraft(); fn(Z.D); Z.dirty = true; render(); }
+/* k = "동번호|키" (동번호가 없으면 선택한 동) */
+function dzToggle(arr, k){ dzSet(D => { let bi = state.dzBlk, key = k; const m = String(k).match(/^(\d+)\|(.*)$/); if(m){ bi = Number(m[1]); key = m[2]; }
+  const B = D.blocks[bi]; if(!B) return; const a = B[arr] || (B[arr] = []); const i = a.indexOf(key); if(i >= 0) a.splice(i, 1); else a.push(key); }); }
+function designInput(e){
+  if(state.tab !== "design") return false;
+  const t = e.target, cur = () => dzDraft().D.blocks[state.dzBlk];
+  if(t.dataset && t.dataset.dzp){ if(e.type !== "change") return true; const k = t.dataset.dzp;
+    dzSet(() => { const B = cur(); if(k === "girts") B.girts = t.value;
+      else if(k === "spans" || k === "bays") B[k] = dzListTxt(dzList(t.value, k === "spans" ? 8000 : 4500));
+      else { const v = num(t.value); B[k] = k === "panels" ? Math.round(Math.min(40, Math.max(2, v))) : Math.max(0, v); } }); return true; }
+  if(t.dataset && t.dataset.dzb){ if(e.type !== "change") return true; const k = t.dataset.dzb;
+    dzSet(() => { const B = cur(); if(k === "kind"){ const nb = dzBlockNew(t.value); ["gutterZ", "ridgeH", "module", "rpurSp", "trussD", "mpH", "girts"].forEach(x => { B[x] = nb[x]; }); B.kind = t.value; } else B[k] = t.value.trim() || B[k]; }); return true; }
+  if(t.dataset && t.dataset.dzxy){ if(e.type !== "change") return true; const k = t.dataset.dzxy; dzSet(() => { cur()[k] = Math.round(num(t.value)); }); return true; }
+  if(t.dataset && t.dataset.dzc){ if(e.type !== "change") return true; const k = t.dataset.dzc; dzSet(() => { cur()[k] = t.checked; }); return true; }
+  if(t.dataset && t.dataset.dzspec){ if(e.type !== "change") return true; const k = t.dataset.dzspec, f = Number(t.dataset.dzsf);
+    dzSet(D => { const c0 = D.specs[k] || [...DZ_SPEC[k]]; c0[f] = f ? num(t.value) : t.value.trim(); D.specs[k] = c0; }); return true; }
+  return false;
+}
+function designClick(e){
+  if(state.tab !== "design") return false;
+  const sb = e.target.closest("[data-dzsub]"); if(sb){ state.dzSub = sb.dataset.dzsub; render(); return true; }
+  const bk = e.target.closest("[data-dzblk]"); if(bk){ state.dzBlk = Number(bk.dataset.dzblk); render(); return true; }
+  const vw = e.target.closest("[data-dzview]"); if(vw){ state.dzView = vw.dataset.dzview; render(); return true; }
+  const cm = e.target.closest("[data-dzcam]"); if(cm){ const [y, p] = DZ_CAMS[cm.dataset.dzcam]; state.dzCam = Object.assign(state.dzCam || {}, { yaw: y, pitch: p, zoom: 1, px: 0, py: 0, hover: null }); const cv = $("#dz-cv"); if(cv) dzDraw(cv, state.dzCam); return true; }
+  const tl = e.target.closest("[data-dztool]"); if(tl){ state.dzTool = tl.dataset.dztool; render(); return true; }
+  const t3 = e.target.closest("[data-dz3tool]"); if(t3){ state.dz3Tool = t3.dataset.dz3tool; if(state.dzCam) state.dzCam.hover = null; render(); return true; }
+  if(e.target.closest("#dz-dxf3")){ dzExport("3d"); return true; }
+  if(e.target.closest("#dz-dxf2")){ dzExport("steel"); return true; }
+  if(e.target.closest("#dz-dxfp")){ dzExport("floor"); return true; }
+  if(!state.canEdit) return false;
+  const cell = e.target.closest("[data-dzcell]"); if(cell){ const [bi, key] = cell.dataset.dzcell.split("|"); state.dzBlk = Number(bi);
+    dzSet(D => { const B = D.blocks[Number(bi)], a = B.off || (B.off = []), i = a.indexOf(key); if(i >= 0) a.splice(i, 1); else a.push(key);
+      const g0 = dzGrid(B), n0 = g0.ns + "×" + g0.nb; dzTrim(B); const g1 = dzGrid(B); if(g1.ns + "×" + g1.nb !== n0) toast(`바깥 줄이 비어 ${B.name} 크기를 ${g1.ns}스팬 × ${g1.nb}칸으로 줄였습니다`, 2600);
+      if(dzBlkArea(g1) === 0){ B.off = []; toast("마지막 칸은 뺄 수 없습니다", 2000); } }); return true; }
+  const gr = e.target.closest("[data-dzgrow]"); if(gr){ const [bi, key] = gr.dataset.dzgrow.split("|"), [s0, j0] = key.split(":").map(Number);
+    dzSet(D => { const B = D.blocks[Number(bi)]; dzGrow(B, s0, j0); const g1 = dzGrid(B); toast(`${B.name}: ${g1.ns}스팬 × ${g1.nb}칸 (${B.spans} / ${B.bays})`, 2200); }); return true; }
+  const sn = e.target.closest("[data-dzsnap]"); if(sn){ const ti = Number($("#dz-snapto").value), side = sn.dataset.dzsnap;
+    dzSet(D => { const B = D.blocks[state.dzBlk], T = D.blocks[ti], g = dzGrid(B), tg = dzGrid(T), tx0 = num(T.x), ty0 = num(T.y);
+      if(side === "R"){ B.x = tx0 + tg.W; B.y = ty0; } else if(side === "L"){ B.x = tx0 - g.W; B.y = ty0; } else if(side === "F"){ B.y = ty0 - g.Lg; B.x = tx0; } else { B.y = ty0 + tg.Lg; B.x = tx0; } }); return true; }
+  const h = e.target.closest("[data-dzhit]"); if(h){ dzToggle(DZ_ARR[state.dzTool || "hbr"], h.dataset.dzhit); return true; }
+  const ad = e.target.closest("[data-dzadd]"); if(ad){ dzSet(D => { const kind = ad.dataset.dzadd, n = D.blocks.length, code = String.fromCharCode(65 + n);
+      const G0 = dzBuild(D); D.blocks.push(dzBlockNew(kind, { name: kind === "gable" ? "관리동" : `온실 ${code}동`, code, x: G0.maxX + 4000, y: G0.minY })); state.dzBlk = n; }); return true; }
+  if(e.target.closest("#dz-sample")){ const Z = dzDraft(); Z.D = dzSample(); Z.dirty = true; state.dzBlk = 0; render(); toast("본동 · 확장동 · 관리동 예시를 넣었습니다. 위치·칸 수를 고친 뒤 저장하세요."); return true; }
+  if(e.target.closest("#dz-blkdel")){ const bi = state.dzBlk; if(bi > 0) dzSet(D => { D.blocks.splice(bi, 1); state.dzBlk = 0; }); return true; }
+  if(e.target.closest("#dz-allin")){ dzSet(D => { D.blocks[state.dzBlk].off = []; }); return true; }
+  if(e.target.closest("#dz-defbrace")){ dzSet(D => Object.assign(D.blocks[state.dzBlk], dzDefaultBraces(D.blocks[state.dzBlk]))); toast("브레싱을 기본 위치로 놓았습니다. 저장해야 남습니다."); return true; }
+  if(e.target.closest("#dz-reset")){ dzSet(D => Object.assign(D.blocks[state.dzBlk], { rmCol: [], rmTr: [], rmMp: [], kb: [], noGirt: [] })); return true; }
+  if(e.target.closest("#dz-save")){ const Z = dzDraft(); commit(d => { d.design = clone(Z.D); }, "설계를 저장했습니다").then(ok => { if(ok){ Z.dirty = false; render(); } }); return true; }
+  return false;
+}
+/* ---- DXF (R12 ASCII, mm) ---- */
+function dzDxf(layers, ents){
+  const out = [], P = (c, v) => out.push(String(c), String(v));
+  P(0, "SECTION"); P(2, "HEADER"); P(9, "$ACADVER"); P(1, "AC1009"); P(9, "$INSUNITS"); P(70, 4); P(9, "$DWGCODEPAGE"); P(3, "ANSI_949"); P(0, "ENDSEC");
+  P(0, "SECTION"); P(2, "TABLES");
+  P(0, "TABLE"); P(2, "LTYPE"); P(70, 2);
+  P(0, "LTYPE"); P(2, "CONTINUOUS"); P(70, 0); P(3, "Solid line"); P(72, 65); P(73, 0); P(40, 0);
+  P(0, "LTYPE"); P(2, "CENTER"); P(70, 0); P(3, "Center"); P(72, 65); P(73, 4); P(40, 2000); P(49, 1250); P(49, -250); P(49, 250); P(49, -250);
+  P(0, "ENDTAB");
+  P(0, "TABLE"); P(2, "LAYER"); P(70, layers.length);
+  layers.forEach(([n, aci, lt]) => { P(0, "LAYER"); P(2, n); P(70, 0); P(62, aci); P(6, lt || "CONTINUOUS"); });
+  P(0, "ENDTAB"); P(0, "ENDSEC");
+  P(0, "SECTION"); P(2, "ENTITIES"); ents.forEach(e => out.push(e)); P(0, "ENDSEC"); P(0, "EOF");
+  return out.join("\r\n") + "\r\n";
+}
+const f3 = n => (Math.round(n * 1000) / 1000).toString();
+const dxLine = (L, a, b) => ["0", "LINE", "8", L, "10", f3(a[0]), "20", f3(a[1]), "30", f3(a[2] || 0), "11", f3(b[0]), "21", f3(b[1]), "31", f3(b[2] || 0)].join("\r\n");
+const dxText = (L, x, y, h, t, center, rot) => ["0", "TEXT", "8", L, "10", f3(x), "20", f3(y), "30", "0", "40", f3(h), "1", t, ...(rot ? ["50", String(rot)] : []), ...(center ? ["72", "1", "73", "2", "11", f3(x), "21", f3(y), "31", "0"] : [])].join("\r\n");
+const dxCircle = (L, x, y, r) => ["0", "CIRCLE", "8", L, "10", f3(x), "20", f3(y), "30", "0", "40", f3(r)].join("\r\n");
+function dzExport(kind){
+  const Z = dzDraft(), D = Z.D, G = dzBuild(D), ents = [], used = new Set(), extra = [];
+  const lay = t => { used.add(t); return DZ_TYPES[t].layer; };
+  const all = G.blocks.flatMap(b => [...b.g.sw, ...b.g.bh]), base = Math.min(...all), big = Math.max(...all), th = base * 0.12, rb = th * 1.1, multi = D.blocks.length > 1;
+  const fy = y => G.maxY + G.minY - y;   // DXF는 y가 위로: 화면 평면과 같은 방향(X1이 위)
+  const axes = () => G.blocks.forEach(b => { const code = multi ? b.B.code + "-" : "";
+    b.X.forEach((x, i) => ents.push(dxLine("AXIS", [x, fy(b.oy - big * 0.9), 0], [x, fy(b.oy + b.g.Lg + big * 0.3), 0]), dxCircle("AXIS-TEXT", x, fy(b.oy - big * 0.9) + rb, rb), dxText("AXIS-TEXT", x, fy(b.oy - big * 0.9) + rb, th * (multi ? 0.7 : 1), code + "Y" + (i + 1), true)));
+    b.Y.forEach((y, j) => ents.push(dxLine("AXIS", [b.ox - big * 0.6, fy(y), 0], [b.ox + b.g.W + big * 0.3, fy(y), 0]), dxCircle("AXIS-TEXT", b.ox - big * 0.6 - rb, fy(y), rb), dxText("AXIS-TEXT", b.ox - big * 0.6 - rb, fy(y), th * (multi ? 0.7 : 1), code + "X" + (j + 1), true))); });
+  const dims = () => { const tk = th * 0.35;   // 동마다 한 줄씩, 도면 바깥(아래·오른쪽)에 쌓음
+    G.blocks.forEach((b, r) => { const yA = fy(G.maxY + big * (0.5 + r * 0.55)), xA = G.maxX + big * (0.5 + r * 0.55), { X, Y, g } = b;
+      g.sw.forEach((w, s) => { ents.push(dxLine("DIM", [X[s], yA, 0], [X[s + 1], yA, 0]), dxLine("DIM", [X[s] - tk, yA - tk, 0], [X[s] + tk, yA + tk, 0])); if(w * 4 > base) ents.push(dxText("DIM", (X[s] + X[s + 1]) / 2, yA + th * 0.6, th * 0.6, String(w), true)); });
+      ents.push(dxLine("DIM", [X[g.ns] - tk, yA - tk, 0], [X[g.ns] + tk, yA + tk, 0]));
+      if(multi) ents.push(dxText("DIM", X[0] - th * 0.6, yA - th * 0.25, th * 0.6, b.B.code));
+      g.bh.forEach((h, j) => { ents.push(dxLine("DIM", [xA, fy(Y[j]), 0], [xA, fy(Y[j + 1]), 0]), dxLine("DIM", [xA - tk, fy(Y[j]) - tk, 0], [xA + tk, fy(Y[j]) + tk, 0])); ents.push(dxText("DIM", xA + th * 0.8, fy((Y[j] + Y[j + 1]) / 2), th * 0.55, String(h), true, 90)); });
+      ents.push(dxLine("DIM", [xA - tk, fy(Y[g.nb]) - tk, 0], [xA + tk, fy(Y[g.nb]) + tk, 0])); });
+    const n = G.blocks.length, yB = fy(G.maxY + big * (0.5 + n * 0.55)), xB = G.maxX + big * (0.5 + n * 0.55), tk2 = th * 0.35;
+    ents.push(dxLine("DIM", [G.minX, yB, 0], [G.maxX, yB, 0]), dxLine("DIM", [G.minX - tk2, yB - tk2, 0], [G.minX + tk2, yB + tk2, 0]), dxLine("DIM", [G.maxX - tk2, yB - tk2, 0], [G.maxX + tk2, yB + tk2, 0]), dxText("DIM", (G.minX + G.maxX) / 2, yB - th * 0.9, th * 0.8, String(G.W), true),
+      dxLine("DIM", [xB, fy(G.minY), 0], [xB, fy(G.maxY), 0]), dxLine("DIM", [xB - tk2, fy(G.minY) - tk2, 0], [xB + tk2, fy(G.minY) + tk2, 0]), dxLine("DIM", [xB - tk2, fy(G.maxY) - tk2, 0], [xB + tk2, fy(G.maxY) + tk2, 0]), dxText("DIM", xB + th * 1.1, fy((G.minY + G.maxY) / 2), th * 0.8, String(G.Lg), true, 90)); };
+  const sq = (L, x, y, s2) => { [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]].forEach(([a, b, c2, d]) => ents.push(dxLine(L, [x + a * s2 / 2, fy(y) + b * s2 / 2, 0], [x + c2 * s2 / 2, fy(y) + d * s2 / 2, 0]))); };
+  const names = () => { if(multi) G.blocks.forEach(b => ents.push(dxText("TITLE", b.ox + b.g.W / 2, fy(b.oy + b.g.Lg / 2), th * 1.6, `${b.B.code}`, true))); };
+  let name;
+  if(kind === "3d"){ name = "3D 철골";
+    G.L.forEach(m => { if(m.t === "roof" && !D.blocks[m.bi].roof) return; ents.push(dxLine(lay(m.t), [m.a[0], fy(m.a[1]), m.a[2]], [m.b[0], fy(m.b[1]), m.b[2]])); }); axes();
+  } else if(kind === "steel"){ name = "철골 평면도";
+    const zTop = new Map(G.blocks.map(b => [b.bi, b.zt])), hs0 = new Map(G.blocks.map(b => [b.bi, b.hs[0]]));
+    G.L.forEach(m => {
+      if(m.t === "col"){ sq(lay("col"), m.a[0], m.a[1], 125); return; }
+      if(m.t === "wcol"){ sq(lay("wcol"), m.a[0], m.a[1], 100); return; }
+      if(m.t === "mp"){ sq(lay("mp"), m.a[0], m.a[1], 75); return; }
+      const flat = (m.t === "chord" && m.a[2] === m.b[2] && m.a[2] === zTop.get(m.bi)) || ["gutter", "hbr", "knee", "rpur"].includes(m.t) || (m.t === "girt" && m.a[2] === hs0.get(m.bi));
+      if(flat) ents.push(dxLine(lay(m.t), [m.a[0], fy(m.a[1]), 0], [m.b[0], fy(m.b[1]), 0]));
+    });
+    G.blocks.forEach(b => { const { B, g, X, Y } = b;
+      (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(!(i <= g.ns && j < g.nb && g.lineOn(i, j))) return; const x = X[i] + 180; ents.push(dxLine(lay("vbr"), [x, fy(Y[j] + 200), 0], [x, fy(Y[j + 1] - 200), 0]), dxText(lay("vbr"), x + 120, fy((Y[j] + Y[j + 1]) / 2), th * 0.5, "VB")); });
+      (B.eb || []).forEach(k => { const [, sp, jj] = k.split(":"), s = Number(sp), j = Number(jj); if(!(s < g.ns && j <= g.nb && g.hEdge(s, j))) return; const out = g.inc(s, j) ? -250 : 250, y = fy(Y[j] + out);
+        ents.push(dxLine(lay("ebr"), [X[s] + 300, y, 0], [X[s + 1] - 300, y, 0]), dxText(lay("ebr"), (X[s] + X[s + 1]) / 2, y + (out < 0 ? th * 0.4 : -th * 0.9), th * 0.5, "EB", true)); }); });
+    axes(); dims(); names();
+  } else { name = "평면도";
+    G.blocks.forEach(b => { const { g, X, Y } = b;
+      for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vEdge(i, j)) ents.push(dxLine("A-WALL", [X[i], fy(Y[j]), 0], [X[i], fy(Y[j + 1]), 0]));
+      for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hEdge(s, j)) ents.push(dxLine("A-WALL", [X[s], fy(Y[j]), 0], [X[s + 1], fy(Y[j]), 0]));
+      for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j)) sq("A-COLUMN", X[i], Y[j], 250);
+      for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++) if(!g.inc(s, j)) ents.push(dxLine("A-OUT", [X[s], fy(Y[j]), 0], [X[s + 1], fy(Y[j + 1]), 0]), dxLine("A-OUT", [X[s + 1], fy(Y[j]), 0], [X[s], fy(Y[j + 1]), 0])); });
+    axes(); dims(); names();
+    ents.push(dxText("TITLE", G.minX, fy(G.minY - big * 2.2), th * 1.2, `AREA ${Math.round(G.area)} m2  ` + G.blocks.map(b => `${b.B.code}: ${b.g.ns} SPAN x ${b.g.nb} BAY ${Math.round(dzBlkArea(b.g))} m2`).join(" / ")));
+    extra.push(["A-WALL", 7], ["A-COLUMN", 1], ["A-OUT", 8]);
+  }
+  ents.push(dxText("TITLE", G.minX, fy(G.minY - big * 1.7), th * 1.4, `VENLO GREENHOUSE ${kind === "3d" ? "3D STEEL" : kind === "steel" ? "STEEL PLAN" : "FLOOR PLAN"}  W=${G.W} L=${G.Lg}`));
+  const layers = [...used].map(t => [DZ_TYPES[t].layer, DZ_TYPES[t].aci]).concat(extra, [["AXIS", 8, "CENTER"], ["AXIS-TEXT", 7], ["DIM", 3], ["TITLE", 7]]);
+  const txt = dzDxf(layers, ents), blob = new Blob([txt], { type: "application/dxf" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `${(state.M && state.M.p.name) || proj().name || "온실"} ${name}.dxf`.replace(/[\\/:*?"<>|]/g, "_");
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`${name} DXF를 만들었습니다 (요소 ${ents.length.toLocaleString()}개)`);
+}
 /* ---- 진도 입력 창 ---- */
 function openPeriod(id, preset){
   const per = id ? periodsOf().find(x => x.id === id) : null;
@@ -2802,6 +3444,7 @@ function render(){
     v.innerHTML = `<div class="alert">선행작업이 순환하고 있어 일정을 계산할 수 없는 작업이 있습니다: <b>${esc(codes)}</b>. 선행작업을 고쳐 주세요.</div>`;
   }
   if(state.tab==="set"){ v.insertAdjacentHTML("beforeend", renderSettings()); bindSettings(); return; }
+  if(state.tab==="design"){ v.insertAdjacentHTML("beforeend", renderDesign()); dzAfter(); return; }
   if(!tasksOf().length){
     v.insertAdjacentHTML("beforeend", `<div class="panel empty"><h2>등록된 작업이 없습니다</h2><p>${state.canEdit ? "‘작업 추가’로 첫 공정을 등록하세요." : "담당자가 공정을 등록하면 여기에 표시됩니다."}</p></div>`);
     return;
@@ -3841,6 +4484,7 @@ document.addEventListener("click", e => {
   if(claimClick(e)) return;
   if(vendorClick(e)) return;
   if(dailyClick(e)) return;
+  if(designClick(e)) return;
   if(resClick(e)) return;
   if(e.target.closest("#b-save")){ saveBuy(); return; }
   if(e.target.closest("#b-del")){ deleteBuy(); return; }
@@ -3872,6 +4516,7 @@ document.addEventListener("change", e => {
   if(periodInput(e)) return;
   if(vendorInput(e)) return;
   if(dailyInput(e)) return;
+  if(designInput(e)) return;
   if(resInput(e)) return;
   { const tr = e.target.closest && e.target.closest("[data-tri]"); if(tr && state.drawer && state.drawer.res){ const x = state.drawer.res[Number(tr.dataset.tri)]; x[e.target.dataset.trf] = e.target.dataset.trf === "qty" ? e.target.value : e.target.value; renderTaskRes(); return; } }
   const dr = state.drawer;
@@ -3974,7 +4619,7 @@ function onUser(user){
   }, () => { state.mode = "denied"; afterData(); });
 }
 async function boot(){
-  if(!["gantt","net","list","buy","labor","evm","vend","daily","res","set"].includes(state.tab)) state.tab = "gantt";
+  if(!["design","gantt","net","list","buy","labor","evm","vend","daily","res","set"].includes(state.tab)) state.tab = "gantt";
   if(![5,12,24].includes(state.zoom)) state.zoom = 12;
   if(state.mode === "demo"){ state.projects = { main: sampleData(), vinyl: sampleVinyl() }; setCurrent(); afterData(); return; }
   render();
