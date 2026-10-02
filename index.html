@@ -121,6 +121,41 @@ table.vdt tr.tot td{background:var(--accent-soft);font-weight:700}
 .vd-pay input[type=number]{width:130px;text-align:right}
 .vd-pay input[type=date]{width:150px}
 .neg{color:var(--crit)}
+.dy-bar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.dy-bar .field{margin:0}
+.dy-bar input[type=date]{width:160px} .dy-bar input[type=text]{width:180px}
+.dy-sec{margin-top:14px}
+.dy-sec h3{font-size:14px;margin:0 0 8px}
+table.dyt{min-width:760px;font-size:12.5px}
+table.dyt td.r,table.dyt th.r{text-align:right}
+table.dyt tr.tot td{background:var(--accent-soft);font-weight:700}
+.dy-grid{display:grid;grid-template-columns:150px 1fr 1fr;gap:8px;align-items:start}
+.dy-grid .gh{font-weight:600;font-size:13px;padding-top:6px}
+.dy-grid .ch{font-size:12px;color:var(--ink-2);font-weight:600}
+.dy-grid textarea{min-height:74px;font-size:12.5px;line-height:1.5;resize:vertical}
+.dy-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.dy-photos figure{margin:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.dy-photos img{width:100%;height:130px;object-fit:cover;display:block}
+.dy-photos figcaption{display:flex;gap:4px;padding:6px}
+.dy-photos figcaption input{font-size:12px;padding:4px 6px}
+@media (max-width:760px){ .dy-grid{grid-template-columns:1fr} }
+#printArea .pg.P4{width:210mm;min-height:297mm;padding:12mm 12mm}
+.dr-doc{font-size:9.5pt;color:#111}
+.dr-doc h1{text-align:center;font-size:20pt;letter-spacing:.4em;margin:2mm 0 1mm;font-weight:500}
+.dr-doc .dt{text-align:center;color:#c62828;font-size:11pt;margin-bottom:4mm}
+.dr-doc .meta{margin:0 0 4mm;line-height:1.75}
+.dr-doc h2{font-size:10.5pt;margin:4mm 0 1.5mm}
+.dr-doc table{border-collapse:collapse;width:100%;min-width:0;table-layout:auto}
+.dr-doc th,.dr-doc td{white-space:normal;word-break:keep-all}
+.dr-doc th,.dr-doc td{border:1px solid #333;padding:1.2mm 1.6mm;vertical-align:middle}
+.dr-doc th{background:#e4e4e4;font-weight:600;text-align:center}
+.dr-doc td.r{text-align:right} .dr-doc td.c{text-align:center}
+.dr-doc .tb{border:2px solid #111}
+.dr-doc .n{width:6mm;text-align:center;color:#444}
+.dr-doc .ph{display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid #111}
+.dr-doc .ph div{border:1px solid #333;height:78mm;display:flex;flex-direction:column}
+.dr-doc .ph img{flex:1;min-height:0;width:100%;object-fit:contain;background:#fafafa}
+.dr-doc .ph .cap{border-top:1px solid #333;padding:1.5mm 2mm;font-size:9pt}
 table.vdt input.vcon{width:130px;padding:3px 6px;text-align:right;font-size:12.5px}
 table.vdt tr.vh td{background:var(--surface-2);padding-top:6px;padding-bottom:8px}
 .payh{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -449,6 +484,7 @@ textarea{resize:vertical;min-height:60px}
       <button role="tab" data-tab="labor">시공 진도</button>
       <button role="tab" data-tab="evm">기성</button>
       <button role="tab" data-tab="vend">업체 관리</button>
+      <button role="tab" data-tab="daily">작업일보</button>
       <button role="tab" data-tab="res">자원</button>
       <button role="tab" data-tab="set">설정</button>
     </div>
@@ -2298,6 +2334,193 @@ async function saveVendor(){
   }, rename ? `업체를 저장하고 항목의 업체 이름도 ‘${name}’(으)로 바꿨습니다` : "업체를 저장했습니다");
   if(ok){ $("#drawer").classList.remove("wide"); closeDrawer(); } else if($("#v-save")) $("#v-save").disabled = false;
 }
+/* ---------- 작업일보 ----------
+   그날 입고된 자재(구매 일정), 수행한 시공(시공 진도 기록), 공정률(계획 대비 실적), 기성 현황으로 일보를 자동으로 채웁니다.
+   손으로 고친 문장은 data.daily[날짜] = { author, checker, today:{공종}, tomorrow:{공종}, note:{공종}, civil, special } 에 저장합니다.
+   사진은 저장하지 않고 인쇄할 때만 붙입니다(용량 때문). */
+const dailyOf = () => (state.data && state.data.daily) || {};
+function nextWorkDay(M, d){ const i = idxOf(M.cal, shiftDate(d, 1)); return M.cal[i] || shiftDate(d, 1); }
+function dailyAuto(M, d){
+  const nd = nextWorkDay(M, d), L = laborOf(), log = L.log || {}, done = L.done || {}, doneAt = L.doneAt || {};
+  const gOf = new Map(); M.groups.forEach(g => g.items.forEach(t => gOf.set(t.id, g.name)));
+  const groups = M.groups.map(g => g.name); const G = name => gOf.get(name) || "기타";
+  const today = {}, tomorrow = {}, add = (o, g, line) => { (o[g] || (o[g] = [])).push(line); };
+  const unitTxt = (q, u) => `${fmtQty(q)}${u ? " " + u : ""}`;
+  /* 시공 실적 (시공 진도 기록) */
+  const work = [];
+  boqOf().filter(isLabLine).forEach(x => { const h = log[x.r]; let dq = 0, cum = 0;
+    if(h && h.length){ const i = h.findIndex(e => e[0] === d); if(i >= 0){ dq = num(h[i][1]) - (i ? num(h[i - 1][1]) : 0); cum = num(h[i][1]); } }
+    else if(doneAt[x.r] === d){ dq = num(done[x.r]); cum = dq; }
+    if(!dq) return;
+    const amt = (x.l + x.e) * (x.q > 0 ? dq / x.q : 1);
+    work.push({ x, dq, cum, amt, t: M.by.get(x.t), vendor: lineVendor(x, L) }); });
+  /* 자재 입고 · 발주 */
+  const recv = [], ordered = [];
+  purchasesOf().forEach(p => { const ds = deliveriesOf(p), a = num(p.amount), tot = toNum(p.qty) || ds.reduce((s0, x) => s0 + toNum(x.qty), 0);
+    if(ds.length) ds.forEach((x, k) => { if(x.receivedDate === d) recv.push({ p, qty: x.qty, amt: tot ? a * toNum(x.qty) / tot : 0, tag: `${k + 1}차` }); });
+    else if(p.receivedDate === d) recv.push({ p, qty: p.qty, amt: a, tag: "" });
+    if(p.orderedDate === d || ds.some(x => x.orderedDate === d)) ordered.push(p); });
+  /* 금일 사항 */
+  const active = x => M.order.map(id => M.by.get(id)).filter(t => t.es != null && !t.ms && t.startDate <= x && x <= t.finishDate && !(t.actualEnd && t.actualEnd < x));
+  const workBy = new Map(); work.forEach(w => { const k = w.t ? w.t.id : ""; if(!workBy.has(k)) workBy.set(k, []); workBy.get(k).push(w); });
+  const tasksToday = new Set([...active(d).map(t => t.id), ...workBy.keys()].filter(Boolean));
+  M.order.forEach(id => { if(!tasksToday.has(id)) return; const t = M.by.get(id);
+    const tag = t.actualStart === d ? " 착수" : t.actualEnd === d ? " 완료" : "";
+    add(today, G(id), `${t.name}${tag} (진척 ${Math.round(t.prog)}%)`);
+    (workBy.get(id) || []).forEach(w => add(today, G(id), `  - ${w.x.n}${w.x.s ? " " + w.x.s : ""} ${unitTxt(w.dq, w.x.u)} 시공${w.x.q > 0 ? ` (누계 ${Math.round(Math.min(1, w.cum / w.x.q) * 100)}%)` : ""}${w.vendor ? " · " + w.vendor : ""}`)); });
+  recv.forEach(r => add(today, G(r.p.taskId), `[입고] ${r.p.name}${r.p.spec ? " " + r.p.spec : ""} ${unitTxt(toNum(r.qty), r.p.unit)}${r.tag ? " (" + r.tag + ")" : ""}${r.p.vendor ? " · " + r.p.vendor : ""}`));
+  const recvIds = new Set(recv.map(r => r.p.id));
+  ordered.filter(p => !recvIds.has(p.id)).forEach(p => add(today, G(p.taskId), `[발주] ${p.name}${p.spec ? " " + p.spec : ""}${p.vendor ? " · " + p.vendor : ""}`));
+  /* 명일 사항 */
+  active(nd).forEach(t => { const starts = t.startDate === nd; add(tomorrow, G(t.id), `${t.name}${starts ? " 착수" : ""} (${fmt(t.startDate)}~${fmt(t.finishDate)}${starts ? "" : `, 진척 ${Math.round(t.prog)}%`})`); });
+  computePurchases(M).forEach(p => {
+    const arrive = p.split ? p.split.list.some(x => !isDate(x.receivedDate) && x.due === nd) : (!isDate(p.receivedDate) && (p.eta === nd || (!p.eta && p.needBy === nd)));
+    if(arrive) add(tomorrow, G(p.taskId), `[입고 예정] ${p.name}${p.spec ? " " + p.spec : ""}${p.vendor ? " · " + p.vendor : ""}`);
+    else if(!isDate(p.orderedDate) && p.orderBy && p.orderBy <= nd && ["late", "soon"].includes(p.st)) add(tomorrow, G(p.taskId), `[발주 필요] ${p.name}${p.spec ? " " + p.spec : ""} (발주 기한 ${fmt(p.orderBy)}${p.orderBy < d ? " 지남" : ""})`); });
+  const toTxt = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v.join("\n")]));
+  return { nd, groups: [...groups, ...(today["기타"] || tomorrow["기타"] ? ["기타"] : [])], today: toTxt(today), tomorrow: toTxt(tomorrow), work, recv, ordered };
+}
+/* 공종별 공정률: 계획(기준 공정 또는 현재 일정의 작업일 비율) · 실시(작업 진척률) */
+function dailyRates(M, d, nd){
+  const cal = M.cal, hasAmt = M.order.some(id => num(M.by.get(id).amount) > 0), w = t => hasAmt ? num(t.amount) : t.te;
+  const doneDays = x => idxOf(cal, shiftDate(x, 1));
+  const frac = (k, a, b) => b <= a ? (k > a ? 1 : 0) : Math.min(1, Math.max(0, (k - a) / (b - a)));
+  const span = t => t.base ? [idxOf(cal, t.base[0]), idxOf(cal, t.base[1]) + 1] : [t.es, t.ef];
+  const all = M.order.map(id => M.by.get(id)).filter(t => t.es != null), TOT = all.reduce((a, t) => a + w(t), 0) || 1;
+  const row = (name, ts) => { const W = ts.reduce((a, t) => a + w(t), 0) || 1, kd = doneDays(d), kn = doneDays(nd);
+    const plan = ts.reduce((a, t) => { const [x, y] = span(t); return a + w(t) * frac(kd, x, y); }, 0) / W;
+    const act = ts.reduce((a, t) => a + w(t) * t.prog / 100, 0) / W;
+    const planN = ts.reduce((a, t) => { const [x, y] = span(t); return a + w(t) * frac(kn, x, y); }, 0) / W;
+    const fcN = ts.reduce((a, t) => a + w(t) * Math.max(t.prog / 100, frac(kn, t.es, t.ef)), 0) / W;
+    return { name, share: ts.reduce((a, t) => a + w(t), 0) / TOT, plan, act, planN, fcN }; };
+  const rows = M.groups.map(g => row(g.name, g.items.map(t => M.by.get(t.id)).filter(t => t && t.es != null))).filter(r => r.share > 0);
+  return { rows, total: row("합계", all), hasAmt };
+}
+function dailyState(M){
+  const date = state.dyDate || (state.dyDate = M.statusDate > localToday() ? localToday() : M.statusDate);
+  if(!state.dy || state.dy.date !== date || state.dy.pid !== state.pid || !state.dy.dirty){            // 고치지 않았으면 최신 데이터로 다시 채움
+    const A = dailyAuto(M, date), sv = dailyOf()[date];
+    let author = ""; try{ author = localStorage.getItem("dyAuthor") || ""; }catch{}
+    state.dy = { pid: state.pid, date, saved: !!sv, author: sv ? sv.author || "" : author, checker: sv ? sv.checker || "" : "",
+      today: { ...A.today, ...(sv && sv.today || {}) }, tomorrow: { ...A.tomorrow, ...(sv && sv.tomorrow || {}) }, note: { ...(sv && sv.note || {}) },
+      civil: sv ? sv.civil || "" : "", special: sv ? sv.special || "" : "", photos: state.dy && state.dy.date === date ? state.dy.photos : [], dirty: false };
+  }
+  return state.dy;
+}
+function dailySite(M, d){ const E = evm(M); if(!E.hasSite) return null; const a = E.siteAt(d), b = E.siteAt(shiftDate(d, -1)); return { now: a, prev: b, BAC: E.BAC }; }
+function dailyClaim(M, d){
+  const E = evm(M), pers = periodsOf().filter(p => p.date <= d), last = pers[pers.length - 1], contract = num(M.p.contractAmount);
+  const ev = last ? E.evOf(last) : 0, rate = E.BAC ? ev / E.BAC : 0;
+  return { last, rate, amount: contract ? Math.trunc(contract * rate) : (E.hasAmt ? ev : 0), contract: contract || (E.hasAmt ? E.BAC : 0), hasAmt: E.hasAmt || contract > 0 };
+}
+function renderDaily(M){
+  const S = dailyState(M), d = S.date, A = dailyAuto(M, d), R = dailyRates(M, d, A.nd), ed = state.canEdit, w = wonM, pc = r => (r * 100).toFixed(2) + "%";
+  const site = dailySite(M, d), cl = dailyClaim(M, d);
+  const recvAmt = A.recv.reduce((a, r) => a + r.amt, 0), workAmt = A.work.reduce((a, x) => a + x.amt, 0);
+  const cards = `<div class="evm-cards">
+    <div class="kpi"><span class="k">금일 자재 입고</span><span class="v">${A.recv.length}건</span><span class="s">${w(recvAmt)}원</span></div>
+    <div class="kpi"><span class="k">금일 시공 (시공 진도)</span><span class="v">${A.work.length}줄</span><span class="s">노무·경비 ${w(workAmt)}원</span></div>
+    <div class="kpi"><span class="k">공정률 계획 / 실시</span><span class="v">${pc(R.total.act)}</span><span class="s">계획 ${pc(R.total.plan)} · 계획 대비 ${R.total.plan ? (R.total.act / R.total.plan * 100).toFixed(1) + "%" : "–"}</span></div>
+    ${site ? `<div class="kpi"><span class="k">현장 실적 (입고+시공)</span><span class="v">${pc(site.now.total / site.BAC)}</span><span class="s">금일 +${w(site.now.total - site.prev.total)}원</span></div>` : ""}
+    <div class="kpi"><span class="k">누계 기성</span><span class="v">${pc(cl.rate)}</span><span class="s">${cl.last ? esc(cl.last.label || "") + " · " + esc(fmtLong(cl.last.date)) : "기성 회차 없음"}</span></div></div>`;
+  const rateRows = [...R.rows, R.total].map(r => `<tr class="${r.name === "합계" ? "tot" : ""}"><td>${esc(r.name)}</td><td class="r num">${(r.share * 100).toFixed(1)}%</td>
+      <td class="r num">${pc(r.plan)}</td><td class="r num">${pc(r.act)}</td><td class="r num">${r.plan ? (r.act / r.plan * 100).toFixed(1) + "%" : "–"}</td>
+      <td class="r num">${pc(r.planN)}</td><td class="r num">${pc(r.fcN)}</td><td class="r num">${r.planN ? (r.fcN / r.planN * 100).toFixed(1) + "%" : "–"}</td></tr>`).join("");
+  const ro = ed ? "" : "disabled";
+  const grid = A.groups.map(g => `<div class="gh">${esc(g)}</div>
+      <textarea data-dyt="today" data-dyg="${esc(g)}" ${ro} aria-label="${esc(g)} 금일 사항" placeholder="금일 작업 없음">${esc(S.today[g] || "")}</textarea>
+      <textarea data-dyt="tomorrow" data-dyg="${esc(g)}" ${ro} aria-label="${esc(g)} 명일 사항" placeholder="명일 작업 없음">${esc(S.tomorrow[g] || "")}</textarea>`).join("");
+  const recvRows = A.recv.map(r => `<tr><td>${esc(r.p.name)}</td><td>${esc(r.p.spec || "")}</td><td class="r num">${esc(fmtQty(toNum(r.qty)))} ${esc(r.p.unit || "")}${r.tag ? ` <span class="note">(${r.tag})</span>` : ""}</td><td class="mono">${esc((M.by.get(r.p.taskId) || {}).code || "")}</td><td>${esc(r.p.vendor || "")}</td><td class="r num">${r.amt ? w(r.amt) : "–"}</td></tr>`).join("");
+  const workRows = A.work.map(x => `<tr><td>${esc(x.x.n)}</td><td>${esc(x.x.s || "")}</td><td class="r num">${esc(fmtQty(x.dq))} ${esc(x.x.u || "")}</td><td class="mono">${esc(x.t ? x.t.code : "")}</td><td>${esc(x.vendor || "")}</td><td class="r num">${w(x.amt)}</td></tr>`).join("");
+  return `<div class="dy-bar">
+      <div class="field"><label for="dy-date">일보 날짜</label><input type="date" id="dy-date" value="${esc(d)}"></div>
+      <button class="btn sm" data-dyshift="-1">◀ 전날</button><button class="btn sm" data-dyshift="1">다음날 ▶</button>
+      <div class="field"><label for="dy-author">작성자</label><input type="text" id="dy-author" value="${esc(S.author)}" placeholder="예: 현장대리인 홍길동" ${ro}></div>
+      <div class="field"><label for="dy-checker">확인자</label><input type="text" id="dy-checker" value="${esc(S.checker)}" ${ro}></div>
+      <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
+        ${ed ? `<button class="btn" id="dy-refill" title="손으로 고친 금일·명일 사항을 지우고 자동 내용으로 다시 채웁니다">자동 내용 다시 채우기</button><button class="btn" id="dy-save">${S.saved ? "저장됨 · 다시 저장" : "일보 저장"}</button>` : ""}
+        <button class="btn primary" id="dy-print">인쇄 / PDF</button></div></div>
+    ${cards}
+    <div class="dy-sec"><h3>공정률 · 공종별 계획 대비 실시 <span class="note" style="font-weight:400">명일 = ${esc(fmtLong(A.nd))}</span></h3>
+      <div class="panel tbl-wrap"><table class="dyt"><thead><tr><th rowspan="2">공종</th><th class="r" rowspan="2">구성비</th><th colspan="3" style="text-align:center">금일 누계</th><th colspan="3" style="text-align:center">명일 계획</th></tr>
+        <tr><th class="r">계획</th><th class="r">실시</th><th class="r">계획 대비</th><th class="r">추진 계획</th><th class="r">실시 계획</th><th class="r">계획 대비</th></tr></thead><tbody>${rateRows}</tbody></table></div>
+      <p class="note">계획은 ${M.p.baseline ? "기준 공정" : "현재 공정표"}의 작업 기간에 ${R.hasAmt ? "금액" : "공기"}을 고르게 나눈 값, 실시는 작업 진척률(시공 진도 저장 시 자동 반영)입니다. 실시 계획 = 지금 일정대로 진행했을 때 명일 예상치.</p></div>
+    <div class="dy-sec"><h3>공사 진행 <span class="note" style="font-weight:400">자동으로 채운 내용이며 고쳐 쓸 수 있습니다${S.saved ? " · 저장된 일보" : ""}</span></h3>
+      <div class="panel" style="padding:12px"><div class="dy-grid"><div class="ch">공종</div><div class="ch">금일 사항</div><div class="ch">명일 사항</div>${grid}
+        <div class="gh">민원 사항</div><textarea data-dyf="civil" style="grid-column:span 2" ${ro} aria-label="민원 사항">${esc(S.civil)}</textarea>
+        <div class="gh" style="color:var(--crit)">특이 사항</div><textarea data-dyf="special" style="grid-column:span 2" ${ro} placeholder="예: 장비 렌탈 1대 및 인원보강 4명" aria-label="특이 사항">${esc(S.special)}</textarea></div></div></div>
+    <div class="dy-sec"><h3>금일 자재 입고 ${A.recv.length}건</h3>${A.recv.length ? `<div class="panel tbl-wrap"><table class="dyt"><thead><tr><th>자재</th><th>규격</th><th class="r">수량</th><th>작업</th><th>업체</th><th class="r">금액</th></tr></thead><tbody>${recvRows}</tbody></table></div>` : `<p class="note">이 날 입고 완료한 자재가 없습니다. 구매 일정에서 입고일을 넣으면 여기에 나옵니다.</p>`}</div>
+    <div class="dy-sec"><h3>금일 시공 ${A.work.length}줄</h3>${A.work.length ? `<div class="panel tbl-wrap"><table class="dyt"><thead><tr><th>항목</th><th>규격</th><th class="r">금일 수행</th><th>작업</th><th>업체</th><th class="r">노무·경비</th></tr></thead><tbody>${workRows}</tbody></table></div>` : `<p class="note">이 날 저장한 시공 진도 기록이 없습니다. 시공 진도 탭에서 수행 수량을 저장하면 그날 기록으로 남습니다.</p>`}</div>
+    <div class="dy-sec"><h3>사진대지</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><label class="btn">사진 추가<input type="file" id="dy-photo" accept="image/*" multiple hidden></label><span class="note" style="margin:0">사진은 인쇄·PDF에만 들어가고 저장되지 않습니다. 한 장에 6장씩 들어갑니다.</span></div>
+      ${S.photos.length ? `<div class="dy-photos">${S.photos.map((p, i) => `<figure><img src="${p.src}" alt=""><figcaption><input type="text" data-dycap="${i}" value="${esc(p.cap)}" placeholder="내용 (예: 지붕 유리 설치)"><button class="btn sm" data-dyrm="${i}" aria-label="사진 빼기">✕</button></figcaption></figure>`).join("")}</div>` : ""}</div>`;
+}
+function dailyInput(e){
+  const t = e.target; if(state.tab !== "daily" || !state.dy) return false;
+  const S = state.dy;
+  if(t.id === "dy-date"){ if(e.type === "change" && isDate(t.value)){ state.dyDate = t.value; render(); } return true; }
+  if(t.id === "dy-author"){ S.author = t.value; S.dirty = true; return true; }
+  if(t.id === "dy-checker"){ S.checker = t.value; S.dirty = true; return true; }
+  if(t.dataset && t.dataset.dyt){ S[t.dataset.dyt][t.dataset.dyg] = t.value; S.dirty = true; return true; }
+  if(t.dataset && t.dataset.dyf){ S[t.dataset.dyf] = t.value; S.dirty = true; return true; }
+  if(t.dataset && t.dataset.dycap){ const p = S.photos[Number(t.dataset.dycap)]; if(p) p.cap = t.value; return true; }
+  if(t.id === "dy-photo" && e.type === "change"){ const files = [...t.files]; Promise.all(files.map(shrinkPhoto)).then(list => { list.forEach((src, i) => src && S.photos.push({ src, cap: files[i].name.replace(/\.[^.]+$/, "") })); render(); }); return true; }
+  return false;
+}
+function shrinkPhoto(file){
+  return new Promise(ok => { const rd = new FileReader(); rd.onerror = () => ok(null);
+    rd.onload = () => { const im = new Image(); im.onerror = () => ok(null);
+      im.onload = () => { const k = Math.min(1, 1400 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", 0.82)); };
+      im.src = rd.result; };
+    rd.readAsDataURL(file); });
+}
+function dailyClick(e){
+  if(state.tab !== "daily") return false;
+  const sh = e.target.closest("[data-dyshift]"); if(sh){ const M = state.M, d = state.dyDate, k = Number(sh.dataset.dyshift);
+    state.dyDate = k > 0 ? nextWorkDay(M, d) : (M.cal[idxOf(M.cal, d) - 1] || shiftDate(d, -1)); render(); return true; }
+  const rm = e.target.closest("[data-dyrm]"); if(rm){ state.dy.photos.splice(Number(rm.dataset.dyrm), 1); render(); return true; }
+  if(e.target.closest("#dy-print")){ printDaily(state.M); return true; }
+  if(e.target.closest("#dy-refill")){ const S = state.dy, A = dailyAuto(state.M, S.date); S.today = { ...A.today }; S.tomorrow = { ...A.tomorrow }; S.dirty = true; render(); toast("자동 내용으로 다시 채웠습니다. 저장해야 남습니다."); return true; }
+  if(e.target.closest("#dy-save")){ const S = state.dy, rec = { author: S.author.trim(), checker: S.checker.trim(), today: S.today, tomorrow: S.tomorrow, note: S.note, civil: S.civil, special: S.special, savedAt: new Date().toISOString(), savedBy: me() };
+    try{ localStorage.setItem("dyAuthor", rec.author); }catch{}
+    commit(d => { (d.daily || (d.daily = {}))[S.date] = clone(rec); }, `${fmtLong(S.date)} 작업일보를 저장했습니다`).then(ok => { if(ok){ S.saved = true; S.dirty = false; render(); } }); return true; }
+  return false;
+}
+function printDaily(M){
+  const S = dailyState(M), d = S.date, A = dailyAuto(M, d), R = dailyRates(M, d, A.nd), cl = dailyClaim(M, d), site = dailySite(M, d), p = M.p, w = wonM, pc = r => (r * 100).toFixed(2) + "%";
+  const [y, mo, da] = d.split("-").map(Number);
+  const lines = txt => String(txt || "").split("\n").map(x => x.trimEnd()).filter(x => x.trim());
+  const sec = (label, a, b, minRows, red) => { const L1 = lines(a), L2 = lines(b), n = Math.max(minRows, L1.length, L2.length);
+    return Array.from({ length: n }, (_, i) => `<tr>${i === 0 ? `<td rowspan="${n}" class="c" style="width:22mm;${red ? "color:#c62828" : ""}">${esc(label)}</td>` : ""}
+      <td class="n">${i + 1}</td><td style="width:72mm;${red ? "color:#c62828" : ""}">${esc(L1[i] || "")}</td><td class="n">${i + 1}</td><td style="width:72mm">${esc(L2[i] || "")}</td>${i === 0 ? `<td rowspan="${n}"></td>` : ""}</tr>`).join(""); };
+  const used = A.groups.filter(g => lines(S.today[g]).length || lines(S.tomorrow[g]).length);   // 내용 있는 공종만 인쇄
+  const body = (used.length ? used.map(g => sec(g, S.today[g], S.tomorrow[g], 1)).join("") : sec("공사", "", "", 2)) + sec("민원사항", S.civil, "", 2) + sec("특이사항", S.special, "", 2, true);
+  const rateRows = [...R.rows, R.total].map(r => `<tr${r.name === "합계" ? ' style="font-weight:700"' : ""}><td class="c">${esc(r.name)}</td><td class="r">${pc(r.plan)}</td><td class="r">${pc(r.act)}</td><td class="r">${r.plan ? (r.act / r.plan * 100).toFixed(1) + "%" : ""}</td><td class="r">${pc(r.planN)}</td><td class="r">${pc(r.fcN)}</td><td class="r">${r.planN ? (r.fcN / r.planN * 100).toFixed(1) + "%" : ""}</td><td></td></tr>`).join("");
+  const recvTxt = A.recv.length ? A.recv.map(r => `${r.p.name} ${fmtQty(toNum(r.qty))}${r.p.unit || ""}`).join(", ") : "없음";
+  const page1 = `<div class="dr-doc"><h1>금 일 공 정(보 고)</h1><div class="dt">${y}년 ${mo}월 ${da}일</div>
+    <div class="meta">▣ 공 사 명 : ${esc(p.name || "")}<br>▣ 공사 기간 : ${esc(fmtLong(p.startDate))} ~ ${esc(fmtLong(p.targetDate || M.finish))}<br>▣ 작 성 자 : ${esc(S.author)}<br>▣ 확 인 자 : ${esc(S.checker)}</div>
+    <h2>1. 기성현황 <span style="float:right;font-weight:400;font-size:8.5pt">(단위: 원)</span></h2>
+    <table class="tb"><tr><th>구분</th><th>(도급)계약금액</th><th>기성 회차 · 검사일</th><th>누계 기성금액</th><th>기성률</th><th>현장 실적 (입고+시공)</th></tr>
+      <tr><td class="c">합 계</td><td class="r">${cl.contract ? w(cl.contract) : ""}</td><td class="c">${cl.last ? esc((cl.last.label || "") + " · " + fmtLong(cl.last.date)) : ""}</td><td class="r">${cl.hasAmt ? w(cl.amount) : ""}</td><td class="r">${pc(cl.rate)}</td><td class="r">${site ? w(site.now.total) + ` (${pc(site.now.total / site.BAC)})` : ""}</td></tr></table>
+    <h2>2. 공정률</h2>
+    <table class="tb"><tr><th rowspan="2">공 종</th><th colspan="3">금 일 누 계</th><th colspan="3">명 일 계 획 (${esc(fmtLong(A.nd))})</th><th rowspan="2">비고</th></tr>
+      <tr><th>계획</th><th>실시</th><th>계획대비 실시비율</th><th>추진계획</th><th>실시계획</th><th>계획대비 실시비율</th></tr>${rateRows}</table>
+    <h2>3. 공사진행</h2>
+    <table class="tb"><tr><th>공종</th><th colspan="2">금 일 사 항</th><th colspan="2">명 일 사 항</th><th style="width:16mm">비 고</th></tr>${body}</table>
+    <p style="font-size:8.5pt;margin:2mm 0 0">금일 자재 입고: ${esc(recvTxt)}${A.work.length ? ` · 금일 시공 ${A.work.length}건 (노무·경비 ${w(A.work.reduce((a, x) => a + x.amt, 0))}원)` : ""}</p></div>`;
+  const pages = [page1];
+  for(let i = 0; i < S.photos.length; i += 6){ const ph = S.photos.slice(i, i + 6); while(ph.length < 6) ph.push(null);
+    pages.push(`<div class="dr-doc"><h1 style="text-decoration:underline double;text-underline-offset:2mm;margin-bottom:6mm">금 일 사 진 대 지</h1>
+      <div class="ph">${ph.map(x => `<div>${x ? `<img src="${x.src}" alt="">` : `<span style="flex:1"></span>`}<div class="cap">내 용 : ${x ? esc(x.cap) : ""}</div></div>`).join("")}</div></div>`); }
+  if(!S.photos.length) pages.push(`<div class="dr-doc"><h1 style="text-decoration:underline double;text-underline-offset:2mm;margin-bottom:6mm">금 일 사 진 대 지</h1><div class="ph">${Array.from({ length: 6 }, () => `<div><span style="flex:1"></span><div class="cap">내 용 :</div></div>`).join("")}</div></div>`);
+  let st = document.getElementById("printPageStyle"); if(!st){ st = document.createElement("style"); st.id = "printPageStyle"; document.head.appendChild(st); }
+  st.textContent = `@page{size:A4 portrait;margin:0}`;
+  let pv = document.getElementById("printPreview"); if(!pv){ pv = document.createElement("div"); pv.id = "printPreview"; document.body.appendChild(pv); }
+  pv.innerHTML = `<div class="pv-bar"><button class="btn primary big" id="pv-print">인쇄 / PDF 저장</button><button class="btn big" id="pv-close">닫기</button></div>
+    <div id="printArea">${pages.map(b => `<div class="pg P4">${b}</div>`).join("")}</div>`;
+  pv.hidden = false;
+}
 /* ---- 진도 입력 창 ---- */
 function openPeriod(id, preset){
   const per = id ? periodsOf().find(x => x.id === id) : null;
@@ -2590,6 +2813,7 @@ function render(){
   else if(state.tab==="evm") v.insertAdjacentHTML("beforeend", renderEvm(M));
   else if(state.tab==="res") v.insertAdjacentHTML("beforeend", renderRes(M));
   else if(state.tab==="vend") v.insertAdjacentHTML("beforeend", renderVendors(M));
+  else if(state.tab==="daily") v.insertAdjacentHTML("beforeend", renderDaily(M));
   else v.insertAdjacentHTML("beforeend", renderList(M));
 }
 
@@ -3616,6 +3840,7 @@ document.addEventListener("click", e => {
   if(periodClick(e)) return;
   if(claimClick(e)) return;
   if(vendorClick(e)) return;
+  if(dailyClick(e)) return;
   if(resClick(e)) return;
   if(e.target.closest("#b-save")){ saveBuy(); return; }
   if(e.target.closest("#b-del")){ deleteBuy(); return; }
@@ -3646,6 +3871,7 @@ document.addEventListener("change", e => {
   if(splitEditorEvent(e)) return;
   if(periodInput(e)) return;
   if(vendorInput(e)) return;
+  if(dailyInput(e)) return;
   if(resInput(e)) return;
   { const tr = e.target.closest && e.target.closest("[data-tri]"); if(tr && state.drawer && state.drawer.res){ const x = state.drawer.res[Number(tr.dataset.tri)]; x[e.target.dataset.trf] = e.target.dataset.trf === "qty" ? e.target.value : e.target.value; renderTaskRes(); return; } }
   const dr = state.drawer;
@@ -3673,7 +3899,7 @@ document.addEventListener("drop", e => {
 document.addEventListener("input", e => {
   if(["f-o","f-m","f-p","f-ms"].includes(e.target.id)) updateTe();
   if(["b-task","b-lead","b-buf"].includes(e.target.id)) updateBuyCalc();
-  splitEditorEvent(e); periodInput(e); resInput(e); vendorInput(e);
+  splitEditorEvent(e); periodInput(e); resInput(e); vendorInput(e); dailyInput(e);
   if(e.target.id === "buy-search" && !e.isComposing) scheduleBuySearch(e.target);
   if(e.target.id === "lab-search" && !e.isComposing) scheduleLabSearch();
   if(e.target.dataset && e.target.dataset.lqty) laborInput(e);   // 한글 조합 중에는 다시 그리지 않음
@@ -3748,7 +3974,7 @@ function onUser(user){
   }, () => { state.mode = "denied"; afterData(); });
 }
 async function boot(){
-  if(!["gantt","net","list","buy","labor","evm","vend","res","set"].includes(state.tab)) state.tab = "gantt";
+  if(!["gantt","net","list","buy","labor","evm","vend","daily","res","set"].includes(state.tab)) state.tab = "gantt";
   if(![5,12,24].includes(state.zoom)) state.zoom = 12;
   if(state.mode === "demo"){ state.projects = { main: sampleData(), vinyl: sampleVinyl() }; setCurrent(); afterData(); return; }
   render();
