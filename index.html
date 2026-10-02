@@ -2638,7 +2638,7 @@ const dzNew = () => ({ blocks: [dzBlockNew("venlo")], specs: {} });
 function dzSample(){   // 본동 8m×11 · 4.5m×19 + 확장동 9.6m×2 · 4.5m×2 + 관리동 6m×2
   const A = dzBlockNew("venlo", { name: "본동", code: "A", spans: "8000*11", bays: "4500*19" });
   const Bk = dzBlockNew("venlo", { name: "확장동", code: "B", spans: "9600*2", bays: "4500*2", x: 88000, y: 0 });
-  const C = dzBlockNew("gable", { name: "관리동", code: "C", spans: "6000*2", bays: "4500*2", x: 0, y: -9000 });
+  const C = dzBlockNew("venlo", { name: "관리동", code: "C", spans: "6000*2", bays: "4500*2", x: 0, y: -9000 });
   return { blocks: [A, Bk, C], specs: {} };
 }
 function dzMigrate(D){
@@ -2792,7 +2792,7 @@ function dzPlanTab(D, G, ed){
     <p class="note">평면에서 동을 <b>끌어서</b> 옮길 수 있고, 다른 동 가장자리에 가까이 가면 붙습니다. 멀리 끌면 떨어집니다.</p>`;
   const side = `<div class="panel dz-side">
       <h3>동 (블록)</h3>${dzBlkChips(D, bi)}
-      ${ed ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn sm" data-dzadd="venlo">+ 온실동</button><button class="btn sm" data-dzadd="gable">+ 관리동</button><button class="btn sm" id="dz-sample" title="본동 8m×11 · 4.5m×19 + 확장동 9.6m×2 · 4.5m×2 + 관리동 6m×2">예시 구성</button></div>` : ""}
+      ${ed ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn sm" data-dzadd="venlo">+ 온실동</button><button class="btn sm" data-dzadd="mgmt">+ 관리동</button><button class="btn sm" id="dz-sample" title="본동 8m×11 · 4.5m×19 + 확장동 9.6m×2 · 4.5m×2 + 관리동 6m×2">예시 구성</button></div>` : ""}
       <div class="g2"><div class="field"><label for="dzb-name">이름</label><input type="text" id="dzb-name" data-dzb="name" value="${esc(B.name)}" ${ro}></div>
         <div class="field"><label for="dzb-code">기호</label><input type="text" id="dzb-code" data-dzb="code" value="${esc(B.code)}" maxlength="3" ${ro}></div></div>
       <div class="field"><label for="dzb-kind">형식</label><select id="dzb-kind" data-dzb="kind" ${ro}>${Object.entries(DZ_KINDS).map(([k, l]) => `<option value="${k}" ${B.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
@@ -3079,8 +3079,8 @@ function designClick(e){
     dzSet(D => { const B = D.blocks[state.dzBlk], T = D.blocks[ti], g = dzGrid(B), tg = dzGrid(T), tx0 = num(T.x), ty0 = num(T.y);
       if(side === "R"){ B.x = tx0 + tg.W; B.y = ty0; } else if(side === "L"){ B.x = tx0 - g.W; B.y = ty0; } else if(side === "F"){ B.y = ty0 - g.Lg; B.x = tx0; } else { B.y = ty0 + tg.Lg; B.x = tx0; } }); return true; }
   const h = e.target.closest("[data-dzhit]"); if(h){ dzToggle(DZ_ARR[state.dzTool || "hbr"], h.dataset.dzhit); return true; }
-  const ad = e.target.closest("[data-dzadd]"); if(ad){ dzSet(D => { const kind = ad.dataset.dzadd, n = D.blocks.length, code = String.fromCharCode(65 + n);
-      const G0 = dzBuild(D); D.blocks.push(dzBlockNew(kind, { name: kind === "gable" ? "관리동" : `온실 ${code}동`, code, x: G0.maxX + 4000, y: G0.minY })); state.dzBlk = n; }); return true; }
+  const ad = e.target.closest("[data-dzadd]"); if(ad){ dzSet(D => { const mg = ad.dataset.dzadd === "mgmt", n = D.blocks.length, code = String.fromCharCode(65 + n);   // 관리동도 벤로형 (형식에서 박공으로 바꿀 수 있음)
+      const G0 = dzBuild(D); D.blocks.push(dzBlockNew("venlo", { name: mg ? "관리동" : `온실 ${code}동`, code, x: G0.maxX + 4000, y: G0.minY, ...(mg ? { spans: "6000*2", bays: "4500*2" } : {}) })); state.dzBlk = n; }); return true; }
   if(e.target.closest("#dz-sample")){ const Z = dzDraft(); Z.D = dzSample(); Z.dirty = true; state.dzBlk = 0; render(); toast("본동 · 확장동 · 관리동 예시를 넣었습니다. 위치·칸 수를 고친 뒤 저장하세요."); return true; }
   if(e.target.closest("#dz-blkdel")){ const bi = state.dzBlk; if(bi > 0) dzSet(D => { D.blocks.splice(bi, 1); state.dzBlk = 0; }); return true; }
   if(e.target.closest("#dz-allin")){ dzSet(D => { D.blocks[state.dzBlk].off = []; }); return true; }
