@@ -3645,7 +3645,7 @@ function eqSnapIn(R, x, y){
   return best || [x, y];
 }
 /* n개를 구역 안에 고르게: nb개 띠(vert=true면 세로 띠)로 나누고, 띠마다 구역이 차지하는 길이에 비례해 개수를 나눈 뒤 띠 안에서 같은 간격으로 */
-function eqSpread(R, n, nb, vert){
+function eqSpread(R, n, nb, vert, alt = false){
   const { b, g } = R, a0 = vert ? R.x0 : R.y0, a1 = vert ? R.x1 : R.y1, step = (a1 - a0) / nb, bands = [];
   for(let i = 0; i < nb; i++){ const c = a0 + (i + 0.5) * step, iv = [];
     R.set.forEach(k => { const [s, j] = k.split(":").map(Number), lo = vert ? b.X[s] : b.Y[j], hi = vert ? b.X[s + 1] : b.Y[j + 1]; if(c >= lo && c < hi) iv.push(vert ? [b.Y[j], b.Y[j + 1]] : [b.X[s], b.X[s + 1]]); });
@@ -3653,9 +3653,13 @@ function eqSpread(R, n, nb, vert){
     bands.push({ c, iv: m, len: m.reduce((t, q) => t + q[1] - q[0], 0) }); }
   const tot = bands.reduce((t, x) => t + x.len, 0) || 1;
   bands.forEach(x => { x.q = n * x.len / tot; x.cnt = Math.floor(x.q); });
-  let left = n - bands.reduce((t, x) => t + x.cnt, 0); [...bands].sort((x, y) => (y.q - y.cnt) - (x.q - x.cnt)).forEach(x => { if(left > 0 && x.len > 0){ x.cnt++; left--; } });
+  if(alt){ let cum = 0, prev = 0; bands.forEach(x => { cum += x.q; const r = Math.round(cum + 1e-9); x.cnt = r - prev; prev = r; }); }   // 누적 반올림 → 4·3·4·3 처럼 번갈아
+  else { let left = n - bands.reduce((t, x) => t + x.cnt, 0); [...bands].sort((x, y) => (y.q - y.cnt) - (x.q - x.cnt)).forEach(x => { if(left > 0 && x.len > 0){ x.cnt++; left--; } }); }
   const pts = [];
-  bands.forEach(x => { for(let k = 0; k < x.cnt; k++){ let d = (k + 0.5) * x.len / x.cnt, pos = x.iv.length ? x.iv[0][0] : 0;
+  bands.forEach((x, i) => { const nb2 = Math.max(bands[i - 1] ? bands[i - 1].cnt : 0, bands[i + 1] ? bands[i + 1].cnt : 0);
+    // 엇갈림: 이웃보다 적은 띠(또는 같으면 홀수 띠)는 이웃 점 사이 가운데에
+    const mid = alt && (x.cnt < nb2 || (x.cnt === nb2 && i % 2 === 1));
+    for(let k = 0; k < x.cnt; k++){ let d = mid ? (k + 1) * x.len / (x.cnt + 1) : (k + 0.5) * x.len / x.cnt, pos = x.iv.length ? x.iv[0][0] : 0;
     for(const q of x.iv){ const L = q[1] - q[0]; if(d <= L){ pos = q[0] + d; break; } d -= L; }
     pts.push(eqSnapIn(R, vert ? x.c : pos, vert ? pos : x.c)); } });
   return pts;
@@ -3663,7 +3667,7 @@ function eqSpread(R, n, nb, vert){
 /* 유동휀: 대수 = 재배면적 × (측고+0.5) × 회전수 ÷ 풍량, 폭 16m마다 한 줄 */
 function eqFan(R, p){
   const vol = R.area * (R.h + 0.5), lo = Math.ceil(vol * 1.5 / p.cap), hi = Math.ceil(vol * 2 / p.cap), n = Math.max(1, Math.ceil(vol * p.ach / p.cap) + (p.add || 0));
-  const W = R.x1 - R.x0, lines = Math.max(1, Math.round(W / Math.max(4000, p.lineW))), pts = eqSpread(R, n, lines, true);
+  const W = R.x1 - R.x0, lines = Math.max(1, Math.round(W / Math.max(4000, p.lineW))), pts = eqSpread(R, n, lines, true, true);
   return { n, lo, hi, pts, lines };
 }
 /* 훈증기: 대수 = 재배면적 ÷ (일반 500㎡ · 딸기 250㎡), 고르게 */
