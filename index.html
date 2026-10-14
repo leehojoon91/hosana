@@ -587,8 +587,8 @@ textarea{resize:vertical;min-height:60px}
       <button role="tab" data-tab="gantt">간트 차트</button>
       <button role="tab" data-tab="net">PERT 네트워크</button>
       <button role="tab" data-tab="list">작업 목록</button>
-      <button role="tab" data-tab="buy">구매 일정</button>
-      <button role="tab" data-tab="labor">시공 진도</button>
+      <button role="tab" data-tab="buy">자재</button>
+      <button role="tab" data-tab="labor">시공</button>
       <button role="tab" data-tab="evm">기성</button>
       <button role="tab" data-tab="vend">업체 관리</button>
       <button role="tab" data-tab="daily">작업일보</button>
@@ -1194,7 +1194,7 @@ function renderImport(imp){
   if(!imp) return `<div class="drop" id="np-drop" tabindex="0" role="button">
       <b>내역서 엑셀을 여기로 끌어다 놓으세요</b><br><span style="font-size:12.5px">또는 눌러서 파일 선택 (.xlsx, .xls)</span>
       <input type="file" id="np-file" accept=".xlsx,.xlsm,.xls" hidden></div>
-      <p class="note">내역서 시트의 공종 제목 줄로 작업을 묶고, 노무비로 기간을, 공종 이름으로 순서를 정합니다. 재료비가 있는 항목은 구매 일정에 들어갑니다. 파일은 이 브라우저 안에서만 읽습니다.</p>`;
+      <p class="note">내역서 시트의 공종 제목 줄로 작업을 묶고, 노무비로 기간을, 공종 이름으로 순서를 정합니다. 재료비가 있는 항목은 자재 탭에 들어갑니다. 파일은 이 브라우저 안에서만 읽습니다.</p>`;
   if(imp.loading) return `<div class="drop"><b>${esc(imp.fileName)}</b> 읽는 중…</div>`;
   const head = `<div class="drop" id="np-drop" tabindex="0" role="button" style="padding:10px"><b>${esc(imp.fileName)}</b> · 다른 파일로 바꾸려면 끌어다 놓거나 누르세요<input type="file" id="np-file" accept=".xlsx,.xlsm,.xls" hidden></div>`;
   if(!imp.rows) return head + `<div class="err" style="margin-top:8px">${esc(imp.err)}</div>`;
@@ -1230,7 +1230,7 @@ function renderImport(imp){
     <div class="imp-tbl"><table><thead><tr><th>자재</th><th>규격</th><th class="r">수량</th><th>사용 작업</th><th class="r">조달·여유</th><th class="r">재료비(원)</th></tr></thead><tbody>
       ${R.purchases.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.spec)}</td><td class="r num">${esc(p.qty)} ${esc(p.unit)}</td><td><span class="mono">${esc(code(p.taskId))}</span></td><td class="r num">${p.lead}·${p.buffer}일</td><td class="r num">${won(p.amount)}</td></tr>`).join("")}
     </tbody></table></div>
-    <p class="note">기간·선행·조달기간은 추정값입니다. 만든 뒤 공정표와 구매 일정 탭에서 바로 고칠 수 있습니다.</p>` : ""}`;
+    <p class="note">기간·선행·조달기간은 추정값입니다. 만든 뒤 공정표와 자재 탭에서 바로 고칠 수 있습니다.</p>` : ""}`;
 }
 function importProjectData(np, R){
   const map = new Map(R.tasks.map(t => [t.id, t]));
@@ -1410,7 +1410,7 @@ function renderPurchases(M){
     <tbody>${rows || `<tr><td colspan="${ncol}" class="note">조건에 맞는 항목이 없습니다.</td></tr>`}</tbody></table></div>
     <p class="note">발주 기한 = 현장 필요일 − 조달기간, 현장 필요일 = 사용 공정 시작일 − 현장 여유일(달력일 기준). 공정 일정이 바뀌면 발주 기한도 자동으로 바뀝니다. ‘발주 임박’은 기한까지 알림 기준일(기본 7일) 이내인 항목입니다. 발주 임박·지연·입고 지연 항목은 평일 오전 8시에 담당자 이메일로 자동 알림이 갑니다.</p>`;
 }
-/* ---------- 시공 진도 (노무비 항목) ----------
+/* ---------- 시공 탭 (노무비 항목) ----------
    data.labor = { mode:{작업id:"직영"|"외주"}, team:{작업id:업체·팀}, done:{내역행: 누계 수행수량}, doneAt:{내역행: 날짜}, matRule:"install"|"receive" }
    줄별 진도: 노무비가 있는 줄 = 체크한 수행 수량 / 수량.  재료비만·경비만 있는 줄 = 같은 작업의 노무 진도(설치된 만큼).
    matRule "receive" 면 재료비만 있는 줄은 입고 완료(분할 납품은 입고 수량)만큼.  작업 진척률 = Σ(줄 금액 × 진도) ÷ 작업 금액 */
@@ -1520,7 +1520,7 @@ function renderLabor(M){
     <datalist id="lab-vendors">${known.map(v => `<option value="${esc(v)}">`).join("")}</datalist>
     <div class="panel tbl-wrap"><table style="min-width:980px"><thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>항목</th><th>분류</th><th title="비워 두면 작업의 업체·팀을 따릅니다">업체</th><th class="r">수량</th><th class="r" title="노무비 + 경비">금액</th><th class="r">누계 수행 수량</th><th class="r">수행률</th><th>완료</th><th>수행일 · 내역</th></tr></thead>
     <tbody>${rows || `<tr><td colspan="10" class="note">조건에 맞는 항목이 없습니다.</td></tr>`}</tbody></table></div>
-    <p class="note">한 작업을 여러 업체가 나눠 하면 줄마다 ‘업체’를 넣으세요(여러 줄은 선택 후 ‘업체 지정’). 비워 두면 작업 제목 줄의 업체·팀을 따릅니다. 노무비가 있는 줄과 경비만 있는 줄을 보여 줍니다. 경비 줄은 따로 넣지 않으면 그 작업의 노무 진도를 따라가고, 수량이나 완료를 넣으면 그 값을 씁니다. 수행 수량(누계)을 넣거나 ‘완료’를 체크하면 그 작업의 진척률이 금액 가중으로 계산됩니다. 같은 작업의 재료비·경비 줄은 시공 진도를 따라갑니다(설치된 만큼). 직영·외주는 작업마다 바꿀 수 있고, 기본은 가설·기초·행잉거터 직영, 나머지 외주입니다. 기성 탭의 ‘시공 진도로 기성 회차 만들기’로 이 값을 기성 회차에 넣을 수 있습니다.</p>`;
+    <p class="note">한 작업을 여러 업체가 나눠 하면 줄마다 ‘업체’를 넣으세요(여러 줄은 선택 후 ‘업체 지정’). 비워 두면 작업 제목 줄의 업체·팀을 따릅니다. 노무비가 있는 줄과 경비만 있는 줄을 보여 줍니다. 경비 줄은 따로 넣지 않으면 그 작업의 노무 진도를 따라가고, 수량이나 완료를 넣으면 그 값을 씁니다. 수행 수량(누계)을 넣거나 ‘완료’를 체크하면 그 작업의 진척률이 금액 가중으로 계산됩니다. 같은 작업의 재료비·경비 줄은 시공 탭을 따라갑니다(설치된 만큼). 직영·외주는 작업마다 바꿀 수 있고, 기본은 가설·기초·행잉거터 직영, 나머지 외주입니다. 기성 탭의 ‘시공 탭으로 기성 회차 만들기’로 이 값을 기성 회차에 넣을 수 있습니다.</p>`;
 }
 function laborClick(e){
   const ed = state.canEdit, draft = state.labDraft || (state.labDraft = {}), sel = state.labSel || (state.labSel = new Set());
@@ -1590,7 +1590,7 @@ async function saveLabor(){
   if(ok){ state.labDraft = {}; render(); toast(`${entries.length}줄의 수행 물량을 저장했습니다${sync ? " · 공정표에 반영" : ""}`, 8000, { label: "되돌리기", fn: () => commit(d => { d.labor = clone(before); }, "되돌렸습니다") }); }
 }
 
-/* ---- 구매 일정 검색: 한글 조합이 끝난 뒤, 잠깐 쉬었다가 다시 그립니다 ---- */
+/* ---- 자재 탭 검색: 한글 조합이 끝난 뒤, 잠깐 쉬었다가 다시 그립니다 ---- */
 let buySearchT = null;
 function scheduleBuySearch(el){
   clearTimeout(buySearchT);
@@ -1606,7 +1606,7 @@ document.addEventListener("compositionend", e => { if(e.target.id === "buy-searc
 let labSearchT = null;
 function scheduleLabSearch(){ clearTimeout(labSearchT); labSearchT = setTimeout(() => { const cur = $("#lab-search"); if(!cur || cur.value === (state.labSearch || "")) return; const pos = cur.selectionStart;
   state.labSearch = cur.value; state.labClosed = null; render(); const n = $("#lab-search"); if(n){ n.focus(); try{ n.setSelectionRange(pos, pos); }catch{} } }, 300); }
-/* ---- 구매 일정 일괄 처리 ---- */
+/* ---- 자재 탭 일괄 처리 ---- */
 function visibleBuyIds(){
   const M = state.M, L = computePurchases(M), filt = state.buyFilter || "all", qtxt = (state.buySearch || "").trim().toLowerCase();
   const ORDERED = ["ordered","etaLate","overdue"], TODO = ["late","soon","plan","nolink"];
@@ -1947,7 +1947,7 @@ function renderEvm(M){
       <span class="chip">자재 입고 <b>${E.siteTot.mat ? (E.siteNow.mat / E.siteTot.mat * 100).toFixed(1) : 0}%</b> ${wonM(E.siteNow.mat)} / ${wonM(E.siteTot.mat)}원</span>
       <span class="chip">노무 수행 <b>${E.siteTot.lab ? (E.siteNow.lab / E.siteTot.lab * 100).toFixed(1) : 0}%</b> ${wonM(E.siteNow.lab)} / ${wonM(E.siteTot.lab)}원</span>
       <span class="chip">경비 수행 <b>${E.siteTot.exp ? (E.siteNow.exp / E.siteTot.exp * 100).toFixed(1) : 0}%</b> ${wonM(E.siteNow.exp)} / ${wonM(E.siteTot.exp)}원</span>
-      <span class="note" style="align-self:center">구매 일정의 입고 완료와 시공 진도의 수행 체크로 계산한 실제 진행 금액입니다.</span></div>` : ""}`;
+      <span class="note" style="align-self:center">자재 탭의 입고 완료와 시공 탭의 수행 체크로 계산한 실제 진행 금액입니다.</span></div>` : ""}`;
   // ---- S-curve
   const mo = E.months, W = Math.max(560, mo.length * 64 + 70), H = 250, L = 52, T = 14, B = 34, ch = H - T - B;
   const xOf = i => L + 28 + i * ((W - L - 40) / Math.max(1, mo.length - 1 || 1));
@@ -1975,7 +1975,7 @@ function renderEvm(M){
       <td class="r num">${money(r.ev - r.prev)}</td><td class="r num">${money(r.ev)}</td><td class="r num">${pctTxt(r.ev, BAC)}</td><td class="r num">${pctTxt(r.pv, BAC)}</td>
       <td class="r num">${r.pv > 0 ? (r.ev / r.pv).toFixed(2) : "–"}</td>${contract ? `<td class="r num">${claim((r.ev - r.prev) / BAC)}</td><td class="r num">${claim(r.ev / BAC)}</td>` : ""}<td>${esc(r.per.note || "")}</td></tr>`).join("");
   return cards + `<div class="panel evm-chart">${svg}${legend}</div>
-    ${state.canEdit && boqOf().some(x => x.l > 0) ? `<div class="evm-sec" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" id="perFromLabor">시공 진도로 기성 회차 만들기</button><span class="note">‘시공 진도’ 탭에서 체크한 수행 물량으로 작업별 진척률을 계산해 새 회차에 채웁니다.</span></div>` : ""}
+    ${state.canEdit && boqOf().some(x => x.l > 0) ? `<div class="evm-sec" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" id="perFromLabor">시공 탭으로 기성 회차 만들기</button><span class="note">‘시공 탭’ 탭에서 체크한 수행 물량으로 작업별 진척률을 계산해 새 회차에 채웁니다.</span></div>` : ""}
     <div class="evm-sec"><h3>기성 회차</h3>${E.perRows.length ? `<div class="panel tbl-wrap"><table class="evt"><thead><tr><th>회차</th><th>기준일</th><th class="r">금회 기성</th><th class="r">누계 기성</th><th class="r">누계 기성률</th><th class="r">계획 공정률</th><th class="r">SPI</th>${contract ? `<th class="r">금회 청구(도급 기준)</th><th class="r">누계 청구</th>` : ""}<th>메모</th></tr></thead><tbody>${perRows}</tbody></table></div>`
       : `<div class="panel empty" style="padding:20px">${state.canEdit ? "아직 기성 회차가 없습니다. 오른쪽 위 <b>진도 입력 (새 회차)</b>로 이번 기준일의 누계 진척률을 입력하세요." : "아직 입력된 기성 회차가 없습니다."}</div>`}</div>
     ${renderClaim(M)}
@@ -1984,7 +1984,7 @@ function renderEvm(M){
     <div class="evm-sec"><h3>도급 금액</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="number" id="e-contract" step="1000000" value="${contract || ""}" placeholder="부가세 포함 도급 금액 (원)" style="max-width:260px" ${state.canEdit ? "" : "disabled"} aria-label="도급 금액">${state.canEdit ? `<button class="btn" id="e-contract-save">저장</button>` : ""}<span class="note">넣으면 기성률 × 도급액으로 청구 예상액을 보여 줍니다.</span></div></div>`;
 }
 /* ---------- 기성내역서 (도급 · 전회 · 금회 · 누계 · 잔여) ----------
-   내역 줄의 누계 비율 = 회차의 내역 수량 → 회차에 저장한 줄 비율(시공 진도) → 작업 누계 진척률
+   내역 줄의 누계 비율 = 회차의 내역 수량 → 회차에 저장한 줄 비율(시공 탭) → 작업 누계 진척률
    금액은 원 단위 절사(TRUNC). 금회 = 누계 − 전회, 잔여 = 도급 − 누계 */
 const clamp01 = v => Math.min(1, Math.max(0, v));
 function lineFracFn(per){
@@ -2246,7 +2246,7 @@ async function exportClaimXlsx(M, perId){
 }
 /* ---------- 업체 관리 ----------
    data.vendors = [{ id, name, contract(계약금액), person, phone, email, note, payments:[{ id, date, amount, note }] }]
-   업체 이름으로 구매 일정(업체)과 시공 진도(줄 업체 → 없으면 작업의 업체·팀) 항목을 모읍니다.
+   업체 이름으로 자재 탭(업체)과 시공 탭(줄 업체 → 없으면 작업의 업체·팀) 항목을 모읍니다.
    기성률 = 완료액 / 담당 항목 총액 (자재는 입고, 노무·경비는 수행 기준)
    지급 가능액 = 계약금액 × 기성률,  미지급 = 지급 가능액 − 지급 누계 */
 const vendorsOf = () => (state.data && state.data.vendors) || [];
@@ -2291,7 +2291,7 @@ function renderVendors(M){
     <div class="kpi"><span class="k">지급 누계</span><span class="v">${w(T.paid / 1e6)}백만</span><span class="s">${w(T.paid)}원</span></div>
     <div class="kpi"><span class="k">지급률 / 기성률</span><span class="v ${T.contract && T.paid / T.contract > T.payable / T.contract + 0.0005 ? "bad" : ""}">${T.contract ? pct(T.paid / T.contract) : "–"}</span><span class="s">${T.contract ? "기성률 " + pct(T.payable / T.contract) + " · 발주금액 기준" : "업체 발주금액을 넣으면 계산됩니다"}</span></div>
     <div class="kpi"><span class="k">미지급 (지급 가능 − 지급)</span><span class="v ${T.unpaid < 0 ? "bad" : ""}">${w(T.unpaid / 1e6)}백만</span><span class="s">${T.unpaid < 0 ? "기성보다 많이 지급됨" : w(T.unpaid) + "원"}</span></div></div>`;
-  if(!list.length) return cards + `<div class="panel empty"><h2>업체가 없습니다</h2><p>구매 일정이나 시공 진도에서 항목에 업체를 넣으면 여기에 모입니다.${ed ? " 아래 ‘업체 추가’로 먼저 등록해도 됩니다." : ""}</p>${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}</div>`;
+  if(!list.length) return cards + `<div class="panel empty"><h2>업체가 없습니다</h2><p>자재 탭이나 시공 탭에서 항목에 업체를 넣으면 여기에 모입니다.${ed ? " 아래 ‘업체 추가’로 먼저 등록해도 됩니다." : ""}</p>${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}</div>`;
   const payList = o => ((o.reg && o.reg.payments) || []).slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   const rows = list.map(o => { const pays = payList(o), open = state.vPayOpen === o.name;
     const main = `<tr data-vendor="${esc(o.name)}">
@@ -2318,10 +2318,10 @@ function renderVendors(M){
     return main + hist + form; }).join("");
   const foot = `<tr class="tot"><td>합계</td><td></td><td class="r num">${w(T.contract)}</td><td class="r num">${w(T.tot)}</td><td class="r num">${w(T.done)}</td><td class="r num">${T.tot ? pct(T.done / T.tot) : "–"}</td><td class="r num">${w(T.payable)}</td><td class="r num">${w(T.paid)}</td><td class="r num">${T.contract ? pct(T.paid / T.contract) : "–"}</td><td class="r num">${w(T.unpaid)}</td><td class="r num">${w(T.contract - T.paid)}</td><td></td></tr>`;
   return cards + `<div class="buy-tools">${ed ? `<button class="btn primary" id="addVendor">업체 추가</button>` : ""}
-      ${none.n ? `<span class="note" style="margin:0">업체가 지정되지 않은 항목 ${none.n}건 · ${w(none.a)}원 (구매 일정·시공 진도에서 업체를 넣으면 여기에 더해집니다)</span>` : ""}</div>
-    <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r" title="이 업체에 발주(계약)한 금액">업체 발주금액</th><th class="r" title="구매 일정 + 시공 진도에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="업체 발주금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 누계 ÷ 업체 발주금액. 기성률과 비교해 기성보다 많이/적게 지급됐는지 봅니다">지급률</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="업체 발주금액 − 지급 누계">발주 잔액</th><th></th></tr></thead>
+      ${none.n ? `<span class="note" style="margin:0">업체가 지정되지 않은 항목 ${none.n}건 · ${w(none.a)}원 (자재 탭·시공 탭에서 업체를 넣으면 여기에 더해집니다)</span>` : ""}</div>
+    <div class="panel tbl-wrap"><table class="vdt"><thead><tr><th>업체</th><th>구분</th><th class="r" title="이 업체에 발주(계약)한 금액">업체 발주금액</th><th class="r" title="자재 탭 + 시공 탭에서 이 업체로 지정된 항목의 내역 금액">담당 항목 총액</th><th class="r" title="자재 입고 + 노무·경비 수행">완료액</th><th class="r">기성률</th><th class="r" title="업체 발주금액 × 기성률">지급 가능액</th><th class="r">지급 누계</th><th class="r" title="지급 누계 ÷ 업체 발주금액. 기성률과 비교해 기성보다 많이/적게 지급됐는지 봅니다">지급률</th><th class="r" title="지급 가능액 − 지급 누계">미지급</th><th class="r" title="업체 발주금액 − 지급 누계">발주 잔액</th><th></th></tr></thead>
     <tbody>${rows}${foot}</tbody></table></div>
-    <p class="note">기성률은 구매 일정과 시공 진도에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 진도의 수행률로 셉니다. 금액은 구매 항목의 금액(내역서로 만든 프로젝트는 자동)을 쓰고, 금액이 없는 항목은 기성률에 들어가지 않습니다. 업체를 눌러 담당 항목에서 금액을 바로 넣을 수 있습니다. 지급 가능액 = 업체 발주금액 × 기성률. 지급률 = 지급 누계 ÷ 업체 발주금액이며, 기성률보다 높으면(빨간색) 공사한 것보다 먼저 지급된 것입니다. ‘지급 추가’로 지급할 때마다 1차·2차… 내역이 쌓입니다. 업체 이름을 누르면 연락처·지급 내역 수정과 담당 항목을 볼 수 있습니다.</p>`;
+    <p class="note">기성률은 자재 탭과 시공 탭에서 이 업체로 지정된 항목의 내역 금액 중 끝난 몫입니다. 자재는 입고 완료(분할 납품은 받은 수량만큼), 노무·경비는 시공 탭의 수행률로 셉니다. 금액은 구매 항목의 금액(내역서로 만든 프로젝트는 자동)을 쓰고, 금액이 없는 항목은 기성률에 들어가지 않습니다. 업체를 눌러 담당 항목에서 금액을 바로 넣을 수 있습니다. 지급 가능액 = 업체 발주금액 × 기성률. 지급률 = 지급 누계 ÷ 업체 발주금액이며, 기성률보다 높으면(빨간색) 공사한 것보다 먼저 지급된 것입니다. ‘지급 추가’로 지급할 때마다 1차·2차… 내역이 쌓입니다. 업체 이름을 누르면 연락처·지급 내역 수정과 담당 항목을 볼 수 있습니다.</p>`;
 }
 function openVendor(name){
   const reg = name ? vendorsOf().find(v => String(v.name).trim() === name) : null;
@@ -2354,7 +2354,7 @@ function renderVendorDrawer(){
         <div class="field"><label for="v-email">이메일</label><input type="email" id="v-email" value="${esc(dr.email)}" ${ro}></div>
         <div class="field"><label for="v-note">메모</label><input type="text" id="v-note" value="${esc(dr.note)}" placeholder="예: 토공 장비 · 부가세 별도" ${ro}></div>
       </div>
-      ${dr.origName && dr.name.trim() && dr.name.trim() !== dr.origName ? `<p class="note">저장하면 구매 일정·시공 진도에서 ‘${esc(dr.origName)}’로 지정된 항목도 ‘${esc(dr.name.trim())}’(으)로 바뀝니다.</p>` : ""}
+      ${dr.origName && dr.name.trim() && dr.name.trim() !== dr.origName ? `<p class="note">저장하면 자재 탭·시공 탭에서 ‘${esc(dr.origName)}’로 지정된 항목도 ‘${esc(dr.name.trim())}’(으)로 바뀝니다.</p>` : ""}
       <div class="imp-sum">
         <span class="chip">담당 항목 <b>${w(o.tot)}원</b></span>
         <span class="chip">완료 <b>${w(o.done)}원</b></span>
@@ -2442,7 +2442,7 @@ async function saveVendor(){
   if(ok){ $("#drawer").classList.remove("wide"); closeDrawer(); } else if($("#v-save")) $("#v-save").disabled = false;
 }
 /* ---------- 작업일보 ----------
-   그날 입고된 자재(구매 일정), 수행한 시공(시공 진도 기록), 공정률(계획 대비 실적), 기성 현황으로 일보를 자동으로 채웁니다.
+   그날 입고된 자재(자재 탭), 수행한 시공(시공 탭 기록), 공정률(계획 대비 실적), 기성 현황으로 일보를 자동으로 채웁니다.
    손으로 고친 문장은 data.daily[날짜] = { author, checker, today:{공종}, tomorrow:{공종}, note:{공종}, civil, special } 에 저장합니다.
    사진은 저장하지 않고 인쇄할 때만 붙입니다(용량 때문). */
 const dailyOf = () => (state.data && state.data.daily) || {};
@@ -2453,7 +2453,7 @@ function dailyAuto(M, d){
   const groups = M.groups.map(g => g.name); const G = name => gOf.get(name) || "기타";
   const today = {}, tomorrow = {}, add = (o, g, line) => { (o[g] || (o[g] = [])).push(line); };
   const unitTxt = (q, u) => `${fmtQty(q)}${u ? " " + u : ""}`;
-  /* 시공 실적 (시공 진도 기록) */
+  /* 시공 실적 (시공 탭 기록) */
   const work = [];
   boqOf().filter(isLabLine).forEach(x => { const h = log[x.r]; let dq = 0, cum = 0;
     if(h && h.length){ const i = h.findIndex(e => e[0] === d); if(i >= 0){ dq = num(h[i][1]) - (i ? num(h[i - 1][1]) : 0); cum = num(h[i][1]); } }
@@ -2526,7 +2526,7 @@ function renderDaily(M){
   const recvAmt = A.recv.reduce((a, r) => a + r.amt, 0), workAmt = A.work.reduce((a, x) => a + x.amt, 0);
   const cards = `<div class="evm-cards">
     <div class="kpi"><span class="k">금일 자재 입고</span><span class="v">${A.recv.length}건</span><span class="s">${w(recvAmt)}원</span></div>
-    <div class="kpi"><span class="k">금일 시공 (시공 진도)</span><span class="v">${A.work.length}줄</span><span class="s">노무·경비 ${w(workAmt)}원</span></div>
+    <div class="kpi"><span class="k">금일 시공 (시공 탭)</span><span class="v">${A.work.length}줄</span><span class="s">노무·경비 ${w(workAmt)}원</span></div>
     <div class="kpi"><span class="k">공정률 계획 / 실시</span><span class="v">${pc(R.total.act)}</span><span class="s">계획 ${pc(R.total.plan)} · 계획 대비 ${R.total.plan ? (R.total.act / R.total.plan * 100).toFixed(1) + "%" : "–"}</span></div>
     ${site ? `<div class="kpi"><span class="k">현장 실적 (입고+시공)</span><span class="v">${pc(site.now.total / site.BAC)}</span><span class="s">금일 +${w(site.now.total - site.prev.total)}원</span></div>` : ""}
     <div class="kpi"><span class="k">누계 기성</span><span class="v">${pc(cl.rate)}</span><span class="s">${cl.last ? esc(cl.last.label || "") + " · " + esc(fmtLong(cl.last.date)) : "기성 회차 없음"}</span></div></div>`;
@@ -2551,13 +2551,13 @@ function renderDaily(M){
     <div class="dy-sec"><h3>공정률 · 공종별 계획 대비 실시 <span class="note" style="font-weight:400">명일 = ${esc(fmtLong(A.nd))}</span></h3>
       <div class="panel tbl-wrap"><table class="dyt"><thead><tr><th rowspan="2">공종</th><th class="r" rowspan="2">구성비</th><th colspan="3" style="text-align:center">금일 누계</th><th colspan="3" style="text-align:center">명일 계획</th></tr>
         <tr><th class="r">계획</th><th class="r">실시</th><th class="r">계획 대비</th><th class="r">추진 계획</th><th class="r">실시 계획</th><th class="r">계획 대비</th></tr></thead><tbody>${rateRows}</tbody></table></div>
-      <p class="note">계획은 ${M.p.baseline ? "기준 공정" : "현재 공정표"}의 작업 기간에 ${R.hasAmt ? "금액" : "공기"}을 고르게 나눈 값, 실시는 작업 진척률(시공 진도 저장 시 자동 반영)입니다. 실시 계획 = 지금 일정대로 진행했을 때 명일 예상치.</p></div>
+      <p class="note">계획은 ${M.p.baseline ? "기준 공정" : "현재 공정표"}의 작업 기간에 ${R.hasAmt ? "금액을" : "공기를"} 고르게 나눈 값, 실시는 작업 진척률(시공 탭 저장 시 자동 반영)입니다. 실시 계획 = 지금 일정대로 진행했을 때 명일 예상치.</p></div>
     <div class="dy-sec"><h3>공사 진행 <span class="note" style="font-weight:400">자동으로 채운 내용이며 고쳐 쓸 수 있습니다${S.saved ? " · 저장된 일보" : ""}</span></h3>
       <div class="panel" style="padding:12px"><div class="dy-grid"><div class="ch">공종</div><div class="ch">금일 사항</div><div class="ch">명일 사항</div>${grid}
         <div class="gh">민원 사항</div><textarea data-dyf="civil" style="grid-column:span 2" ${ro} aria-label="민원 사항">${esc(S.civil)}</textarea>
         <div class="gh" style="color:var(--crit)">특이 사항</div><textarea data-dyf="special" style="grid-column:span 2" ${ro} placeholder="예: 장비 렌탈 1대 및 인원보강 4명" aria-label="특이 사항">${esc(S.special)}</textarea></div></div></div>
-    <div class="dy-sec"><h3>금일 자재 입고 ${A.recv.length}건</h3>${A.recv.length ? `<div class="panel tbl-wrap"><table class="dyt"><thead><tr><th>자재</th><th>규격</th><th class="r">수량</th><th>작업</th><th>업체</th><th class="r">금액</th></tr></thead><tbody>${recvRows}</tbody></table></div>` : `<p class="note">이 날 입고 완료한 자재가 없습니다. 구매 일정에서 입고일을 넣으면 여기에 나옵니다.</p>`}</div>
-    <div class="dy-sec"><h3>금일 시공 ${A.work.length}줄</h3>${A.work.length ? `<div class="panel tbl-wrap"><table class="dyt"><thead><tr><th>항목</th><th>규격</th><th class="r">금일 수행</th><th>작업</th><th>업체</th><th class="r">노무·경비</th></tr></thead><tbody>${workRows}</tbody></table></div>` : `<p class="note">이 날 저장한 시공 진도 기록이 없습니다. 시공 진도 탭에서 수행 수량을 저장하면 그날 기록으로 남습니다.</p>`}</div>
+    <div class="dy-sec"><h3>금일 자재 입고 ${A.recv.length}건</h3>${A.recv.length ? `<div class="panel tbl-wrap"><table class="dyt"><thead><tr><th>자재</th><th>규격</th><th class="r">수량</th><th>작업</th><th>업체</th><th class="r">금액</th></tr></thead><tbody>${recvRows}</tbody></table></div>` : `<p class="note">이 날 입고 완료한 자재가 없습니다. 자재 탭에서 입고일을 넣으면 여기에 나옵니다.</p>`}</div>
+    <div class="dy-sec"><h3>금일 시공 ${A.work.length}줄</h3>${A.work.length ? `<div class="panel tbl-wrap"><table class="dyt"><thead><tr><th>항목</th><th>규격</th><th class="r">금일 수행</th><th>작업</th><th>업체</th><th class="r">노무·경비</th></tr></thead><tbody>${workRows}</tbody></table></div>` : `<p class="note">이 날 저장한 시공 탭 기록이 없습니다. 시공 탭에서 수행 수량을 저장하면 그날 기록으로 남습니다.</p>`}</div>
     <div class="dy-sec"><h3>사진대지</h3>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><label class="btn">사진 추가<input type="file" id="dy-photo" accept="image/*" multiple hidden></label><span class="note" style="margin:0">사진은 인쇄·PDF에만 들어가고 저장되지 않습니다. 한 장에 6장씩 들어갑니다.</span></div>
       ${S.photos.length ? `<div class="dy-photos">${S.photos.map((p, i) => `<figure><img src="${p.src}" alt=""><figcaption><input type="text" data-dycap="${i}" value="${esc(p.cap)}" placeholder="내용 (예: 지붕 유리 설치)"><button class="btn sm" data-dyrm="${i}" aria-label="사진 빼기">✕</button></figcaption></figure>`).join("")}</div>` : ""}</div>`;
@@ -3873,13 +3873,13 @@ async function eqExportXlsx(sub){
   toast(`${title} 수량산출서 엑셀을 만들었습니다`);
 }
 function dzSoonTab(sub, D, G){
-  const info = { alu: ["알루미늄", ["지붕 바 (유리 지지 알루미늄 바)", "용마루·거터 알루미늄 프로파일", "천창(개폐창) 프레임 · 랙 구동부", "측창 · 출입문 프레임", "물량표 (길이·개수·kg) → 구매 일정"]],
+  const info = { alu: ["알루미늄", ["지붕 바 (유리 지지 알루미늄 바)", "용마루·거터 알루미늄 프로파일", "천창(개폐창) 프레임 · 랙 구동부", "측창 · 출입문 프레임", "물량표 (길이·개수·kg) → 자재 탭"]],
     cover: ["피복", ["지붕 유리 (판 크기·매수 자동 계산)", "측벽·전후면 피복 (유리 / 폴리카보네이트 / 필름)", "천창 피복 면적", "보온·차광 커튼 면적", "피복 면적·자재 물량표"]],
-    vent: ["천창", ["천창 배치 (지붕마다 · 칸마다 · 엇갈림)", "천창 크기 (폭 × 길이) · 개폐 방식 (한쪽 / 양쪽)", "랙·피니언 구동축 · 모터 수량", "환기 면적 비율 (천창 면적 ÷ 바닥 면적)", "천창 물량표 → 구매 일정"]],
-    screen: ["스크린", ["스크린 종류 (보온 · 차광 · 암막) · 층수", "구동 방향 (폭 / 길이) · 구간(칸막이·관리동 기준) 나누기", "트러스 위 지지선 · 구동 와이어 · 모터 수량", "스크린 면적 · 원단 물량", "스크린 물량표 → 구매 일정"]],
-    fan: ["유동휀", ["유동휀 배치 (줄 간격 · 높이 · 방향)", "구역별 대수 · 소비전력 합계", "전기 배선 · 제어반 연결", "유동휀 물량표 → 구매 일정"]],
-    hgut: ["행잉거터", ["행잉거터 배치 (재배 줄 간격 · 방향 · 높이)", "줄 길이 · 구역(칸막이·복도·관리동) 기준 끊기", "행거 · 와이어 · 경사(구배) · 배수 연결", "행잉거터 물량표 (m · 개수) → 구매 일정"]],
-    fog: ["훈증기", ["훈증기 배치 (구역 · 면적 기준 대수)", "약제 투입량 기준 · 전원 위치", "관리동·칸막이 구역별 계통", "훈증기 물량표 → 구매 일정"]] }[sub];
+    vent: ["천창", ["천창 배치 (지붕마다 · 칸마다 · 엇갈림)", "천창 크기 (폭 × 길이) · 개폐 방식 (한쪽 / 양쪽)", "랙·피니언 구동축 · 모터 수량", "환기 면적 비율 (천창 면적 ÷ 바닥 면적)", "천창 물량표 → 자재 탭"]],
+    screen: ["스크린", ["스크린 종류 (보온 · 차광 · 암막) · 층수", "구동 방향 (폭 / 길이) · 구간(칸막이·관리동 기준) 나누기", "트러스 위 지지선 · 구동 와이어 · 모터 수량", "스크린 면적 · 원단 물량", "스크린 물량표 → 자재 탭"]],
+    fan: ["유동휀", ["유동휀 배치 (줄 간격 · 높이 · 방향)", "구역별 대수 · 소비전력 합계", "전기 배선 · 제어반 연결", "유동휀 물량표 → 자재 탭"]],
+    hgut: ["행잉거터", ["행잉거터 배치 (재배 줄 간격 · 방향 · 높이)", "줄 길이 · 구역(칸막이·복도·관리동) 기준 끊기", "행거 · 와이어 · 경사(구배) · 배수 연결", "행잉거터 물량표 (m · 개수) → 자재 탭"]],
+    fog: ["훈증기", ["훈증기 배치 (구역 · 면적 기준 대수)", "약제 투입량 기준 · 전원 위치", "관리동·칸막이 구역별 계통", "훈증기 물량표 → 자재 탭"]] }[sub];
   return `<div class="panel" style="padding:20px"><h2 style="font-size:16px;margin:0 0 6px">${info[0]} <span class="pill p-wait">준비 중</span></h2>
     <p class="note">이 탭은 앞으로 하나씩 만들어 갑니다. 평면도(${D.blocks.map(B => `${esc(B.name)} ${esc(B.spans)} / ${esc(B.bays)}`).join(" · ")}, ${wonM(G.area)}㎡)와 철골 골격을 바탕으로 계산하게 됩니다.</p>
     <ul style="margin:8px 0 0 18px;line-height:1.9;font-size:13px">${info[1].map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
@@ -4352,7 +4352,7 @@ function openPeriod(id, preset){
   M.order.forEach(tid => { const t = M.by.get(tid); pct[tid] = preset ? num(preset.pct[tid]) : per ? num((per.pct || {})[tid]) : (prev ? periodPct(prev, tid) : t.prog); });
   if(!preset) Object.assign(qty, per ? (per.qty || {}) : (prev ? (prev.qty || {}) : {}));
   state.drawer = { kind:"period", id: per ? per.id : null, date: per ? per.date : localToday(), label: per ? per.label : `${periodsOf().length + 1}회 기성`, note: per ? per.note || "" : "",
-    pct, qty, prevId: prev ? prev.id : null, open: {}, sync: true, arm: false, note: preset ? "시공 진도 기준" : (per ? per.note || "" : ""),
+    pct, qty, prevId: prev ? prev.id : null, open: {}, sync: true, arm: false, note: preset ? "시공 탭 기준" : (per ? per.note || "" : ""),
     lines: preset && preset.lines ? { ...preset.lines } : per && per.lines ? { ...per.lines } : null };
   renderDrawer(); $("#drawer").classList.add("wide"); $("#drawer").hidden = false; $("#scrim").hidden = false;
 }
@@ -4419,7 +4419,7 @@ async function savePeriod(){
   const M = state.M, id = dr.id || "pr" + Date.now().toString(36);
   const pct = {}; M.order.forEach(tid => { const q = taskQtyPct(tid, dr.qty); pct[tid] = +(q != null ? q : num(dr.pct[tid])).toFixed(2); });
   const per = { id, date: dr.date, label: dr.label.trim() || "기성", note: dr.note.trim(), pct, qty: { ...dr.qty } };
-  if(dr.lines){   // 시공 진도의 줄별 비율: 작업 진척률을 손으로 바꾼 작업은 버림
+  if(dr.lines){   // 시공 탭의 줄별 비율: 작업 진척률을 손으로 바꾼 작업은 버림
     const lines = {}, bl = boqOf();
     M.order.forEach(tid => { const ls = bl.filter(x => x.t === tid), tot = ls.reduce((a, x) => a + x.a, 0); if(!tot) return;
       const w = ls.reduce((a, x) => a + x.a * (dr.lines[x.r] != null ? num(dr.lines[x.r]) : pct[tid] / 100), 0) / tot * 100;
