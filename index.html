@@ -293,6 +293,16 @@ tr.b.sel td{background:var(--prog-soft)}
 .lk{fill:none;stroke:var(--ink-3);stroke-width:1;opacity:.75}
 .lk.crit{stroke:var(--crit);stroke-width:1.4;opacity:.95}
 .lk-g:hover .lk{stroke:var(--ink);stroke-width:2;opacity:1}
+.lk-hit{fill:none;stroke:transparent;stroke-width:9}
+.lk-g.can{cursor:pointer}
+/* 선후행 끌어 잇기: 막대 오른쪽 끝의 점 */
+.lk-h{fill:var(--surface);stroke:var(--accent);stroke-width:1.6;opacity:0;cursor:crosshair;touch-action:none;transition:opacity .12s}
+.lk-hz{fill:transparent;cursor:crosshair;touch-action:none}
+.bar:hover .lk-h,.bar .lk-hz:hover + .lk-h,body.linking .lk-h{opacity:1}
+.lk-tmp{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 3;pointer-events:none}
+.bar.lk-target .b-bg{stroke:var(--accent);stroke-width:2.5}
+.bar.lk-bad .b-bg{stroke:var(--bad);stroke-width:2.5}
+body.linking,body.linking *{cursor:crosshair!important}
 .g-resl{display:flex;flex-direction:column;justify-content:center;padding:0 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-top:1px solid var(--line)}
 .res-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
 .res-ctl label{display:inline-flex;gap:4px;align-items:center}
@@ -4847,6 +4857,7 @@ function renderGantt(M){
       g += `<text class="b-lbl" x="${lx}" y="${y+RH/2+2}">${t.dur}일${t.prog>0&&t.prog<100?" · "+Math.round(t.prog)+"%":""}</text>`;
     }
     const tip = `${t.code} ${t.name}\n${fmt(t.startDate)} → ${fmt(t.finishDate)} (${t.dur}작업일)\n기대값 ${t.te.toFixed(1)}일 · 여유 ${t.float}일${isDate(t.notBefore)&&t.status==="wait"?`\n착수 제한 ${fmt(t.notBefore)} 이후`:""}${t.delay?`\n기준 대비 ${t.delay>0?"+":""}${t.delay}일`:""}${editable?(t.status==="prog"?"\n오른쪽 끝을 끌어 공기 조정":"\n끌어서 이동 · 양 끝을 끌어 기간 조정"):""}`;
+    if(state.canEdit && !late){ const gg = geo.get(t.id); if(gg) g += `<circle class="lk-hz" cx="${gg.xe + 5}" cy="${gg.y + 2}" r="8" data-lkfrom="${esc(t.id)}"/><circle class="lk-h" cx="${gg.xe + 5}" cy="${gg.y + 2}" r="4.5" data-lkfrom="${esc(t.id)}"><title>끌어서 다른 작업에 놓으면 ${esc(t.code)} → 그 작업 (선행 연결)</title></circle>`; }
     bars += `<g class="bar ${cls} ${editable?"edit":""}" data-id="${esc(t.id)}" data-st="${t.status}"><title>${esc(tip)}</title>${g}</g>`;
   });
   let links = "";
@@ -4856,7 +4867,8 @@ function renderGantt(M){
     rows.forEach(r => { if(!r.t || !geo.has(r.t.id)) return; const t = r.t, b = geo.get(t.id);
       t._preds.forEach(pid => { const a = geo.get(pid); if(!a) return; const rl = relOf(t, pid), pt = M.by.get(pid);
         const crit = pt.crit && t.crit && t._con && t._con[pid] === t.es;
-        links += `<g class="lk-g"><path class="lk ${crit ? "crit" : ""}" d="${linkPath(a, b, rl.type, RH)}" marker-end="url(#${crit ? "lkc" : "lka"})"><title>${esc(relTxt(codeOf(pid), rl) + " → " + t.code)}</title></path></g>`; }); });
+        const dP = linkPath(a, b, rl.type, RH), ed = state.canEdit && state.sched !== "late";
+        links += `<g class="lk-g ${ed ? "can" : ""}" ${ed ? `data-lk="${esc(pid)}|${esc(t.id)}"` : ""}><path class="lk-hit" d="${dP}"/><path class="lk ${crit ? "crit" : ""}" d="${dP}" marker-end="url(#${crit ? "lkc" : "lka"})"></path><title>${esc(relTxt(codeOf(pid), rl) + " → " + t.code)}${ed ? " · 눌러서 연결 끊기" : ""}</title></g>`; }); });
   }
   let marks = "";
   if(M.statusDate >= S(a0) && M.statusDate <= S(a1)){ const x = X(M.statusDate); marks += `<line class="l-today" x1="${x}" y1="${HH-6}" x2="${x}" y2="${H}"/><text class="t-today" x="${x+3}" y="${HH-8}">기준일</text>`; }
@@ -5590,6 +5602,60 @@ document.addEventListener("pointerdown", e => {
   try{ g.ownerSVGElement.setPointerCapture(e.pointerId); }catch{}
   e.preventDefault();
 });
+/* ---------- 선후행 끌어 잇기: 막대 끝 점 → 다른 막대 (FS), 연결선 누르기 → 끊기 ---------- */
+let lkDrag = null;
+document.addEventListener("pointerdown", e => {
+  const h = e.target.closest && e.target.closest("#view [data-lkfrom]"); if(!h || e.button !== 0 || !state.canEdit || !state.M) return;
+  e.preventDefault(); e.stopPropagation();
+  const svg = h.ownerSVGElement, cx = +h.getAttribute("cx") - 5, cy = +h.getAttribute("cy") - 2, tmp = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  tmp.setAttribute("class", "lk-tmp"); svg.appendChild(tmp);
+  lkDrag = { from: h.dataset.lkfrom, svg, cx, cy, tmp, tgt: null, ok: false, pid: e.pointerId };
+  try{ svg.setPointerCapture(e.pointerId); }catch{}
+  document.body.classList.add("linking");
+}, true);
+function lkCheck(from, to){   // 이을 수 있는지: 같은 작업·이미 연결·순환
+  if(!to || to === from) return "같은 작업입니다";
+  const t = tasksOf().find(x => x.id === to); if(!t) return "작업이 없습니다";
+  if((t.preds || []).includes(from)) return "이미 연결되어 있습니다";
+  const cand = tasksOf().map(x => ({ ...x, preds: x.id === to ? [...(x.preds || []), from] : [...(x.preds || [])] }));
+  if(topo(cand).cyc.length) return "연결하면 선행작업이 순환합니다";
+  return "";
+}
+document.addEventListener("pointermove", e => {
+  if(!lkDrag) return;
+  const d = lkDrag, pt = d.svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(d.svg.getScreenCTM().inverse());
+  const mx = (d.cx + q.x) / 2; d.tmp.setAttribute("d", `M${d.cx} ${d.cy} C${mx} ${d.cy} ${mx} ${q.y} ${q.x} ${q.y}`);
+  const el = document.elementFromPoint(e.clientX, e.clientY), bar = el && el.closest && el.closest("#view .bar"), rowEl = !bar && el && el.closest && el.closest("#view .g-row");
+  const to = bar ? bar.dataset.id : rowEl ? rowEl.dataset.id : null, tgtBar = to ? document.querySelector(`#view .bar[data-id="${CSS.escape(to)}"]`) : null;
+  if(d.tgt && d.tgt !== tgtBar) d.tgt.classList.remove("lk-target", "lk-bad");
+  d.tgt = tgtBar; d.to = to; d.why = to ? lkCheck(d.from, to) : "";
+  if(tgtBar && to !== d.from){ tgtBar.classList.toggle("lk-target", !d.why); tgtBar.classList.toggle("lk-bad", !!d.why); }
+  const M = state.M, a = M.by.get(d.from), b = to && M.by.get(to);
+  const tip = $("#dragTip"); tip.hidden = false; tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px";
+  tip.innerHTML = b && to !== d.from ? `${esc(a.code)} → ${esc(b.code)}<small>${d.why ? "⚠ " + esc(d.why) : "놓으면 선행 연결 (끝나면 시작)"}</small>` : `${esc(a.code)} → ?<small>이어질 작업 막대에 놓으세요</small>`;
+}, true);
+async function lkEnd(e, cancel){
+  if(!lkDrag) return; const d = lkDrag; lkDrag = null;
+  try{ d.svg.releasePointerCapture(d.pid); }catch{} d.tmp.remove(); if(d.tgt) d.tgt.classList.remove("lk-target", "lk-bad");
+  document.body.classList.remove("linking"); $("#dragTip").hidden = true;
+  state.suppressClick = true; setTimeout(() => { state.suppressClick = false; }, 60);
+  if(cancel || !d.to || d.to === d.from) return;
+  if(d.why){ toast(d.why, 2500); return; }
+  const M = state.M, a = M.by.get(d.from), b = M.by.get(d.to);
+  const ok = await commit(dd => { const t = (dd.tasks || []).find(x => x.id === d.to); if(t){ t.preds = t.preds || []; if(!t.preds.includes(d.from)) t.preds.push(d.from); } }, "");
+  if(ok) toast(`${a.code} → ${b.code} 선행 연결 (끝나면 시작) · 종류·Lag는 작업 수정에서`, 7000, { label: "되돌리기", fn: () => commit(dd => { const t = (dd.tasks || []).find(x => x.id === d.to); if(t){ t.preds = (t.preds || []).filter(x => x !== d.from); if(t.rel) delete t.rel[d.from]; } }, "되돌렸습니다") });
+}
+document.addEventListener("pointerup", e => { if(lkDrag) lkEnd(e, false); }, true);
+document.addEventListener("pointercancel", e => { if(lkDrag) lkEnd(e, true); }, true);
+document.addEventListener("keydown", e => { if(e.key === "Escape" && lkDrag) lkEnd(e, true); });
+document.addEventListener("click", async e => {   // 연결선 누르기 → 끊기 (되돌리기 가능)
+  const g = e.target.closest && e.target.closest("#view [data-lk]"); if(!g || !state.canEdit || state.suppressClick) return;
+  e.stopPropagation();
+  const [pid, tid] = g.dataset.lk.split("|"), M = state.M, a = M.by.get(pid), b = M.by.get(tid); if(!a || !b) return;
+  const rel = (tasksOf().find(x => x.id === tid) || {}).rel, keep = rel && rel[pid] ? clone(rel[pid]) : null;
+  const ok = await commit(dd => { const t = (dd.tasks || []).find(x => x.id === tid); if(t){ t.preds = (t.preds || []).filter(x => x !== pid); if(t.rel) delete t.rel[pid]; } }, "");
+  if(ok) toast(`${a.code} → ${b.code} 연결을 끊었습니다`, 7000, { label: "되돌리기", fn: () => commit(dd => { const t = (dd.tasks || []).find(x => x.id === tid); if(t){ t.preds = t.preds || []; if(!t.preds.includes(pid)) t.preds.push(pid); if(keep){ t.rel = t.rel || {}; t.rel[pid] = keep; } } }, "되돌렸습니다") });
+}, true);
 function endDrag(e, cancel){
   if(!drag) return;
   const d = drag; drag = null;
