@@ -484,6 +484,9 @@ svg text{font-family:var(--sans)}
 /* Table */
 .tbl-wrap{overflow-x:auto}
 .od{color:var(--bad);font-weight:700}
+#view tr.b td[data-bf]:hover{background:var(--accent-soft);cursor:pointer}
+@keyframes bfflash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.bf-hit{animation:bfflash 1.4s ease-out;border-radius:6px}
 .buy-sum button.chip{cursor:pointer;font:inherit;border:1px solid transparent}
 .buy-sum button.chip:hover{border-color:var(--line)}
 .buy-sum button.chip.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink) inset}
@@ -1340,9 +1343,9 @@ function splitRows(x, M){
       <td class="dday ${d.st === "late" || d.st === "overdue" ? "bad" : d.st === "soon" ? "warn" : ""}">${d.st === "recv" ? "–" : ddayTxt(dd)}</td>
       <td class="num">${d.ordered ? fmtC(d.ordered) : "–"}</td>
       <td></td>
-      <td class="num">${fmtOD(d.needBy, d.st !== "recv" && isDate(d.needBy) && d.needBy < M.statusDate)}</td>
+      <td class="num" data-bf="sf:${d.n}차 현장 필요일">${fmtOD(d.needBy, d.st !== "recv" && isDate(d.needBy) && d.needBy < M.statusDate)}</td>
       <td class="num">${d.st === "recv" ? "–" : fmtOD(d.due, d.ordered && isDate(d.due) && d.due < M.statusDate)}</td>
-      <td class="num">${isDate(d.receivedDate) ? fmtC(d.receivedDate) : "–"}</td>
+      <td class="num" data-bf="sf:${d.n}차 입고일">${isDate(d.receivedDate) ? fmtC(d.receivedDate) : "–"}</td>
       <td></td><td></td>${state.canEdit ? `<td>${d.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${fmtC(d.receivedDate)} 입고</span>`
         : d.ordered ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" data-dn="${d.n - 1}" title="오늘 날짜로 ${d.n}차 입고일을 기록합니다">${d.n}차 입고</button>`
         : `<button class="btn sm go" data-quick="order" data-id="${esc(x.id)}" data-dn="${d.n - 1}" title="오늘 날짜로 ${d.n}차 발주일을 기록합니다">${d.n}차 발주</button>`}</td>` : ""}</tr>`;
@@ -1382,18 +1385,18 @@ function renderPurchases(M){
     return `<tr class="b ${x.st==="recv"?"recv":""} ${selSet.has(x.id)?"sel":""}" data-buy="${esc(x.id)}">
       ${ed ? `<td class="ck"><input type="checkbox" data-bsel="${esc(x.id)}" ${selSet.has(x.id) ? "checked" : ""} aria-label="${esc(x.name)} 선택"></td>` : ""}
       <td><span class="pill ${cls}">${lab}</span></td>
-      <td><b style="font-weight:600">${esc(x.name)}</b>${x.spec?`<div style="font-size:12px;color:var(--ink-3)">${esc(x.spec)}</div>`:""}${x.split ? splitSummary(x) : ""}</td>
-      <td class="r num">${esc(x.qty||"")} ${esc(x.unit||"")}</td>
-      <td>${task}</td>
-      <td class="num">${fmtOD(x.orderBy, x.st === "late")}</td>
-      <td class="dday ${dcls}">${x.st==="recv" || (x.eta && !x.split) ? "–" : ddayTxt(x.dleft)}</td>
-      <td class="num">${buyOrdTxt(x)}</td>
-      <td class="r num">${num(x.lead)}일</td>
-      <td class="num">${fmtOD(x.needBy, x.st !== "recv" && isDate(x.needBy) && x.needBy < M.statusDate)}</td>
-      <td class="num">${x.eta ? fmtOD(x.eta, x.st !== "recv" && x.eta < M.statusDate) : "–"}</td>
-      <td class="num">${buyRcvTxt(x)}</td>
-      <td>${esc(x.vendor||"")}</td>
-      <td>${esc(x.owner||"")}</td>
+      <td data-bf="b-name"><b style="font-weight:600">${esc(x.name)}</b>${x.spec?`<div style="font-size:12px;color:var(--ink-3)">${esc(x.spec)}</div>`:""}${x.split ? splitSummary(x) : ""}</td>
+      <td class="r num" data-bf="b-qty">${esc(x.qty||"")} ${esc(x.unit||"")}</td>
+      <td data-bf="b-task">${task}</td>
+      <td class="num" data-bf="${x.split ? "b-lead" : "b-obd"}">${fmtOD(x.orderBy, x.st === "late")}</td>
+      <td data-bf="${x.split ? "b-lead" : "b-obd"}" class="dday ${dcls}">${x.st==="recv" || (x.eta && !x.split) ? "–" : ddayTxt(x.dleft)}</td>
+      <td class="num" data-bf="b-ord">${buyOrdTxt(x)}</td>
+      <td class="r num" data-bf="b-lead">${num(x.lead)}일</td>
+      <td class="num" data-bf="${x.split ? "b-buf" : "b-need"}">${fmtOD(x.needBy, x.st !== "recv" && isDate(x.needBy) && x.needBy < M.statusDate)}</td>
+      <td class="num" data-bf="${x.split ? "b-lead" : "b-eta"}">${x.eta ? fmtOD(x.eta, x.st !== "recv" && x.eta < M.statusDate) : "–"}</td>
+      <td class="num" data-bf="${x.split ? "b-split" : "b-rcv"}">${buyRcvTxt(x)}</td>
+      <td data-bf="b-vendor">${esc(x.vendor||"")}</td>
+      <td data-bf="b-owner">${esc(x.owner||"")}</td>
       ${ed ? `<td>${x.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${fmtC(x.receivedDate)} 입고</span>`
         : x.split ? `<span style="font-size:12px;color:var(--ink-3)">회차별 ↓</span>`
         : x.eta ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" title="오늘 날짜로 입고일을 기록합니다">${x.split && x.split.next ? x.split.next.n + "차 입고" : "입고 완료"}</button>`
@@ -1698,10 +1701,16 @@ function bulkBuyClick(e){
   const bk = e.target.closest("[data-bk]"); if(bk){ bulkBuy(bk.dataset.bk); return true; }
   return false;
 }
-function openBuy(id){
+function openBuy(id, field){
   state.drawer = { kind: "buy", id: id || null, arm: false };
   renderDrawer();
   $("#drawer").hidden = false; $("#scrim").hidden = false;
+  if(field && state.canEdit){   // 누른 칸 → 수정 창의 그 칸으로, 날짜면 달력까지 펼침
+    const el = field.startsWith("sf:") ? document.querySelector(`#drawer [aria-label="${CSS.escape(field.slice(3))}"]`) || $("#b-split") : $("#" + field);
+    if(!el) return;
+    el.scrollIntoView({ block: "center" }); el.classList.add("bf-hit"); setTimeout(() => el.classList.remove("bf-hit"), 1400);
+    if(el.matches("input, select, textarea")){ el.focus(); if(el.type === "date" || el.tagName === "SELECT"){ try{ el.showPicker(); }catch(_){} } else if(el.select) el.select(); }
+  }
 }
 function renderBuyDrawer(){
   const dr = state.drawer, M = state.M, el = $("#drawer");
@@ -1747,6 +1756,12 @@ function renderBuyDrawer(){
         <div class="field"><label for="b-alert">알림(일 전)</label><input type="number" min="0" id="b-alert" value="${esc(v.alertDays ?? 7)}"></div>
       </div>
       <p class="note" style="margin:-4px 0 12px">조달기간은 발주부터 현장 도착까지 걸리는 달력일입니다. 알림은 발주 기한 며칠 전부터 ‘발주 임박’으로 표시할지 정합니다.</p>
+      ${raw && deliveriesOf(raw).length ? "" : `<div class="g3">
+        <div class="field"><label for="b-obd">발주 기한</label><input type="date" id="b-obd"></div>
+        <div class="field"><label for="b-need">현장 필요일</label><input type="date" id="b-need"></div>
+        <div class="field"><label for="b-eta">입고 예정</label><input type="date" id="b-eta"></div>
+      </div>
+      <p class="note" style="margin:-4px 0 12px">날짜를 고치면 맞게 바뀝니다: 현장 필요일 → 현장 여유, 발주 기한·입고 예정 → 조달기간 (입고 예정은 발주일 기준, 발주일이 없으면 오늘 기준).</p>`}
       <div class="g2">
         <div class="field"><label for="b-vendor">업체</label><input type="text" id="b-vendor" value="${esc(v.vendor||"")}"></div>
         <div class="field"><label for="b-amount">금액 (원, 업체 기성률 계산용)</label><input type="number" id="b-amount" min="0" step="10000" value="${num(v.amount) || ""}" placeholder="예: 3500000"></div>
@@ -1824,12 +1839,23 @@ function splitEditorClick(e){
   if(del){ dr.splits.splice(Number(del.dataset.sdel), 1); renderSplitEditor(); return true; }
   return false;
 }
+/* 수정 창의 날짜 칸 → 조달기간·현장 여유로 되돌려 계산 */
+function buyDateEdit(id, v){
+  const t = state.M && state.M.by.get(($("#b-task") || {}).value), lead = $("#b-lead"), buf = $("#b-buf");
+  if(id === "b-eta"){ const ord = $("#b-ord").value, base = isDate(ord) ? ord : localToday(); lead.value = Math.max(0, dayCount(base, v)); }
+  else if(!t || !t.startDate){ toast("사용 공정을 먼저 고르세요", 2000); return; }
+  else if(id === "b-need") buf.value = Math.max(0, dayCount(v, t.startDate));
+  else if(id === "b-obd") lead.value = Math.max(0, dayCount(v, shiftDate(t.startDate, -num(buf.value))));
+  updateBuyCalc();
+}
 function updateBuyCalc(){
   const box = $("#b-calc"); if(!box || !state.M) return;
   const t = state.M.by.get($("#b-task").value);
   if(!t || !t.startDate){ box.innerHTML = `<span style="grid-column:1/-1">사용 공정을 고르면 발주 기한이 계산됩니다.</span>`; return; }
   const need = shiftDate(t.startDate, -num($("#b-buf").value)), ob = shiftDate(need, -num($("#b-lead").value));
   const d = dayCount(state.M.statusDate, ob);
+  const setD = (id, v) => { const el = $("#" + id); if(el && document.activeElement !== el) el.value = v || ""; };
+  const ord = ($("#b-ord") || {}).value; setD("b-need", need); setD("b-obd", ob); setD("b-eta", isDate(ord) ? shiftDate(ord, num($("#b-lead").value)) : "");
   box.innerHTML = `<span>공정 시작 <b>${esc(fmt(t.startDate))}</b></span><span>현장 필요일 <b>${esc(fmt(need))}</b></span>
     <span>발주 기한 <b>${esc(fmt(ob))}</b></span><span>남은 날 <b style="color:${d<0?"var(--bad)":d<=7?"var(--warn)":"inherit"}">${ddayTxt(d)}</b></span>`;
 }
@@ -5779,7 +5805,7 @@ document.addEventListener("click", e => {
   const td = e.target.closest("[data-today]");
   if(td){ e.preventDefault(); const inp = $("#" + td.dataset.today); inp.value = localToday(); if(td.dataset.today === "b-rcv" && !$("#b-ord").value) $("#b-ord").value = localToday(); return; }
   const by = e.target.closest("#view [data-buy]");
-  if(by){ openBuy(by.dataset.buy); return; }
+  if(by){ const bf = e.target.closest("[data-bf]"); openBuy(by.dataset.buy, bf && bf.dataset.bf); return; }
   if(e.target.closest("[data-close]") || e.target.id==="scrim"){ closeDrawer(); return; }
   if(e.target.closest("#f-save")){ saveTask(); return; }
   if(e.target.closest("#f-del")){ deleteTask(); return; }
@@ -5827,7 +5853,8 @@ document.addEventListener("drop", e => {
 });
 document.addEventListener("input", e => {
   if(["f-o","f-m","f-p","f-ms"].includes(e.target.id)) updateTe();
-  if(["b-task","b-lead","b-buf"].includes(e.target.id)) updateBuyCalc();
+  if(["b-task","b-lead","b-buf","b-ord"].includes(e.target.id)) updateBuyCalc();
+  if(["b-need","b-obd","b-eta"].includes(e.target.id) && isDate(e.target.value)) buyDateEdit(e.target.id, e.target.value);
   splitEditorEvent(e); periodInput(e); resInput(e); vendorInput(e); dailyInput(e);
   if(e.target.id === "buy-search" && !e.isComposing) scheduleBuySearch(e.target);
   if(e.target.id === "lab-search" && !e.isComposing) scheduleLabSearch();
