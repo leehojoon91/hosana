@@ -53,6 +53,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14p
   padding-inline:20px;padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(60px + env(safe-area-inset-bottom,0px))}
 [hidden]{display:none!important}
 .wrap{max-width:1400px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+/* 틀 고정 (넓은 화면): 제목·요약·탭 줄은 그대로, 아래 내용(#view)만 스크롤 */
+@media screen and (min-width:900px) and (min-height:560px){
+  html,body{height:100%}
+  body{overflow:hidden;box-sizing:border-box;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+  .wrap{height:100%}
+  #view{flex:1;min-height:0;overflow:auto;position:relative;padding-bottom:24px;overscroll-behavior:contain}
+}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -412,9 +419,9 @@ tr.b.sub td{font-size:12.5px;background:var(--surface-2);padding-top:5px;padding
 .codebox{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-all;user-select:all}
 
 /* Gantt */
-.gantt{display:grid;grid-template-columns:260px minmax(0,1fr);overflow:hidden}
-.g-left{border-right:1px solid var(--line)}
-.g-head{height:48px;border-bottom:1px solid var(--line);display:flex;align-items:flex-end;padding:0 12px 6px;font-size:12px;color:var(--ink-3)}
+.gantt{display:grid;grid-template-columns:260px max-content;overflow:auto;max-height:70vh;overscroll-behavior:contain}
+.g-left{border-right:1px solid var(--line);position:sticky;left:0;z-index:3;background:var(--surface)}
+.g-head{position:sticky;top:0;z-index:4;background:var(--surface);height:48px;border-bottom:1px solid var(--line);display:flex;align-items:flex-end;padding:0 12px 6px;font-size:12px;color:var(--ink-3)}
 .g-row{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;cursor:pointer;white-space:nowrap;overflow:hidden}
 .g-row:hover{background:var(--surface-2)}
 .g-row .code{font-family:var(--mono);font-size:12px;color:var(--ink-3);width:28px;flex:none}
@@ -422,8 +429,9 @@ tr.b.sub td{font-size:12.5px;background:var(--surface-2);padding-top:5px;padding
 .g-row.crit .code{color:var(--crit);font-weight:600}
 .g-row.done .nm{color:var(--ink-3)}
 .g-grp{height:30px;display:flex;align-items:center;padding:0 12px;font-weight:600;font-size:13px;background:var(--surface-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.g-right{overflow-x:auto}
+.g-right{position:relative;min-width:0}
 .g-right svg{display:block}
+.g-right svg.g-hsvg{position:sticky;top:0;z-index:2;box-shadow:0 1px 0 var(--line)}
 svg text{font-family:var(--sans)}
 .t-month{font-size:12px;font-weight:600;fill:var(--ink)}
 .t-day{font-size:10px;fill:var(--ink-3);font-family:var(--mono)}
@@ -562,7 +570,7 @@ textarea{resize:vertical;min-height:60px}
 @media (max-width:640px){
   body{padding-inline:16px}
   h1{font-size:21px}
-  .gantt{grid-template-columns:130px minmax(0,1fr)}
+  .gantt{grid-template-columns:130px max-content}
   .g-row .code{display:none}
   .kpi .v{font-size:17px}
 }
@@ -4617,7 +4625,7 @@ function render(){
   $("#meta").textContent = `착공 ${fmtLong(p.startDate)} · 기준일 ${fmtLong(M ? M.statusDate : localToday())}` + (up ? ` · 최종 수정 ${fmtLong(up.slice(0,10))}${state.data.updatedBy ? " ("+state.data.updatedBy.split("@")[0]+")" : ""}` : "");
   renderKpis(M); renderTools();
   const v = $("#view");
-  const keepScroll = ($(".g-right") || {}).scrollLeft || 0;
+  const gOld = $(".gantt"), keepScroll = gOld ? [gOld.scrollLeft, gOld.scrollTop] : [0, 0];
   v.innerHTML = "";
   if(M && M.cyc.length){
     const codes = M.cyc.map(id => (tasksOf().find(t=>t.id===id)||{}).code || id).join(", ");
@@ -4629,7 +4637,7 @@ function render(){
     v.insertAdjacentHTML("beforeend", `<div class="panel empty"><h2>등록된 작업이 없습니다</h2><p>${state.canEdit ? "‘작업 추가’로 첫 공정을 등록하세요." : "담당자가 공정을 등록하면 여기에 표시됩니다."}</p></div>`);
     return;
   }
-  if(state.tab==="gantt"){ v.insertAdjacentHTML("beforeend", renderGantt(M)); const gr = $(".g-right"); if(gr) gr.scrollLeft = keepScroll; }
+  if(state.tab==="gantt"){ v.insertAdjacentHTML("beforeend", renderGantt(M)); ganttFit(); const gr = $(".gantt"); if(gr){ gr.scrollLeft = keepScroll[0]; gr.scrollTop = keepScroll[1]; } }
   else if(state.tab==="net") v.insertAdjacentHTML("beforeend", renderNet(M));
   else if(state.tab==="buy") v.insertAdjacentHTML("beforeend", renderPurchases(M));
   else if(state.tab==="labor") v.insertAdjacentHTML("beforeend", renderLabor(M));
@@ -4774,6 +4782,16 @@ const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border
   ${state.canEdit ? `<span style="color:var(--ink-3)">· 막대를 끌어 이동, 양 끝(↔)을 끌어 기간 조정</span>` : ""}`}
 </div>`;
 
+/* 틀 고정: 간트 상자를 화면 아래 끝까지만 키우고 그 안에서 스크롤 → 위쪽(요약·탭·도구)과 날짜 줄은 그대로 보임 */
+function ganttFit(){
+  const g = $(".gantt"); if(!g) return;
+  const v = $("#view"), leg = g.nextElementSibling ? g.nextElementSibling.offsetHeight + 12 : 0;
+  const inView = v && getComputedStyle(v).overflowY === "auto";   // 넓은 화면: #view 안에서 스크롤
+  const room = inView ? v.clientHeight - (g.getBoundingClientRect().top - v.getBoundingClientRect().top + v.scrollTop) - leg - 28
+    : window.innerHeight - (g.getBoundingClientRect().top + window.scrollY) - leg - 16;
+  g.style.maxHeight = Math.max(320, room) + "px";
+}
+window.addEventListener("resize", () => { if(state.tab === "gantt") ganttFit(); });
 function renderGantt(M){
   const px = state.zoom, RH = 30, HH = 48;
   state.gantt = { px };
@@ -4879,7 +4897,8 @@ function renderGantt(M){
   }
   return `<div class="panel"><div class="gantt">
     <div class="g-left"><div class="g-head">작업</div>${left}${RB ? `<div class="g-resl" style="height:${RB}px"><b>노무 투입</b><span>일별 합계 (최대 ${fmtQty(Math.max(0, ...[...dailyLoad(M, state.sched === "late").values()].map(o => resOf().filter(r => (r.type || "노무") === "노무").reduce((s, r) => s + (o[r.id] || 0), 0))))})</span><span style="color:var(--ink-3)">막대를 옮기면 바로 다시 계산</span></div>` : ""}</div>
-    <div class="g-right"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="간트 차트">
+    <div class="g-right"><svg class="g-hsvg" width="${W}" height="${HH}" viewBox="0 0 ${W} ${HH}" aria-hidden="true"><rect x="0" y="0" width="${W}" height="${HH}" fill="var(--surface)"/>${hdr}${marks}<line class="l-grid" x1="0" y1="${HH - 0.5}" x2="${W}" y2="${HH - 0.5}"/></svg>
+      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="간트 차트" style="margin-top:-${HH}px">
       ${bg}${grp}<line class="l-grid" x1="0" y1="${HH}" x2="${W}" y2="${HH}"/>${hdr}${links}${bars}${pos}${band}${marks}</svg></div>
   </div>${legendHTML(false)}</div>`;
 }
