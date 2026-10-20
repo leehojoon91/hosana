@@ -483,6 +483,8 @@ svg text{font-family:var(--sans)}
 
 /* Table */
 .tbl-wrap{overflow-x:auto}
+table.stick-head thead th{position:relative;z-index:2;background:var(--surface);will-change:transform}
+table.stick-head.stuck thead th{box-shadow:0 1px 0 var(--line),0 4px 6px -4px rgba(0,0,0,.18)}
 table{border-collapse:collapse;width:100%;min-width:980px;font-size:13px}
 th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-size:12px;font-weight:500;color:var(--ink-3);background:var(--surface);position:sticky;top:0}
@@ -1338,6 +1340,15 @@ function splitRows(x, M){
       <td></td><td></td>${state.canEdit ? "<td></td>" : ""}</tr>`;
   }).join("");
 }
+/* 표 머리줄 틀 고정: 스크롤하면 탭 줄 바로 아래에 붙어 따라옴 (가로 스크롤 상자 안에서도 되도록 transform 사용) */
+function stickHeads(){
+  const nav = $("#navrow"), top = nav ? nav.getBoundingClientRect().bottom : 0;
+  document.querySelectorAll("#view table.stick-head").forEach(t => { const h = t.tHead; if(!h) return;
+    const r = t.getBoundingClientRect(), hh = h.offsetHeight, off = Math.max(0, Math.min(top - r.top, r.height - hh * 2));
+    const v = off > 0 ? `translateY(${off}px)` : ""; t.classList.toggle("stuck", off > 0);
+    h.querySelectorAll("th").forEach(th => { if(th.style.transform !== v) th.style.transform = v; }); });
+}
+window.addEventListener("scroll", stickHeads, { passive: true }); window.addEventListener("resize", stickHeads);
 /* 자재 표: 발주일·입고일 (분할 납품은 첫 발주일 / 마지막 입고일 + 받은 회차) */
 const buyOrdTxt = x => { if(x.split){ const o = x.split.list.map(d => d.ordered).filter(isDate).sort(); return o.length ? esc(fmt(o[0])) : "–"; } return isDate(x.orderedDate) ? esc(fmt(x.orderedDate)) : "–"; };
 const buyRcvTxt = x => { if(x.split){ const r = x.split.list.filter(d => isDate(d.receivedDate)); return r.length ? `${esc(fmt(r.map(d => d.receivedDate).sort().pop()))}${r.length < x.split.list.length ? ` <span style="color:var(--ink-3);font-size:11.5px">(${r.length}/${x.split.list.length}차)</span>` : ""}` : "–"; }
@@ -1423,7 +1434,7 @@ function renderPurchases(M){
       <span class="chip">입고 대기 <b>${wait}</b></span>
       <span class="chip">입고 완료 <b>${recv}</b></span>
     </div>${tools}${bulk}
-    <div class="panel tbl-wrap"><table>
+    <div class="panel tbl-wrap"><table class="stick-head">
     <thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th title="실제로 발주한 날">발주일</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th title="실제로 현장에 들어온 날">입고일</th><th>업체</th><th>담당자</th>${ed ? "<th>처리</th>" : ""}</tr></thead>
     <tbody>${rows || `<tr><td colspan="${ncol}" class="note">조건에 맞는 항목이 없습니다.</td></tr>`}</tbody></table></div>
     <p class="note">발주 기한 = 현장 필요일 − 조달기간, 현장 필요일 = 사용 공정 시작일 − 현장 여유일(달력일 기준). 공정 일정이 바뀌면 발주 기한도 자동으로 바뀝니다. ‘발주 임박’은 기한까지 알림 기준일(기본 7일) 이내인 항목입니다. 발주 임박·지연·입고 지연 항목은 평일 오전 8시에 담당자 이메일로 자동 알림이 갑니다.</p>`;
@@ -4649,7 +4660,7 @@ function render(){
   }
   if(state.tab==="gantt"){ v.insertAdjacentHTML("beforeend", renderGantt(M)); const gr = $(".g-right"); if(gr) gr.scrollLeft = keepScroll; }
   else if(state.tab==="net") v.insertAdjacentHTML("beforeend", renderNet(M));
-  else if(state.tab==="buy") v.insertAdjacentHTML("beforeend", renderPurchases(M));
+  else if(state.tab==="buy"){ v.insertAdjacentHTML("beforeend", renderPurchases(M)); requestAnimationFrame(stickHeads); }
   else if(state.tab==="labor") v.insertAdjacentHTML("beforeend", renderLabor(M));
   else if(state.tab==="evm") v.insertAdjacentHTML("beforeend", renderEvm(M));
   else if(state.tab==="res") v.insertAdjacentHTML("beforeend", renderRes(M));
