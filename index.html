@@ -483,6 +483,10 @@ svg text{font-family:var(--sans)}
 
 /* Table */
 .tbl-wrap{overflow-x:auto}
+.od{color:var(--bad);font-weight:700}
+.buy-sum button.chip{cursor:pointer;font:inherit;border:1px solid transparent}
+.buy-sum button.chip:hover{border-color:var(--line)}
+.buy-sum button.chip.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink) inset}
 table.stick-head thead th{position:relative;z-index:2;background:var(--surface);will-change:transform}
 table.stick-head.stuck thead th{box-shadow:0 1px 0 var(--line),0 4px 6px -4px rgba(0,0,0,.18)}
 table{border-collapse:collapse;width:100%;min-width:980px;font-size:13px}
@@ -626,6 +630,8 @@ const S = dt => dt.toISOString().slice(0,10);
 const addDays = (dt,n) => new Date(dt.getTime() + n*864e5);
 const WD = ["일","월","화","수","목","금","토"];
 const fmt = s => { if(!s) return "–"; const d=D(s); return `${d.getUTCMonth()+1}/${d.getUTCDate()} (${WD[d.getUTCDay()]})`; };
+const fmtC = s => esc(fmt(s)).replace(" (", "(");   // 자재 표: 10/24(토)
+const fmtOD = (s, over) => over ? `<span class="od" title="기한이 지났습니다">${fmtC(s)}</span>` : fmtC(s);
 const fmtLong = s => { if(!s) return "–"; const d=D(s); return `${d.getUTCFullYear()}.${String(d.getUTCMonth()+1).padStart(2,"0")}.${String(d.getUTCDate()).padStart(2,"0")}`; };
 const localToday = () => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; };
 const isDate = s => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -1330,14 +1336,16 @@ function splitRows(x, M){
       <td style="padding-left:22px">└ ${d.n}차</td>
       <td class="r num">${esc(d.qty)} ${esc(x.unit || "")}</td>
       <td>${d.mode === "task" && d.t ? `<span class="mono" style="color:var(--ink-3)">${esc(d.t.code)}</span> ${esc(d.t.name)}` : `<span style="color:var(--ink-3)">날짜 지정</span>`}</td>
-      <td class="num">${d.ordered ? "–" : esc(fmt(d.orderBy))}</td>
+      <td class="num">${d.ordered ? "–" : fmtOD(d.orderBy, d.st === "late")}</td>
       <td class="dday ${d.st === "late" || d.st === "overdue" ? "bad" : d.st === "soon" ? "warn" : ""}">${d.st === "recv" ? "–" : ddayTxt(dd)}</td>
-      <td class="num">${d.ordered ? esc(fmt(d.ordered)) : "–"}</td>
+      <td class="num">${d.ordered ? fmtC(d.ordered) : "–"}</td>
       <td></td>
-      <td class="num">${esc(fmt(d.needBy))}</td>
-      <td class="num">${d.st === "recv" ? "–" : esc(fmt(d.due))}</td>
-      <td class="num">${isDate(d.receivedDate) ? esc(fmt(d.receivedDate)) : "–"}</td>
-      <td></td><td></td>${state.canEdit ? "<td></td>" : ""}</tr>`;
+      <td class="num">${fmtOD(d.needBy, d.st !== "recv" && isDate(d.needBy) && d.needBy < M.statusDate)}</td>
+      <td class="num">${d.st === "recv" ? "–" : fmtOD(d.due, d.ordered && isDate(d.due) && d.due < M.statusDate)}</td>
+      <td class="num">${isDate(d.receivedDate) ? fmtC(d.receivedDate) : "–"}</td>
+      <td></td><td></td>${state.canEdit ? `<td>${d.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${fmtC(d.receivedDate)} 입고</span>`
+        : d.ordered ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" data-dn="${d.n - 1}" title="오늘 날짜로 ${d.n}차 입고일을 기록합니다">${d.n}차 입고</button>`
+        : `<button class="btn sm go" data-quick="order" data-id="${esc(x.id)}" data-dn="${d.n - 1}" title="오늘 날짜로 ${d.n}차 발주일을 기록합니다">${d.n}차 발주</button>`}</td>` : ""}</tr>`;
   }).join("");
 }
 /* 표 머리줄 틀 고정: 스크롤하면 탭 줄 바로 아래에 붙어 따라옴 (가로 스크롤 상자 안에서도 되도록 transform 사용) */
@@ -1350,9 +1358,9 @@ function stickHeads(){
 }
 window.addEventListener("scroll", stickHeads, { passive: true }); window.addEventListener("resize", stickHeads);
 /* 자재 표: 발주일·입고일 (분할 납품은 첫 발주일 / 마지막 입고일 + 받은 회차) */
-const buyOrdTxt = x => { if(x.split){ const o = x.split.list.map(d => d.ordered).filter(isDate).sort(); return o.length ? esc(fmt(o[0])) : "–"; } return isDate(x.orderedDate) ? esc(fmt(x.orderedDate)) : "–"; };
-const buyRcvTxt = x => { if(x.split){ const r = x.split.list.filter(d => isDate(d.receivedDate)); return r.length ? `${esc(fmt(r.map(d => d.receivedDate).sort().pop()))}${r.length < x.split.list.length ? ` <span style="color:var(--ink-3);font-size:11.5px">(${r.length}/${x.split.list.length}차)</span>` : ""}` : "–"; }
-  return isDate(x.receivedDate) ? esc(fmt(x.receivedDate)) : "–"; };
+const buyOrdTxt = x => { if(x.split){ const o = x.split.list.map(d => d.ordered).filter(isDate).sort(); return o.length ? fmtC(o[0]) : "–"; } return isDate(x.orderedDate) ? fmtC(x.orderedDate) : "–"; };
+const buyRcvTxt = x => { if(x.split){ const r = x.split.list.filter(d => isDate(d.receivedDate)); return r.length ? `${fmtC(r.map(d => d.receivedDate).sort().pop())}${r.length < x.split.list.length ? ` <span style="color:var(--ink-3);font-size:11.5px">(${r.length}/${x.split.list.length}차)</span>` : ""}` : "–"; }
+  return isDate(x.receivedDate) ? fmtC(x.receivedDate) : "–"; };
 const ddayTxt = n => n == null ? "–" : n === 0 ? "D-day" : n > 0 ? `D-${n}` : `D+${-n}`;
 
 function renderPurchases(M){
@@ -1365,7 +1373,7 @@ function renderPurchases(M){
   const ed = state.canEdit, view = state.buyView || "task", filt = state.buyFilter || "all", qtxt = (state.buySearch || "").trim().toLowerCase();
   const selSet = state.buySel || (state.buySel = new Set());
   const ORDERED = ["ordered","etaLate","overdue"], TODO = ["late","soon","plan","nolink"];
-  const FILT = { all: () => true, todo: x => TODO.includes(x.st), urgent: x => ["late","soon","overdue","etaLate"].includes(x.st), ordered: x => ORDERED.includes(x.st), recv: x => x.st === "recv" };
+  const FILT = { all: () => true, todo: x => TODO.includes(x.st), urgent: x => ["late","soon","overdue","etaLate"].includes(x.st), late: x => x.st === "late", soon: x => x.st === "soon", ordered: x => ORDERED.includes(x.st), recv: x => x.st === "recv" };
   const V = L.filter(FILT[filt] || FILT.all).filter(x => !qtxt || [x.name, x.spec, x.vendor, x.owner, x.t && x.t.name, x.t && x.t.code].some(v => String(v || "").toLowerCase().includes(qtxt)));
   const row = x => {
     const [lab, cls] = BUY_ST[x.st];
@@ -1377,17 +1385,18 @@ function renderPurchases(M){
       <td><b style="font-weight:600">${esc(x.name)}</b>${x.spec?`<div style="font-size:12px;color:var(--ink-3)">${esc(x.spec)}</div>`:""}${x.split ? splitSummary(x) : ""}</td>
       <td class="r num">${esc(x.qty||"")} ${esc(x.unit||"")}</td>
       <td>${task}</td>
-      <td class="num">${esc(fmt(x.orderBy))}</td>
+      <td class="num">${fmtOD(x.orderBy, x.st === "late")}</td>
       <td class="dday ${dcls}">${x.st==="recv" || (x.eta && !x.split) ? "–" : ddayTxt(x.dleft)}</td>
       <td class="num">${buyOrdTxt(x)}</td>
       <td class="r num">${num(x.lead)}일</td>
-      <td class="num">${esc(fmt(x.needBy))}</td>
-      <td class="num">${x.eta ? esc(fmt(x.eta)) : "–"}</td>
+      <td class="num">${fmtOD(x.needBy, x.st !== "recv" && isDate(x.needBy) && x.needBy < M.statusDate)}</td>
+      <td class="num">${x.eta ? fmtOD(x.eta, x.st !== "recv" && x.eta < M.statusDate) : "–"}</td>
       <td class="num">${buyRcvTxt(x)}</td>
       <td>${esc(x.vendor||"")}</td>
       <td>${esc(x.owner||"")}</td>
-      ${ed ? `<td>${x.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${esc(fmt(x.receivedDate))} 입고</span>`
-        : (x.split ? x.split.list.every(d => d.ordered) : x.eta) ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" title="오늘 날짜로 입고일을 기록합니다">${x.split && x.split.next ? x.split.next.n + "차 입고" : "입고 완료"}</button>`
+      ${ed ? `<td>${x.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${fmtC(x.receivedDate)} 입고</span>`
+        : x.split ? `<span style="font-size:12px;color:var(--ink-3)">회차별 ↓</span>`
+        : x.eta ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" title="오늘 날짜로 입고일을 기록합니다">${x.split && x.split.next ? x.split.next.n + "차 입고" : "입고 완료"}</button>`
         : `<button class="btn sm go" data-quick="order" data-id="${esc(x.id)}" title="오늘 날짜로 발주일을 기록합니다">발주 완료</button>`}</td>` : ""}</tr>` + (x.split ? splitRows(x, M) : "");
   };
   const ncol = 14 + (ed ? 1 : 0);
@@ -1410,7 +1419,7 @@ function renderPurchases(M){
       rows += `<tr class="bgrp">${ed ? `<td class="ck"><input type="checkbox" data-bgsel="${esc(k)}" ${allSel ? "checked" : ""} ${someSel ? 'data-some="1"' : ""} aria-label="이 공정 자재 모두 선택" title="이 공정의 자재 ${list.length}건 모두 선택"></td>` : ""}
         <td colspan="${ncol - (ed ? 1 : 0)}"><button class="linkx" data-bgtoggle="${esc(k)}" style="text-decoration:none;font-size:13px">${closed ? "▸" : "▾"}</button>
         <b>${t ? `<span class="mono" style="color:var(--ink-3)">${esc(t.code)}</span> ${esc(t.name)}` : "공정 미연결"}</b>
-        <span class="gsum">${list.length}건${amt ? ` · ${wonM(amt)}원` : ""} · 발주 전 <b>${nTodo}</b> · 발주 완료 <b>${nOrd}</b> · 입고 <b>${nRecv}</b>${nLate ? ` · <span class="late">지연 ${nLate}</span>` : ""}${first ? ` · 가장 이른 발주 기한 <b>${esc(fmt(first))}</b>` : ""}${t && t.startDate ? ` · 공정 시작 ${esc(fmt(t.startDate))}` : ""}</span></td></tr>`;
+        <span class="gsum">${list.length}건${amt ? ` · ${wonM(amt)}원` : ""} · 발주 전 <b>${nTodo}</b> · 발주 완료 <b>${nOrd}</b> · 입고 <b>${nRecv}</b>${nLate ? ` · <span class="late">지연 ${nLate}</span>` : ""}${first ? ` · 가장 이른 발주 기한 <b>${fmtC(first)}</b>` : ""}${t && t.startDate ? ` · 공정 시작 ${fmtC(t.startDate)}` : ""}</span></td></tr>`;
       if(!closed) rows += list.map(row).join("");
     });
   } else rows = V.map(row).join("");
@@ -1423,16 +1432,15 @@ function renderPurchases(M){
       <span class="sep"></span>조달 <input type="number" id="bk-lead" min="0" placeholder="일"> 여유 <input type="number" id="bk-buf" min="0" placeholder="일"><button class="btn sm" data-bk="lead">기간 변경</button></div></div>` : "";
   const tools = `<div class="buy-tools">
       <span class="seg">${[["task","공정별"],["urgent","급한 순"]].map(([k,l]) => `<button data-bview="${k}" class="${view===k?"on":""}">${l}</button>`).join("")}</span>
-      <select id="buy-filter" aria-label="상태 거르기">${[["all","전체"],["todo","발주 전"],["urgent","지연·임박만"],["ordered","발주 완료(입고 대기)"],["recv","입고 완료"]].map(([k,l]) => `<option value="${k}" ${filt===k?"selected":""}>${l}</option>`).join("")}</select>
+      <select id="buy-filter" aria-label="상태 거르기">${[["all","전체"],["todo","발주 전"],["urgent","지연·임박만"],["late","발주 지연"],["soon","발주 임박"],["ordered","발주 완료(입고 대기)"],["recv","입고 완료"]].map(([k,l]) => `<option value="${k}" ${filt===k?"selected":""}>${l}</option>`).join("")}</select>
       <input type="search" id="buy-search" value="${esc(state.buySearch || "")}" placeholder="자재·업체·공정 검색" aria-label="검색">
       <span class="note">${V.length}건 표시${V.length !== L.length ? ` / 전체 ${L.length}건` : ""}</span>
       ${ed ? `<button class="btn sm" data-bk="selvis">보이는 항목 모두 선택</button>` : ""}
       ${view === "task" ? `<button class="btn sm" data-bk="openall">모두 펼치기</button><button class="btn sm" data-bk="closeall">모두 접기</button>` : ""}</div>`;
   return `<div class="buy-sum" style="margin-bottom:12px">
-      <span class="chip ${late?"bad":""}">발주 지연 <b>${late}</b></span>
-      <span class="chip ${soon?"warn":""}">발주 임박 <b>${soon}</b></span>
-      <span class="chip">입고 대기 <b>${wait}</b></span>
-      <span class="chip">입고 완료 <b>${recv}</b></span>
+      ${[["late", "발주 지연", late, late ? "bad" : ""], ["soon", "발주 임박", soon, soon ? "warn" : ""], ["ordered", "입고 대기", wait, ""], ["recv", "입고 완료", recv, ""]].map(([k, l, n, c]) =>
+        `<button type="button" class="chip ${c} ${filt === k ? "on" : ""}" data-bchip="${k}" title="${filt === k ? "다시 누르면 전체 보기" : `${l} 항목만 보기`}">${l} <b>${n}</b></button>`).join("")}
+      ${filt !== "all" ? `<button type="button" class="linkx" data-bchip="all" style="font-size:12.5px">전체 보기</button>` : ""}
     </div>${tools}${bulk}
     <div class="panel tbl-wrap"><table class="stick-head">
     <thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th title="실제로 발주한 날">발주일</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th title="실제로 현장에 들어온 날">입고일</th><th>업체</th><th>담당자</th>${ed ? "<th>처리</th>" : ""}</tr></thead>
@@ -1639,7 +1647,7 @@ function scheduleLabSearch(){ clearTimeout(labSearchT); labSearchT = setTimeout(
 function visibleBuyIds(){
   const M = state.M, L = computePurchases(M), filt = state.buyFilter || "all", qtxt = (state.buySearch || "").trim().toLowerCase();
   const ORDERED = ["ordered","etaLate","overdue"], TODO = ["late","soon","plan","nolink"];
-  const FILT = { all: () => true, todo: x => TODO.includes(x.st), urgent: x => ["late","soon","overdue","etaLate"].includes(x.st), ordered: x => ORDERED.includes(x.st), recv: x => x.st === "recv" };
+  const FILT = { all: () => true, todo: x => TODO.includes(x.st), urgent: x => ["late","soon","overdue","etaLate"].includes(x.st), late: x => x.st === "late", soon: x => x.st === "soon", ordered: x => ORDERED.includes(x.st), recv: x => x.st === "recv" };
   return L.filter(FILT[filt] || FILT.all).filter(x => !qtxt || [x.name, x.spec, x.vendor, x.owner, x.t && x.t.name, x.t && x.t.code].some(v => String(v || "").toLowerCase().includes(qtxt)));
 }
 async function bulkBuy(kind){
@@ -1686,6 +1694,7 @@ function bulkBuyClick(e){
     list.forEach(x => all ? s0.delete(x.id) : s0.add(x.id)); render(); return true; }
   const tg = e.target.closest("[data-bgtoggle]"); if(tg){ const c = state.buyClosed || (state.buyClosed = new Set()); const k = tg.dataset.bgtoggle; c.has(k) ? c.delete(k) : c.add(k); render(); return true; }
   const bv = e.target.closest("[data-bview]"); if(bv){ state.buyView = bv.dataset.bview; render(); return true; }
+  const bc = e.target.closest("[data-bchip]"); if(bc){ const k = bc.dataset.bchip; state.buyFilter = k === "all" || state.buyFilter === k ? "all" : k; state.buyClosed = null; render(); return true; }
   const bk = e.target.closest("[data-bk]"); if(bk){ bulkBuy(bk.dataset.bk); return true; }
   return false;
 }
@@ -1862,12 +1871,18 @@ async function deleteBuy(){
   const ok = await commit(data => { data.purchases = (data.purchases || []).filter(p => p.id !== dr.id); }, "삭제했습니다");
   if(ok) closeDrawer();
 }
-async function quickBuy(id, what){
+async function quickBuy(id, what, dn){
   const cur = purchasesOf().find(p => p.id === id); if(!cur) return;
   const today = localToday();
   const before = { orderedDate: cur.orderedDate || "", receivedDate: cur.receivedDate || "", deliveries: clone(deliveriesOf(cur)) };
   let upd = what === "order" ? { orderedDate: today } : { receivedDate: today, orderedDate: cur.orderedDate || today }, label = what === "order" ? "발주 완료" : "입고 완료";
-  if(what === "recv" && deliveriesOf(cur).length){
+  if(dn != null && dn !== "" && deliveriesOf(cur)[+dn]){   // 분할 납품: 그 회차만
+    const list = clone(deliveriesOf(cur)), d = list[+dn], k = +dn + 1;
+    if(what === "order"){ d.orderedDate = today; upd = { deliveries: list }; label = `${k}차 발주 완료`; }
+    else { if(!isDate(d.orderedDate) && !isDate(cur.orderedDate)) d.orderedDate = today; d.receivedDate = today;
+      upd = { deliveries: list, receivedDate: list.every(x => isDate(x.receivedDate)) ? list.map(x => x.receivedDate).sort().pop() : "" }; label = `${k}차 입고 (${d.qty} ${cur.unit || ""})`; }
+  }
+  else if(what === "recv" && deliveriesOf(cur).length){
     const list = clone(deliveriesOf(cur)); const nx = list.find(x => !isDate(x.receivedDate));
     if(nx){ nx.receivedDate = today; label = `${list.indexOf(nx) + 1}차 입고 (${nx.qty} ${cur.unit || ""})`; }
     upd = { deliveries: list, orderedDate: cur.orderedDate || today, receivedDate: list.every(x => isDate(x.receivedDate)) ? today : "" };
@@ -5760,7 +5775,7 @@ document.addEventListener("click", e => {
   if(bulkBuyClick(e)) return;
   if(laborClick(e)) return;
   const qb = e.target.closest("[data-quick]");
-  if(qb){ qb.disabled = true; quickBuy(qb.dataset.id, qb.dataset.quick); return; }
+  if(qb){ qb.disabled = true; quickBuy(qb.dataset.id, qb.dataset.quick, qb.dataset.dn); return; }
   const td = e.target.closest("[data-today]");
   if(td){ e.preventDefault(); const inp = $("#" + td.dataset.today); inp.value = localToday(); if(td.dataset.today === "b-rcv" && !$("#b-ord").value) $("#b-ord").value = localToday(); return; }
   const by = e.target.closest("#view [data-buy]");
