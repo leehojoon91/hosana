@@ -597,7 +597,6 @@ textarea{resize:vertical;min-height:60px}
     <div class="tabs" role="tablist" id="tabs">
       <button role="tab" data-tab="design">설계도</button>
       <button role="tab" data-tab="gantt">간트 차트</button>
-      <button role="tab" data-tab="list">작업 목록</button>
       <button role="tab" data-tab="buy">자재</button>
       <button role="tab" data-tab="labor">시공</button>
       <button role="tab" data-tab="evm">기성</button>
@@ -4619,7 +4618,7 @@ function render(){
   if(state.mode === "setup"){ showChrome(false); renderSetup(); return; }
 
   showChrome(true);
-  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab===(state.tab === "net" ? "gantt" : state.tab))));   // PERT 네트워크 = 간트 차트 안의 보기
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab===(["net", "list"].includes(state.tab) ? "gantt" : state.tab))));   // PERT 네트워크·작업 목록 = 간트 차트 안의 보기
   const M = compute(); state.M = M;
   const p = proj();
   $("#pname").textContent = p.name || "온실 공정표";
@@ -4752,7 +4751,7 @@ function renderKpis(M){
 function renderTools(){
   let h = "";
   if(state.tab==="gantt") h += `<button class="btn ${state.links !== "off" ? "primary" : ""}" id="toggleLinks" title="선행 관계 화살표 켜기/끄기">연결선</button>`;
-  if(state.tab==="gantt" || state.tab==="net") h += `<button class="btn ${state.tab === "net" ? "primary" : ""}" id="toggleNet" title="${state.tab === "net" ? "간트 차트로 돌아가기" : "작업 사이의 선후행 관계를 PERT 네트워크도로 보기"}">PERT 네트워크</button>`;
+  if(["gantt", "net", "list"].includes(state.tab)) h = `<div class="seg" role="group" aria-label="공정 보기">${[["gantt", "간트"], ["net", "PERT 네트워크"], ["list", "작업 목록"]].map(([k, l]) => `<button data-gview="${k}" class="${state.tab === k ? "on" : ""}">${l}</button>`).join("")}</div>` + h;
   if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="일정 기준"><button data-sched="early" class="${state.sched!=="late"?"on":""}" title="가장 이른 일정(ES-EF)">조기</button><button data-sched="late" class="${state.sched==="late"?"on":""}" title="가장 늦은 일정(LS-LF): 늦어도 이때까지는 해야 함">만기</button></div>`;
   if(state.tab==="gantt") h += `<div class="seg" role="group" aria-label="확대">${[[5,"월"],[12,"주"],[24,"일"]].map(([z,l])=>`<button data-zoom="${z}" class="${state.zoom===z?"on":""}">${l}</button>`).join("")}</div>`;
   if(state.tab==="gantt" && resOf().length) h += `<button class="btn ${state.showRes ? "primary" : ""}" id="toggleRes" title="간트 아래에 일별 노무 투입량을 같은 시간축으로 보여 줍니다">자원 보기</button>`;
@@ -5700,7 +5699,7 @@ document.addEventListener("click", e => {
   if(state.suppressClick){ state.suppressClick = false; return; }
   const tab = e.target.closest("#tabs button");
   if(tab){ state.tab = tab.dataset.tab; store.set("tab", state.tab); if(state.tab==="set"){ state.draftOff=null; state.draftKey=null; } state.resDraft = null; render(); return; }
-  if(e.target.closest("#toggleNet")){ state.tab = state.tab === "net" ? "gantt" : "net"; store.set("tab", state.tab); render(); return; }
+  const gv = e.target.closest("[data-gview]"); if(gv){ state.tab = gv.dataset.gview; store.set("tab", state.tab); render(); return; }
   if(e.target.closest("#toggleLinks")){ state.links = state.links === "off" ? "on" : "off"; store.set("links", state.links); render(); return; }
   const sc = e.target.closest("[data-sched]");
   if(sc){ state.sched = sc.dataset.sched; store.set("sched", state.sched); render(); return; }
