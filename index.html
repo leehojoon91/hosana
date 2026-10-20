@@ -1330,12 +1330,18 @@ function splitRows(x, M){
       <td>${d.mode === "task" && d.t ? `<span class="mono" style="color:var(--ink-3)">${esc(d.t.code)}</span> ${esc(d.t.name)}` : `<span style="color:var(--ink-3)">날짜 지정</span>`}</td>
       <td class="num">${d.ordered ? "–" : esc(fmt(d.orderBy))}</td>
       <td class="dday ${d.st === "late" || d.st === "overdue" ? "bad" : d.st === "soon" ? "warn" : ""}">${d.st === "recv" ? "–" : ddayTxt(dd)}</td>
+      <td class="num">${d.ordered ? esc(fmt(d.ordered)) : "–"}</td>
       <td></td>
       <td class="num">${esc(fmt(d.needBy))}</td>
-      <td class="num">${d.st === "recv" ? esc(fmt(d.receivedDate)) + " 입고" : esc(fmt(d.due))}</td>
+      <td class="num">${d.st === "recv" ? "–" : esc(fmt(d.due))}</td>
+      <td class="num">${isDate(d.receivedDate) ? esc(fmt(d.receivedDate)) : "–"}</td>
       <td></td><td></td>${state.canEdit ? "<td></td>" : ""}</tr>`;
   }).join("");
 }
+/* 자재 표: 발주일·입고일 (분할 납품은 첫 발주일 / 마지막 입고일 + 받은 회차) */
+const buyOrdTxt = x => { if(x.split){ const o = x.split.list.map(d => d.ordered).filter(isDate).sort(); return o.length ? esc(fmt(o[0])) : "–"; } return isDate(x.orderedDate) ? esc(fmt(x.orderedDate)) : "–"; };
+const buyRcvTxt = x => { if(x.split){ const r = x.split.list.filter(d => isDate(d.receivedDate)); return r.length ? `${esc(fmt(r.map(d => d.receivedDate).sort().pop()))}${r.length < x.split.list.length ? ` <span style="color:var(--ink-3);font-size:11.5px">(${r.length}/${x.split.list.length}차)</span>` : ""}` : "–"; }
+  return isDate(x.receivedDate) ? esc(fmt(x.receivedDate)) : "–"; };
 const ddayTxt = n => n == null ? "–" : n === 0 ? "D-day" : n > 0 ? `D-${n}` : `D+${-n}`;
 
 function renderPurchases(M){
@@ -1362,16 +1368,18 @@ function renderPurchases(M){
       <td>${task}</td>
       <td class="num">${esc(fmt(x.orderBy))}</td>
       <td class="dday ${dcls}">${x.st==="recv" || (x.eta && !x.split) ? "–" : ddayTxt(x.dleft)}</td>
+      <td class="num">${buyOrdTxt(x)}</td>
       <td class="r num">${num(x.lead)}일</td>
       <td class="num">${esc(fmt(x.needBy))}</td>
       <td class="num">${x.eta ? esc(fmt(x.eta)) : "–"}</td>
+      <td class="num">${buyRcvTxt(x)}</td>
       <td>${esc(x.vendor||"")}</td>
       <td>${esc(x.owner||"")}</td>
       ${ed ? `<td>${x.st === "recv" ? `<span style="font-size:12px;color:var(--ink-3)">${esc(fmt(x.receivedDate))} 입고</span>`
         : (x.split ? x.split.list.every(d => d.ordered) : x.eta) ? `<button class="btn sm ok" data-quick="recv" data-id="${esc(x.id)}" title="오늘 날짜로 입고일을 기록합니다">${x.split && x.split.next ? x.split.next.n + "차 입고" : "입고 완료"}</button>`
         : `<button class="btn sm go" data-quick="order" data-id="${esc(x.id)}" title="오늘 날짜로 발주일을 기록합니다">발주 완료</button>`}</td>` : ""}</tr>` + (x.split ? splitRows(x, M) : "");
   };
-  const ncol = 12 + (ed ? 1 : 0);
+  const ncol = 14 + (ed ? 1 : 0);
   let rows = "";
   if(view === "task"){
     const order = new Map(); M.groups.forEach(g => g.items.forEach(t => order.set(t.id, order.size)));
@@ -1416,7 +1424,7 @@ function renderPurchases(M){
       <span class="chip">입고 완료 <b>${recv}</b></span>
     </div>${tools}${bulk}
     <div class="panel tbl-wrap"><table>
-    <thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th>업체</th><th>담당자</th>${ed ? "<th>처리</th>" : ""}</tr></thead>
+    <thead><tr>${ed ? `<th class="ck">선택</th>` : ""}<th>상태</th><th>자재</th><th class="r">수량</th><th>사용 공정</th><th title="현장 필요일 − 조달기간">발주 기한</th><th>남은 날</th><th title="실제로 발주한 날">발주일</th><th class="r" title="발주부터 현장 도착까지">조달기간</th><th title="공정 시작일 − 현장 여유일">현장 필요일</th><th title="발주일 + 조달기간">입고 예정</th><th title="실제로 현장에 들어온 날">입고일</th><th>업체</th><th>담당자</th>${ed ? "<th>처리</th>" : ""}</tr></thead>
     <tbody>${rows || `<tr><td colspan="${ncol}" class="note">조건에 맞는 항목이 없습니다.</td></tr>`}</tbody></table></div>
     <p class="note">발주 기한 = 현장 필요일 − 조달기간, 현장 필요일 = 사용 공정 시작일 − 현장 여유일(달력일 기준). 공정 일정이 바뀌면 발주 기한도 자동으로 바뀝니다. ‘발주 임박’은 기한까지 알림 기준일(기본 7일) 이내인 항목입니다. 발주 임박·지연·입고 지연 항목은 평일 오전 8시에 담당자 이메일로 자동 알림이 갑니다.</p>`;
 }
