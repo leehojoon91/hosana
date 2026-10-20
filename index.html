@@ -4779,10 +4779,10 @@ const legendHTML = (net) => `<div class="legend" style="padding:10px 12px;border
   <span>→ 선행 연결 <span style="color:var(--crit)">(빨강 = 주공정)</span></span>
   <span style="color:var(--bad)">▲n 착수·종료 지연(기준 공정 대비)</span>
   ${state.sched === "late" ? `<span style="color:var(--prog);font-weight:600">· 만기 일정(가장 늦은 일정) 보기 중</span>` : ""}
-  <span><i class="sw" style="width:10px;height:7px;background:#7B4FB8;clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 전(발주 기한)</span>
-  <span><i class="sw" style="width:10px;height:7px;background:var(--prog);clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 완료(발주일)</span>
-  <span><i class="sw" style="width:10px;height:7px;background:var(--done);clip-path:polygon(0 0,100% 0,50% 100%)"></i>입고 완료</span>
-  <span><i class="sw" style="width:10px;height:7px;background:var(--bad);clip-path:polygon(0 0,100% 0,50% 100%)"></i>발주 지연</span>
+  <span><i class="sw" style="width:9px;height:9px;background:#7B4FB8;border-radius:50%"></i>발주 전(발주 기한)</span>
+  <span><i class="sw" style="width:9px;height:9px;background:var(--prog);border-radius:50%"></i>발주 완료(발주일)</span>
+  <span><i class="sw" style="width:9px;height:9px;background:var(--done);border-radius:50%"></i>입고 완료</span>
+  <span><i class="sw" style="width:9px;height:9px;background:var(--bad);border-radius:50%"></i>발주 지연</span>
   ${state.canEdit ? `<span style="color:var(--ink-3)">· 막대를 끌어 이동, 양 끝(↔)을 끌어 기간 조정</span>` : ""}`}
 </div>`;
 
@@ -4815,7 +4815,7 @@ function renderGantt(M){
   const mark = (x, date, t, cls, label, tip) => {
     const i = t ? rowOf.get(t.id) : null; if(i == null || !isDate(date)) return;
     const cx = X(date) + px/2, y = HH + i*RH + 3;
-    pos += `<g data-buy="${esc(x.id)}" style="cursor:pointer"><path class="b-po ${cls}" d="M${cx-5} ${y} h10 l-5 7 z"><title>${esc(tip)}</title></path>${label ? `<text x="${cx+7}" y="${y+7}" style="font-size:9px;font-weight:700;fill:var(--ink-2);pointer-events:none">${label}</text>` : ""}</g>`;
+    pos += `<g data-buy="${esc(x.id)}" style="cursor:pointer"><circle class="b-po ${cls}" cx="${cx}" cy="${y+3.5}" r="4.5"><title>${esc(tip)}</title></circle>${label ? `<text x="${cx+7}" y="${y+7}" style="font-size:9px;font-weight:700;fill:var(--ink-2);pointer-events:none">${label}</text>` : ""}</g>`;
   };
   buys.forEach(x => {
     if(x.split){
@@ -4829,7 +4829,7 @@ function renderGantt(M){
     const cx = X(markDate(x)) + px/2, y = HH + i*RH + 3;
     const cls = x.st === "recv" ? "done" : x.st === "late" ? "late" : x.eta ? ("ordered" + (x.st === "overdue" || x.st === "etaLate" ? " risk" : "")) : "";
     const when = x.st === "recv" ? `발주 ${fmt(x.orderedDate)} · 입고 ${fmt(x.receivedDate)}` : x.eta ? `발주 ${fmt(x.orderedDate)} · 입고 예정 ${fmt(x.eta)}` : `발주 기한 ${fmt(x.orderBy)} (${ddayTxt(x.dleft)})`;
-    pos += `<path class="b-po ${cls}" data-buy="${esc(x.id)}" d="M${cx-5} ${y} h10 l-5 7 z"><title>${esc(`${x.name} · ${BUY_ST[x.st][0]}\n${when}\n현장 필요 ${fmt(x.needBy)}`)}</title></path>`;
+    pos += `<circle class="b-po ${cls}" data-buy="${esc(x.id)}" cx="${cx}" cy="${y+3.5}" r="4.5"><title>${esc(`${x.name} · ${BUY_ST[x.st][0]}\n${when}\n현장 필요 ${fmt(x.needBy)}`)}</title></circle>`;
   });
   const geo = new Map();
   rows.forEach((r,i) => {
