@@ -4203,30 +4203,43 @@ function dzDraw(cv, cam){
   const sc = Math.min((Wc - 40) / (bw || 1), (Hc - 40) / (bh || 1)) * cam.zoom, ox = Wc / 2 + cam.px, oy = Hc / 2 + cam.py;
   const S2 = p => { const q = pr(p); return [ox + q[0] * sc, oy + q[1] * sc, q[2]]; };
   const order = ["roof", "gutter", "rpur", "girt", "pgirt", "web", "chord", "hbr", "vbr", "ebr", "knee", "mp", "wcol", "col"];
-  const thin = Math.min(1, Math.max(0.45, sc * 60));
-  order.forEach(t => { const T = DZ_TYPES[t]; c.strokeStyle = T.c; c.lineWidth = T.w * thin; c.globalAlpha = t === "roof" ? 0.55 : 1; c.beginPath();
+  const thin = Math.min(1, Math.max(0.45, sc * 60)), tool0 = state.canEdit ? state.dz3Tool : "", tT = tool0 ? DZ_TOOL_COLOR[tool0] : "";
+  order.forEach(t => { const T = DZ_TYPES[t]; c.strokeStyle = T.c; c.lineWidth = T.w * thin; c.globalAlpha = tool0 ? (t === tT ? 0.9 : 0.18) : t === "roof" ? 0.55 : 1; c.beginPath();
     G.L.forEach(m => { if(m.t !== t) return; if(t === "roof" && !D.blocks[m.bi].roof) return; const a = S2(m.a), b = S2(m.b); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }); c.stroke(); });
   c.globalAlpha = 1;
   const tool = state.canEdit ? state.dz3Tool : "";
   cv._S2 = S2; cv._slots = tool ? dzSlots(D, G, tool) : [];
-  if(tool){ const col = DZ_TYPES[DZ_TOOL_COLOR[tool]].c; c.setLineDash([5, 4]); c.strokeStyle = col; c.globalAlpha = 0.45; c.lineWidth = 1.2; c.beginPath();
-    cv._slots.forEach(sl => { if(sl.on) return; sl.segs.slice(0, tool === "truss" ? 2 : undefined).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); }); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+  if(tool){ const col = DZ_TYPES[DZ_TOOL_COLOR[tool]].c, segsOf = sl => sl.segs.slice(0, tool === "truss" ? 2 : undefined), dotR = tool === "col" ? 4.5 : 3;
+    const dot = (p, r, fill) => { c.beginPath(); c.arc(p[0], p[1], r, 0, Math.PI * 2); if(fill){ c.fillStyle = fill; c.fill(); } c.stroke(); };
+    // 빈 자리: 점선 + 속 빈 동그라미
+    c.setLineDash([5, 4]); c.strokeStyle = col; c.globalAlpha = 0.6; c.lineWidth = 1.6; c.beginPath();
+    cv._slots.forEach(sl => { if(sl.on) return; segsOf(sl).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); }); c.stroke(); c.setLineDash([]);
+    c.lineWidth = 1.2; cv._slots.forEach(sl => { if(sl.on) return; const q = S2(segsOf(sl)[0][0]); dot(q, dotR - 1, "#fff"); });
+    // 있는 부재: 굵게 + 채운 동그라미
+    c.globalAlpha = 0.95; c.strokeStyle = col; c.lineWidth = tool === "col" ? 4 : 3; c.lineCap = "round"; c.beginPath();
+    cv._slots.forEach(sl => { if(!sl.on) return; segsOf(sl).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); }); c.stroke();
+    c.lineWidth = 1; cv._slots.forEach(sl => { if(!sl.on) return; const q = S2(segsOf(sl)[0][0]); c.strokeStyle = "#fff"; dot(q, dotR, col); });
+    c.globalAlpha = 1;
+    // 마우스 올린 자리: 훨씬 굵게 + 빛 + 양 끝 큰 동그라미 (넣기/빼기 안내는 기존 말풍선)
     const h = cam.hover && cv._slots.find(x => x.k === cam.hover.k);
-    if(h){ c.strokeStyle = h.on ? "#E53935" : "#1E88E5"; c.lineWidth = 5; c.globalAlpha = 0.85; c.lineCap = "round"; c.beginPath();
-      h.segs.slice(0, tool === "truss" ? 2 : undefined).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); c.stroke(); c.globalAlpha = 1; c.lineCap = "butt"; } }
+    if(h){ const hc = h.on ? "#E53935" : "#1E88E5", sg = segsOf(h);
+      c.save(); c.shadowColor = hc; c.shadowBlur = 14; c.strokeStyle = hc; c.lineWidth = 9; c.globalAlpha = 0.9; c.lineCap = "round"; c.beginPath();
+      sg.forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); c.stroke(); c.restore();
+      c.lineWidth = 2; c.strokeStyle = "#fff"; sg.forEach(([a, b]) => { dot(S2(a), 7, hc); dot(S2(b), 7, hc); }); }
+    c.lineCap = "butt"; }
   c.fillStyle = "#56636A"; c.font = "11px sans-serif"; c.textAlign = "center";
   const b = G.blocks[state.dzBlk] || G.blocks[0], code = D.blocks.length > 1 ? b.B.code + "-" : "", off = Math.max(...b.g.sw) * 0.35, offy = Math.max(...b.g.bh) * 0.6;
   b.Y.forEach((y, j) => { const p = S2([b.ox - off, y, 0]); c.fillText(code + "X" + (j + 1), p[0], p[1]); });
   b.X.forEach((x, i) => { const p = S2([x, b.oy - offy, 0]); c.fillText(code + "Y" + (i + 1), p[0], p[1]); });
-  if(D.blocks.length > 1){ c.font = "bold 12px sans-serif"; G.blocks.forEach(x => { const p = S2([x.ox + x.g.W / 2, x.oy + x.g.Lg / 2, x.gz + x.ridgeH + 600]); c.fillStyle = DZ_BLK_COLORS[x.bi % DZ_BLK_COLORS.length]; c.fillText(`${x.B.code} · ${x.B.name}`, p[0], p[1]); }); }
+  if(D.blocks.length > 1){ c.font = "bold 12px sans-serif"; G.blocks.forEach(x => { const p = S2([x.ox + x.g.W / 2, x.oy + x.g.Lg / 2, x.gz + x.ridgeH + 600]); c.fillStyle = DZ_BLK_COLORS[x.bi % DZ_BLK_COLORS.length]; c.fillText(dzBlkLabel(x.B), p[0], p[1]); }); }
 }
-/* 화면 좌표에서 가장 가까운 자리 (8px 안, 겹치면 앞쪽) */
+/* 화면 좌표에서 가장 가까운 자리 (12px 안, 겹치면 앞쪽) */
 function dzPick(cv, mx, my){
   const S2 = cv._S2, list = cv._slots || []; if(!S2 || !list.length) return null;
   const dseg = (p, q) => { const vx = q[0] - p[0], vy = q[1] - p[1], L2 = vx * vx + vy * vy; let t = L2 ? ((mx - p[0]) * vx + (my - p[1]) * vy) / L2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(mx - p[0] - t * vx, my - p[1] - t * vy); };
-  let best = null, bd = 8, bz = Infinity;
+  let best = null, bd = 12, bz = Infinity;
   list.forEach(sl => sl.segs.forEach(([a, b]) => { const p = S2(a), q = S2(b), d = dseg(p, q), z = (p[2] + q[2]) / 2;
-    if(d > 8) return; if(!best || d < bd - 2.5 || (Math.abs(d - bd) <= 2.5 && z < bz)){ bd = d; bz = z; best = sl; } }));
+    if(d > 12) return; if(!best || d < bd - 2.5 || (Math.abs(d - bd) <= 2.5 && z < bz)){ bd = d; bz = z; best = sl; } }));
   return best;
 }
 /* ---- 입력 · 클릭 ---- */
