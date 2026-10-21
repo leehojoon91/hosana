@@ -2781,6 +2781,14 @@ const dzCorrKey = (t, n, w, a, f0, f1, max) => f0 <= 0 && f1 >= max ? `${t}:${n}
 /* 같은 줄에서 구간이 겹치는 다른 복도가 있는지 */
 const dzCorrHit = (g, t, n, f0, f1, skip) => g.corrs.some(c => c.key !== skip && c.t === t && c.n === n && c.f0 <= f1 && f0 <= c.f1);
 /* 새 복도 기본 폭: 가로 복도 = 칸 길이(기둥 간격) − 500, 세로 복도 = 스팬 폭 ÷ 지붕 수 · 위치는 앞(가로)·왼쪽(세로) */
+/* 복도 넣기: 같은 줄에서 겹치거나 맞닿는 복도와는 하나로 합침 (겹친 구간이 두 번 들어가지 않게). 합쳤으면 true */
+function dzCorrAdd(B, dir, n, f0, f1){
+  const g = dzGrid(B), max = (dir === "r" ? g.ns : g.nb) - 1, same = g.corrs.filter(c => c.t === dir && c.n === n && c.f0 <= f1 + 1 && f0 <= c.f1 + 1);
+  B.corr = B.corr || [];
+  if(!same.length){ B.corr.push(dzCorrKey(dir, n, dzCorrDef(B, g, dir, n), "s", f0, f1, max)); return false; }
+  const lo = Math.min(f0, ...same.map(c => c.f0)), hi = Math.max(f1, ...same.map(c => c.f1)), base = same[0];
+  B.corr = B.corr.filter(k => !same.some(c => c.key === k)); B.corr.push(dzCorrKey(dir, n, base.w, base.a, lo, hi, max)); return true;
+}
 const dzCorrDef = (B, g, dir, n) => dir === "r" ? Math.max(100, g.bh[n] - 500) : Math.max(100, Math.round(g.sw[n] / dzRoofs(B, g, n)));
 /* 복도 사각형 (동 안 좌표): 영역 칸마다 잘라 이어 붙임. 관리동 칸 안에는 복도를 그리지 않음 */
 function dzCorrRects(g, c){
@@ -4099,9 +4107,8 @@ function dzFloorDrag(){
       const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); if(box) box.remove(); if(!moved) return;
         state.suppressClick = true; setTimeout(() => { state.suppressClick = false; }, 0);
         const f0 = Math.min(p0, p1), f1 = Math.max(p0, p1), L = dir === "r" ? "Y" : "X";
-        if(dzCorrHit(g, dir, n, f0, f1)){ toast("그 구간에는 이미 복도가 있습니다 — 먼저 그 복도를 눌러 지워 주세요", 2400); return; }
-        dzSet(D2 => { const B2 = D2.blocks[bi]; (B2.corr || (B2.corr = [])).push(dzCorrKey(dir, n, dzCorrDef(B2, g, dir, n), "s", f0, f1, max)); });
-        toast(`복도 ${L}${f0 + 1} ~ ${L}${f1 + 2} 구간에 넣음`, 1800); };
+        let merged = false; dzSet(D2 => { merged = dzCorrAdd(D2.blocks[bi], dir, n, f0, f1); });
+        toast(merged ? "기존 복도와 겹치거나 맞닿아 하나로 합쳤습니다 (겹친 구간은 한 번만)" : `복도 ${L}${f0 + 1} ~ ${L}${f1 + 2} 구간에 넣음`, 2200); };
       window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); };
     return;
   }
@@ -4295,7 +4302,7 @@ function designClick(e){
     const on = g0.corrs.find(c => c.t === dir && c.n === n && c.f0 <= q && q <= c.f1);
     let lo = q, hi = q; if(!on){ while(lo > 0 && !dzCorrHit(g0, dir, n, lo - 1, lo - 1)) lo--; while(hi < max && !dzCorrHit(g0, dir, n, hi + 1, hi + 1)) hi++; }
     dzSet(D => { const B = D.blocks[Number(bi)], a = B.corr || (B.corr = []);
-      if(on) B.corr = a.filter(k => k !== on.key); else a.push(dzCorrKey(dir, n, dzCorrDef(B, g0, dir, n), "s", lo, hi, max)); }); return true; }
+      if(on) B.corr = a.filter(k => k !== on.key); else dzCorrAdd(B, dir, n, lo, hi); }); return true; }
   if(["part", "use"].includes(state.dzPTool || "cell") && e.target.closest("[data-dzcell]")) return true;
   const cell = e.target.closest("[data-dzcell]"); if(cell){ const [bi, key] = cell.dataset.dzcell.split("|"); state.dzBlk = Number(bi);
     dzSet(D => { const B = D.blocks[Number(bi)], a = B.off || (B.off = []), i = a.indexOf(key); if(i >= 0) a.splice(i, 1); else a.push(key);
