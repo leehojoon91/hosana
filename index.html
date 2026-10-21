@@ -2987,7 +2987,9 @@ function renderDesign(){
   else body = dzSoonTab(sub, D, G);
   return subs + body;
 }
-const dzBlkChips = (D, cur) => `<div class="dz-blks">${D.blocks.map((B, bi) => `<button data-dzblk="${bi}" class="${bi === cur ? "on" : ""}"><i style="background:${DZ_BLK_COLORS[bi % DZ_BLK_COLORS.length]}"></i>${esc(B.code)} · ${esc(B.name)}</button>`).join("")}</div>`;
+/* 동 이름표: 이름에 기호가 이미 들어 있으면(A동) 이름만, 아니면 "A · 본동" */
+const dzBlkLabel = B => { const c = String(B.code || "").trim(), n = String(B.name || "").trim(); return !n ? c : !c || n.startsWith(c) ? n : `${c} · ${n}`; };
+const dzBlkChips = (D, cur) => `<div class="dz-blks">${D.blocks.map((B, bi) => `<button data-dzblk="${bi}" class="${bi === cur ? "on" : ""}"><i style="background:${DZ_BLK_COLORS[bi % DZ_BLK_COLORS.length]}"></i>${esc(dzBlkLabel(B))}</button>`).join("")}</div>`;
 /* 구역 표: 칸 줄마다 들어간 스팬 수가 같은 것끼리 묶음 → [{ bays(스팬 수), sections(칸 수), area }] */
 function dzZoneRows(g, pred){
   const rows = [];
@@ -3091,7 +3093,7 @@ function dzFloorSvg(D, G, ed){
       if(ma){ const pm = spot(mx / ma, my / ma, true); if(pm) o += tx(pm[0], pm[1] + fs * 0.4, "관리동", "middle", fs * 1.2, "#B4561A", 'font-weight="700" pointer-events="none"');
         const pg = ga && spot(gx / ga, gy / ga, false); if(pg) o += tx(pg[0], pg[1] + fs * 0.4, "재배동", "middle", fs * 1.2, colr, 'font-weight="700" pointer-events="none"'); } }
     for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j)) o += `<rect x="${X[i] - cs}" y="${Y[j] - cs}" width="${cs * 2}" height="${cs * 2}" fill="#C0392B"/>`;
-    o += tx((X[0] + X[g.ns]) / 2, Y[0] - pad * 0.5, `${esc(b.B.code)} · ${esc(b.B.name)}`, "middle", fs * 1.1, colr, 'font-weight="700" pointer-events="none"');
+    o += tx((X[0] + X[g.ns]) / 2, Y[0] - pad * 0.5, esc(dzBlkLabel(b.B)), "middle", fs * 1.1, colr, 'font-weight="700" pointer-events="none"');
     o += `</g>`;
   });
   // 선택한 동: 축 · 치수
@@ -4195,7 +4197,7 @@ function dzDraw(cv, cam){
   if(!Wc) return;
   cv.width = Wc * dpr; cv.height = Hc * dpr; const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, Wc, Hc);
   const cx = (G.minX + G.maxX) / 2, cy = (G.minY + G.maxY) / 2, cz = G.topZ / 2, cyw = Math.cos(cam.yaw), syw = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), spt = Math.sin(cam.pitch);
-  const pr = p => { const x = p[0] - cx, y = p[1] - cy, z = p[2] - cz; const X1 = x * cyw - y * syw, Y1 = x * syw + y * cyw; return [X1, -(z * cp + Y1 * spt), Y1 * cp - z * spt]; };
+  const pr = p => { const x = p[0] - cx, y = cy - p[1] /* 평면 y(아래로) → 3D y(위로): 평면도와 같은 방향(X1·Y1 왼쪽 위) */, z = p[2] - cz; const X1 = x * cyw - y * syw, Y1 = x * syw + y * cyw; return [X1, -(z * cp + Y1 * spt), Y1 * cp - z * spt]; };
   const corners = []; [G.minX, G.maxX].forEach(x => [G.minY, G.maxY].forEach(y => [0, G.topZ].forEach(z => corners.push(pr([x, y, z])))));
   const bw = Math.max(...corners.map(q => q[0])) - Math.min(...corners.map(q => q[0])), bh = Math.max(...corners.map(q => q[1])) - Math.min(...corners.map(q => q[1]));
   const sc = Math.min((Wc - 40) / (bw || 1), (Hc - 40) / (bh || 1)) * cam.zoom, ox = Wc / 2 + cam.px, oy = Hc / 2 + cam.py;
