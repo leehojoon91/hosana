@@ -221,6 +221,7 @@ table.zt td,table.zt th{border-bottom:1px solid var(--line)}
 .dz-coltab td{padding:3px 6px;white-space:nowrap}.dz-coltab td i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 .dz-coltab input{font:inherit;font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink)}.dz-coltab input:disabled{border-color:transparent;background:transparent}
 .dz-coltab tr.sum td{border-top:1px solid var(--line);font-weight:600}
+.dz-coltab input.cc{width:26px;height:20px;padding:0;border:1px solid var(--line);border-radius:4px;cursor:pointer}
 .dz-tip{position:absolute;pointer-events:none;background:rgba(20,30,26,.88);color:#fff;font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(12px,-28px)}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .dz-canvas{background:#1A2226} }
 .dz-plan{width:100%;height:auto;max-height:640px;display:block;background:var(--surface);border-radius:10px}
@@ -2714,9 +2715,9 @@ const DZ_PARAMS = {
   venlo: [["gutterZ", "거터 높이 (mm)"], ["module", "지붕 폭 (mm)"], ["ridgeH", "지붕 높이 (거터~용마루)"], ["trussD", "트러스 춤 (mm)"], ["mpH", "미니기둥 높이 (mm)"], ["panels", "트러스 칸 수 (8m당)"], ["kneeL", "보강재 길이 (mm)"]],
   gable: [["gutterZ", "처마 높이 (mm)"], ["ridgeH", "지붕 높이 (처마~용마루)"], ["module", "전후면 샛기둥 간격 (mm)"], ["rpurSp", "지붕 퍼린 간격 (mm)"], ["panels", "트러스 칸 수 (8m당)"], ["kneeL", "보강재 길이 (mm)"]] };
 const DZ_TYPES = {
-  col:    { n: "내부기둥", c: "#C0392B", w: 2.4, layer: "S-COLUMN", aci: 1 },
-  scol:   { n: "측면기둥", c: "#E0675A", w: 2.0, layer: "S-COLUMN-SIDE", aci: 1 },
-  ecol:   { n: "전후면기둥", c: "#922B21", w: 2.4, layer: "S-COLUMN-END", aci: 1 },
+  col:    { n: "내부기둥", c: "#1565C0", w: 2.4, layer: "S-COLUMN", aci: 1 },
+  scol:   { n: "측면기둥", c: "#2E7D32", w: 2.0, layer: "S-COLUMN-SIDE", aci: 1 },
+  ecol:   { n: "전후면기둥", c: "#C62828", w: 2.4, layer: "S-COLUMN-END", aci: 1 },
   wcol:   { n: "샛기둥 (예전)", c: "#E0675A", w: 1.6, layer: "S-POST", aci: 1, old: true },
   chord:  { n: "트러스 상·하현재", c: "#7E57C2", w: 2.0, layer: "S-TRUSS", aci: 6 },
   web:    { n: "트러스 사재", c: "#A88BD8", w: 0.9, layer: "S-TRUSS-WEB", aci: 6 },
@@ -2741,6 +2742,18 @@ const DZ_SPEC = { col: ["□-125×75×3.2", 9.72], scol: ["□-125×75×2.3", 7.
   knee: ["□-75×45×2.3", 4.17], hbr: ["환봉 Ø12", 0.89], gb: ["□-75×45×2.3", 4.17], vbr: ["환봉 Ø12", 0.89], bb: ["□-75×45×3.2", 5.71], ebr: ["환봉 Ø12", 0.89], roof: ["알루미늄 (참고)", 0] };
 /* 기둥 기호 (규격표 D.specs[t][2]로 바꿀 수 있음) */
 const DZ_CODE = { ecol: "C1", col: "C2", scol: "C3" };
+const DZ_COL_BASE = ["ecol", "col", "scol"], DZ_COL_PAL = ["#8E24AA", "#EF6C00", "#00838F", "#6D4C41", "#AD1457", "#5E35B1", "#9E9D24"];
+let DZ_TYPES0 = null;
+const dzColTypes = D => [...DZ_COL_BASE, ...(D.colTypes || []).filter(id => D.specs[id])];
+/* 기둥 타입 이름·색·사용자 타입을 DZ_TYPES·DZ_SPEC·DZ_CODE에 반영 (만들 때마다) */
+function dzSyncTypes(D){
+  if(!DZ_TYPES0) DZ_TYPES0 = Object.fromEntries(DZ_COL_BASE.map(t => [t, { n: DZ_TYPES[t].n, c: DZ_TYPES[t].c }]));
+  Object.keys(DZ_TYPES).forEach(t => { if(DZ_TYPES[t].custom){ delete DZ_TYPES[t]; delete DZ_SPEC[t]; delete DZ_CODE[t]; } });
+  DZ_COL_BASE.forEach(t => { const sp = D.specs && D.specs[t]; DZ_TYPES[t].n = (sp && sp[3]) || DZ_TYPES0[t].n; DZ_TYPES[t].c = (sp && sp[4]) || DZ_TYPES0[t].c; });
+  (D.colTypes || []).forEach((id, k) => { const sp = D.specs[id]; if(!sp) return; const code = String(sp[2] || "C" + (4 + k));
+    DZ_TYPES[id] = { n: sp[3] || "추가 기둥", c: sp[4] || DZ_COL_PAL[k % DZ_COL_PAL.length], w: 2.2, layer: "S-COLUMN-" + (code.replace(/[^A-Za-z0-9_-]/g, "") || id.toUpperCase()), aci: 1, custom: true };
+    DZ_SPEC[id] = [sp[0] || "□-125×75×3.2", num(sp[1])]; DZ_CODE[id] = code; });
+}
 const dzCode = (D, t) => (D.specs[t] && D.specs[t][2] != null && String(D.specs[t][2]).trim()) || DZ_CODE[t] || "";
 const DZ_TOOLS = [["col", "기둥"], ["truss", "트러스"], ["mp", "미니기둥"], ["knee", "보강재"], ["hbr", "수평 브레싱"], ["gb", "측면 수평 보강재"], ["vbr", "수직 브레싱"], ["ebr", "전후면 브레싱"], ["girt", "퍼린"]];
 const DZ_TOOL_COLOR = { col: "col", truss: "chord", mp: "mp", knee: "knee", hbr: "hbr", gb: "gb", vbr: "vbr", ebr: "ebr", girt: "girt" };
@@ -2907,6 +2920,7 @@ function dzShiftKeys(B, dx, dy){
   B.corr = (B.corr || []).map(k => { const p = k.split(":"), n = Number(p[1]) + (p[0] === "r" ? dy : dx); if(n < 0) return null; p[1] = String(n);
     if(p.length >= 6){ const d = p[0] === "r" ? dx : dy, a = Number(p[4]) + d, z = Number(p[5]) + d; if(z < 0) return null; p[4] = String(Math.max(0, a)); p[5] = String(z); }
     return p.join(":"); }).filter(Boolean);
+  const ctm = {}; Object.entries(B.colType || {}).forEach(([k, v]) => { const p = k.split(":"), xi = /^(sm|em)$/.test(p[0]) ? 1 : 0, yi = p.length - 1, nx = Number(p[xi]) + dx, ny = Number(p[yi]) + dy; if(nx >= 0 && ny >= 0){ p[xi] = String(nx); p[yi] = String(ny); ctm[p.join(":")] = v; } }); B.colType = ctm;
   const um = {}; Object.entries(B.use || {}).forEach(([k, v]) => { const [a, b] = k.split(":").map(Number), nx = a + dx, ny = b + dy; if(nx >= 0 && ny >= 0) um[`${nx}:${ny}`] = v; }); B.use = um;
   DZ_KEYARR.filter(a => a !== "corr").forEach(a => { B[a] = (B[a] || []).map(k => { const p = k.split(":"), xi = /^(v|h|sm|em)$/.test(p[0]) ? 1 : 0, yi = p.length - 1;
     const nx = Number(p[xi]) + dx, ny = Number(p[yi]) + dy; if(nx < 0 || ny < 0) return null; p[xi] = String(nx); p[yi] = String(ny); return p.join(":"); }).filter(Boolean); });
@@ -2946,7 +2960,7 @@ function dzBuildBlock(B, ox, oy, g, bi){
   const pH = new Set(g.parts.filter(k => k[0] === "h")), pV = new Set(g.parts.filter(k => k[0] === "v"));
   const endW = (s, j) => s >= 0 && s < ns && (g.hOut(s, j) || pH.has(`h:${s}:${j}`)), sideW = (i, j) => j >= 0 && j < nb && (g.vOut(i, j) || pV.has(`v:${i}:${j}`));
   const colT = (i, j) => endW(i - 1, j) || endW(i, j) ? "ecol" : sideW(i, j - 1) || sideW(i, j) ? "scol" : "col";
-  const colSlots = [], colAt = (k, x, y, t, top, mid) => { const on = k.startsWith("add:") || !has("rmCol", k); colSlots.push({ k, x: x + ox, y: y + oy, t, top, mid, on, add: k.startsWith("add:") }); if(on) add(t, [x, y, 0], [x, y, top], mid); };
+  const colSlots = [], colAt = (k, x, y, t0, top, mid) => { const ov = (B.colType || {})[k], t = ov && DZ_CODE[ov] ? ov : t0, on = k.startsWith("add:") || !has("rmCol", k); colSlots.push({ k, x: x + ox, y: y + oy, t, top, mid, on, add: k.startsWith("add:") }); if(on) add(t, [x, y, 0], [x, y, top], mid); };
   for(let i = 0; i <= ns; i++) for(let j = 0; j <= nb; j++) if(g.colOn(i, j)) colAt(`${i}:${j}`, xs[i], ys[j], colT(i, j), gz);
   if(B.sideMid) for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++) if(sideW(i, j)) colAt(`sm:${i}:${j}`, xs[i], ys[j] + bh[j] / 2, "scol", gz, true);
   (B.addCol || []).forEach(a => { const [x, y, t] = a.split(":"); if(isFinite(+x) && isFinite(+y)) colAt("add:" + a, +x, +y, DZ_CODE[t] ? t : "col", gz, true); });   // 직접 추가한 기둥 (문기둥 등)
@@ -3004,6 +3018,7 @@ function dzBuildBlock(B, ox, oy, g, bi){
 }
 /* 전체: 동마다 만들고 겹치는 부재(맞붙은 벽의 기둥 등)는 하나만 */
 function dzBuild(D){
+  dzSyncTypes(D);
   const pos = dzLayout(D);
   const covered = (bi, x, y) => pos.some((p, k) => { if(k === bi) return false; const g = p.g, lx = x - p.ox, ly = y - p.oy; if(lx <= 0 || ly <= 0 || lx >= g.W || ly >= g.Lg) return false;
     let s = 0; while(s < g.ns - 1 && g.xs[s + 1] <= lx) s++; let j = 0; while(j < g.nb - 1 && g.ys[j + 1] <= ly) j++; return g.inc(s, j); });
@@ -3187,21 +3202,27 @@ function dzSteelTab(D, G, ed, Z){
   const legend = `<div class="dz-legend">${Object.entries(DZ_TYPES).filter(([t]) => G.L.some(m => m.t === t)).map(([t, x]) => `<span><i style="background:${x.c}"></i>${x.n}</span>`).join("")}</div>`;
   const tip = { col: "기둥 자리를 눌러 빼거나 다시 넣습니다.", truss: "트러스(가로선)를 눌러 빼거나 다시 넣습니다.", mp: "미니기둥 점을 눌러 빼거나 넣습니다 (벤로 동).", knee: "기둥을 눌러 보강재를 붙이거나 뗍니다 (양쪽 트러스 하현으로).", hbr: "지붕 하나 폭의 칸(사각형)을 눌러 수평 브레싱 X를 넣거나 뺍니다.", gb: "측벽 쪽 칸을 눌러 측면 수평 브레싱 보강재(GB, 측벽→트러스 지그재그)를 빼거나 다시 넣습니다.", vbr: "기둥줄의 칸 구간(세로선)을 눌러 수직 브레싱을 넣거나 뺍니다 (안쪽 줄은 위·아래 보강재 BB 포함).", ebr: "전후면 벽의 지붕 칸 하나를 눌러 브레싱 X를 넣거나 뺍니다.", girt: "바깥 벽 구간을 눌러 그 구간의 퍼린을 넣거나 뺍니다. 동끼리 맞붙은 벽의 퍼린도 여기서 뺄 수 있습니다." };
   const t3 = state.dz3Tool || "";
-  const colTab = () => { const rows = ["ecol", "col", "scol"].map(t => { const ms = G.L.filter(m => m.t === t); return { t, n: ms.length, len: ms.reduce((a, m) => a + dzLen(m), 0) / 1000 }; }).filter(r => r.n);
-    const sp = t => (D.specs[t] && D.specs[t][0]) || DZ_SPEC[t][0], dis = ed ? "" : "disabled";
-    return `<div class="dz-coltab" aria-label="기둥 범례"><table><thead><tr><th>기호</th><th>명칭</th><th>규격</th><th class="r">수량</th><th class="r">길이</th></tr></thead><tbody>
-      ${rows.map(r => `<tr><td><input data-dzspec="${r.t}" data-dzsf="2" value="${esc(dzCode(D, r.t))}" ${dis} aria-label="${DZ_TYPES[r.t].n} 기호" style="width:4.2em"></td><td><i style="background:${DZ_TYPES[r.t].c}"></i>${DZ_TYPES[r.t].n}</td>
-        <td><input data-dzspec="${r.t}" data-dzsf="0" value="${esc(sp(r.t))}" ${dis} aria-label="${DZ_TYPES[r.t].n} 규격" style="width:9.5em"></td><td class="r num">${r.n}개</td><td class="r num">${fmtQty(Math.round(r.len * 10) / 10)}m</td></tr>`).join("")}
-      <tr class="sum"><td colspan="3">합계</td><td class="r num">${rows.reduce((a, r) => a + r.n, 0)}개</td><td class="r num">${fmtQty(Math.round(rows.reduce((a, r) => a + r.len, 0) * 10) / 10)}m</td></tr></tbody></table></div>`; };
+  const colTab = () => { const types = dzColTypes(D), dis = ed ? "" : "disabled";
+    const rows = types.map(t => { const ms = G.L.filter(m => m.t === t); return { t, n: ms.length, len: ms.reduce((a, m) => a + dzLen(m), 0) / 1000, custom: !DZ_COL_BASE.includes(t) }; }).filter(r => r.n || r.custom);
+    const sp = t => (D.specs[t] && D.specs[t][0]) || DZ_SPEC[t][0], kg = t => num(D.specs[t] && D.specs[t][1] != null ? D.specs[t][1] : DZ_SPEC[t][1]);
+    return `<div class="dz-coltab" aria-label="기둥 범례"><table><thead><tr><th>색</th><th>기호</th><th>명칭</th><th>규격</th><th class="r">kg/m</th><th class="r">수량</th><th class="r">길이</th>${ed ? "<th></th>" : ""}</tr></thead><tbody>
+      ${rows.map(r => `<tr><td><input type="color" data-dzspec="${r.t}" data-dzsf="4" value="${esc(DZ_TYPES[r.t].c)}" ${dis} aria-label="${esc(DZ_TYPES[r.t].n)} 색" class="cc"></td>
+        <td><input data-dzspec="${r.t}" data-dzsf="2" value="${esc(dzCode(D, r.t))}" ${dis} aria-label="기호" style="width:3.6em"></td>
+        <td><input data-dzspec="${r.t}" data-dzsf="3" value="${esc(DZ_TYPES[r.t].n)}" ${dis} aria-label="명칭" style="width:6.5em"></td>
+        <td><input data-dzspec="${r.t}" data-dzsf="0" value="${esc(sp(r.t))}" ${dis} aria-label="규격" style="width:8.5em"></td>
+        <td class="r"><input type="number" step="0.01" data-dzspec="${r.t}" data-dzsf="1" value="${kg(r.t)}" ${dis} aria-label="단위중량" style="width:5.2em;text-align:right"></td>
+        <td class="r num">${r.n}개</td><td class="r num">${fmtQty(Math.round(r.len * 10) / 10)}m</td>${ed ? `<td>${r.custom ? `<button class="dz-x" data-dzctdel="${r.t}" title="이 타입 지우기 (이 타입 기둥은 내부기둥으로)">×</button>` : ""}</td>` : ""}</tr>`).join("")}
+      <tr class="sum"><td colspan="5">합계${ed ? ` <button class="btn sm" data-dzctadd style="margin-left:6px">＋ 타입 추가</button>` : ""}</td><td class="r num">${rows.reduce((a, r) => a + r.n, 0)}개</td><td class="r num">${fmtQty(Math.round(rows.reduce((a, r) => a + r.len, 0) * 10) / 10)}m</td>${ed ? "<td></td>" : ""}</tr></tbody></table></div>`; };
   let main;
   if(view === "3d") main = `<div class="dz-tools"><button data-dz3tool="" class="${t3 ? "" : "on"}">🖐 보기만</button>${DZ_TOOLS.map(([k, l]) => `<button data-dz3tool="${k}" class="${t3 === k ? "on" : ""}" ${ed ? "" : "disabled"}><i style="background:${DZ_TYPES[DZ_TOOL_COLOR[k]].c}"></i>${l}</button>`).join("")}</div>
       ${t3 ? `<p class="note" style="margin:0 0 6px">점선 = 넣을 수 있는 자리, 실선 = 지금 있는 부재. 마우스를 올려 강조되면 클릭해서 넣거나 뺍니다. 끌면 여전히 회전합니다.</p>` : ""}
       <div class="dz-wrap"><canvas class="dz-canvas ${t3 ? "pick" : ""}" id="dz-cv"></canvas><div class="dz-tip" id="dz-tip" hidden></div>${t3 === "col" ? colTab() : ""}</div>${legend}`;
   else if(view === "plan") main = `<div class="dz-tools">${DZ_TOOLS.map(([k, l]) => `<button data-dztool="${k}" class="${tool === k ? "on" : ""}"><i style="background:${DZ_TYPES[DZ_TOOL_COLOR[k]].c}"></i>${l}</button>`).join("")}</div>
       <p class="note" style="margin:0 0 6px">${tip[tool]}${ed ? "" : " (보기 전용)"}</p>
-      ${ed && tool === "col" ? `<div class="dz-tools" style="margin-top:-2px"><button data-dzcoladd class="${state.dzColAdd ? "on" : ""}">＋ 기둥 추가</button>
-        <select data-dzcoltype aria-label="추가할 기둥 종류" style="width:auto;flex:none">${["ecol", "col", "scol"].map(t => `<option value="${t}" ${(state.dzColType || "ecol") === t ? "selected" : ""}>${esc(dzCode(D, t))} ${DZ_TYPES[t].n}</option>`).join("")}</select>
-        <span class="note" style="margin:0 0 0 6px">${state.dzColAdd ? "평면의 빈 곳을 누르면 그 자리에 기둥이 생깁니다 (기둥줄 400mm 안이면 줄에 붙음 · 100mm 단위). 추가한 기둥(점선 원)을 누르면 지웁니다." : "‘＋ 기둥 추가’를 켜면 문기둥 등 원하는 자리에 기둥을 더 놓을 수 있습니다."}</span></div>` : ""}
+      ${ed && tool === "col" ? (() => { const md = state.dzColMode || "toggle", ct = dzColTypes(D).includes(state.dzColType) ? state.dzColType : "ecol";
+        return `<div class="dz-tools" style="margin-top:-2px">${[["toggle", "넣기·빼기"], ["add", "＋ 기둥 추가"], ["type", "타입 바꾸기"]].map(([k, l]) => `<button data-dzcolmode="${k}" class="${md === k ? "on" : ""}">${l}</button>`).join("")}
+        ${md !== "toggle" ? `<select data-dzcoltype aria-label="기둥 타입" style="width:auto;flex:none">${dzColTypes(D).map(t => `<option value="${t}" ${ct === t ? "selected" : ""}>${esc(dzCode(D, t))} ${esc(DZ_TYPES[t].n)}</option>`).join("")}${md === "type" ? `<option value="" ${state.dzColType === "" ? "selected" : ""}>(원래 타입으로)</option>` : ""}</select>` : ""}
+        <span class="note" style="margin:0 0 0 6px">${md === "add" ? "평면의 빈 곳을 누르면 고른 타입의 기둥이 생깁니다 (기둥줄 400mm 안이면 줄에 붙음 · 100mm 단위). 추가한 기둥(점선 원)을 누르면 지웁니다." : md === "type" ? "기둥을 누르면 고른 타입으로 바뀝니다. ‘(원래 타입으로)’를 고르고 누르면 되돌립니다." : "기둥을 누르면 빼거나 다시 넣습니다."}</span></div>`; })() : ""}
       <div class="dz-zwrap"><div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>${dzPlanSvg(D, G, tool, ed)}${tool === "col" ? colTab() : ""}</div>`;
   else main = dzBomHtml(D, bom, ed);
   return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${tabs}${main}</div></div>`;
@@ -4091,7 +4112,7 @@ function dzPlanSvg(D, G, tool, ed){
     const cT = new Map(G.L.filter(m => m.bi === bi && DZ_CODE[m.t]).map(m => [Math.round(m.a[0]) + "," + Math.round(m.a[1]), m.t]));
     const colSym = (x, y, t, off, small) => { const k = small ? 0.75 : 1, w = cs * 1.15 * k, h = t === "ecol" ? w : cs * 0.72 * k, c = T[t].c;
       let q = `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" fill="${off ? "none" : c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'stroke-dasharray="3 3"' : ""}><title>${esc(dzCode(D, t))} ${T[t].n}</title></rect>`;
-      if(tool === "col" && !off) q += `<text x="${x + w * 0.65}" y="${y - h * 0.7}" font-size="${cs * 1.25}" fill="${c}" font-weight="700" pointer-events="none">${esc(dzCode(D, t))}</text>`; return q; };
+      if(!off) q += `<text x="${x + w * 0.65}" y="${y - h * 0.7}" font-size="${cs * 1.25}" fill="${c}" font-weight="700" pointer-events="none">${esc(dzCode(D, t))}</text>`; return q; };
     b.colSlots.forEach(c => { o += colSym(c.x, c.y, c.t, !c.on, c.mid && !c.add); if(c.add) o += `<circle cx="${c.x}" cy="${c.y}" r="${cs * 0.95}" fill="none" stroke="${T[c.t].c}" stroke-width="1.4" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; });
     for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j) && has("kb", `${i}:${j}`)) o += `<circle cx="${X[i]}" cy="${Y[j]}" r="${cs * 1.05}" fill="none" stroke="${T.knee.c}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
     if(ed){ const p = bi + "|";
@@ -4302,9 +4323,9 @@ function dzDraw(cv, cam){
   const bw = Math.max(...corners.map(q => q[0])) - Math.min(...corners.map(q => q[0])), bh = Math.max(...corners.map(q => q[1])) - Math.min(...corners.map(q => q[1]));
   const sc = Math.min((Wc - 40) / (bw || 1), (Hc - 40) / (bh || 1)) * cam.zoom, ox = Wc / 2 + cam.px, oy = Hc / 2 + cam.py;
   const S2 = p => { const q = pr(p); return [ox + q[0] * sc, oy + q[1] * sc, q[2]]; };
-  const order = ["roof", "gutter", "rpur", "girt", "scp", "pgirt", "web", "tv", "chord", "hbr", "gb", "vbr", "bb", "ebr", "knee", "mp", "wcol", "scol", "ecol", "col"];
+  const order = ["roof", "gutter", "rpur", "girt", "scp", "pgirt", "web", "tv", "chord", "hbr", "gb", "vbr", "bb", "ebr", "knee", "mp", "wcol", "scol", "ecol", "col", ...Object.keys(DZ_CODE).filter(t => !DZ_COL_BASE.includes(t))];
   const thin = Math.min(1, Math.max(0.45, sc * 60)), tool0 = state.canEdit ? state.dz3Tool : "", tT = tool0 ? DZ_TOOL_COLOR[tool0] : "";
-  order.forEach(t => { const T = DZ_TYPES[t]; c.strokeStyle = T.c; c.lineWidth = T.w * thin; c.globalAlpha = tool0 ? ((DZ_TOOL_TYPES[tool0] || [tT]).includes(t) ? 0.9 : 0.18) : t === "roof" ? 0.55 : 1; c.beginPath();
+  order.forEach(t => { const T = DZ_TYPES[t]; c.strokeStyle = T.c; c.lineWidth = T.w * thin; c.globalAlpha = tool0 ? ((tool0 === "col" ? !!DZ_CODE[t] : (DZ_TOOL_TYPES[tool0] || [tT]).includes(t)) ? 0.9 : 0.18) : t === "roof" ? 0.55 : 1; c.beginPath();
     G.L.forEach(m => { if(m.t !== t) return; if(t === "roof" && !D.blocks[m.bi].roof) return; const a = S2(m.a), b = S2(m.b); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }); c.stroke(); });
   c.globalAlpha = 1;
   const tool = state.canEdit ? state.dz3Tool : "";
@@ -4327,6 +4348,7 @@ function dzDraw(cv, cam){
       sg.forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); c.stroke(); c.restore();
       c.lineWidth = 2; c.strokeStyle = "#fff"; sg.forEach(([a, b]) => { dot(S2(a), 7, hc); dot(S2(b), 7, hc); }); }
     c.lineCap = "butt"; }
+  if(tool === "col"){ c.font = "bold 10px sans-serif"; c.textAlign = "left"; G.L.forEach(m => { if(!DZ_CODE[m.t]) return; const q = S2(m.b); c.fillStyle = DZ_TYPES[m.t].c; c.fillText(dzCode(D, m.t), q[0] + 3, q[1] - 2); }); }
   c.fillStyle = "#56636A"; c.font = "11px sans-serif"; c.textAlign = "center";
   const b = G.blocks[state.dzBlk] || G.blocks[0], code = D.blocks.length > 1 ? b.B.code + "-" : "", off = Math.max(...b.g.sw) * 0.35, offy = Math.max(...b.g.bh) * 0.6;
   b.Y.forEach((y, j) => { const p = S2([b.ox - off, y, 0]); c.fillText(code + "X" + (j + 1), p[0], p[1]); });
@@ -4389,7 +4411,7 @@ function designInput(e){
   if(t.dataset && t.dataset.dzc){ if(e.type !== "change") return true; const k = t.dataset.dzc; dzSet(() => { cur()[k] = t.checked; }); return true; }
   if(t.matches && t.matches("[data-dzcoltype]")){ state.dzColType = t.value; return true; }
   if(t.dataset && t.dataset.dzspec){ if(e.type !== "change") return true; const k = t.dataset.dzspec, f = Number(t.dataset.dzsf);
-    dzSet(D => { const c0 = D.specs[k] || [...DZ_SPEC[k]]; c0[f] = f === 1 ? num(t.value) : t.value.trim(); D.specs[k] = c0; }); return true; }
+    dzSet(D => { const c0 = D.specs[k] || [...DZ_SPEC[k]]; while(c0.length < 5) c0.push(""); c0[f] = f === 1 ? num(t.value) : t.value.trim(); D.specs[k] = c0; }); return true; }
   return false;
 }
 function designClick(e){
@@ -4433,14 +4455,25 @@ function designClick(e){
   const sn = e.target.closest("[data-dzsnap]"); if(sn){ const ti = Number($("#dz-snapto").value), side = sn.dataset.dzsnap;
     dzSet(D => { const B = D.blocks[state.dzBlk], T = D.blocks[ti], g = dzGrid(B), tg = dzGrid(T), tx0 = num(T.x), ty0 = num(T.y);
       if(side === "R"){ B.x = tx0 + tg.W; B.y = ty0; } else if(side === "L"){ B.x = tx0 - g.W; B.y = ty0; } else if(side === "F"){ B.y = ty0 - g.Lg; B.x = tx0; } else { B.y = ty0 + tg.Lg; B.x = tx0; } }); return true; }
-  if(e.target.closest("[data-dzcoladd]")){ state.dzColAdd = !state.dzColAdd; render(); return true; }
-  if(state.dzColAdd && state.canEdit && state.dzView === "plan" && state.dzTool === "col" && !e.target.closest("[data-dzhit]")){   // 빈 곳 → 기둥 추가
+  const cmd = e.target.closest("[data-dzcolmode]"); if(cmd){ state.dzColMode = cmd.dataset.dzcolmode; if(cmd.dataset.dzcolmode === "type" && state.dzColType == null) state.dzColType = "ecol"; render(); return true; }
+  if(e.target.closest("[data-dzctadd]") && state.canEdit){ dzSet(D => { const id = "cx" + Date.now().toString(36), n = (D.colTypes || []).length; D.colTypes = [...(D.colTypes || []), id];
+      D.specs[id] = ["□-125×75×3.2", 9.72, "C" + (4 + n), "추가 기둥", DZ_COL_PAL[n % DZ_COL_PAL.length]]; state.dzColType = id; }); toast("기둥 타입을 추가했습니다 — 기호·명칭·규격을 고치고, ‘타입 바꾸기’나 ‘＋ 기둥 추가’로 쓰세요", 3200); return true; }
+  const ctd = e.target.closest("[data-dzctdel]"); if(ctd && state.canEdit){ const id = ctd.dataset.dzctdel; dzSet(D => { D.colTypes = (D.colTypes || []).filter(x => x !== id); delete D.specs[id];
+      D.blocks.forEach(B => { const ov = { ...(B.colType || {}) }; Object.keys(ov).forEach(k => { if(ov[k] === id) delete ov[k]; }); B.colType = ov; B.addCol = (B.addCol || []).map(a => a.endsWith(":" + id) ? a.slice(0, -id.length) + "col" : a); }); if(state.dzColType === id) state.dzColType = "ecol"; }); return true; }
+  if((state.dzColMode === "type") && state.canEdit && state.dzView === "plan" && state.dzTool === "col"){ const hh = e.target.closest("[data-dzhit]");   // 기둥 타입 바꾸기
+    if(hh){ const [bi0, key] = hh.dataset.dzhit.split(/\|(.*)/), bi = Number(bi0), t = state.dzColType || "";
+      dzSet(D => { const B = D.blocks[bi]; if(!B) return;
+        if(key.startsWith("add:")){ const a0 = key.slice(4), [x, y] = a0.split(":"); B.addCol = (B.addCol || []).map(a => a === a0 ? `${x}:${y}:${t || "col"}` : a); return; }
+        const ov = { ...(B.colType || {}) }; if(t) ov[key] = t; else delete ov[key]; B.colType = ov; });
+      return true; } }
+  if(state.dzColMode === "add" && state.canEdit && state.dzView === "plan" && state.dzTool === "col" && !e.target.closest("[data-dzhit]")){   // 빈 곳 → 기둥 추가
     const svg = e.target.closest('.dz-plan[data-zk="steel"]');
     if(svg){ const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(svg.getScreenCTM().inverse());
       const G = dzBuild(dzDraft().D), b = G.blocks.find(x => q.x >= x.ox - 200 && q.x <= x.ox + x.g.W + 200 && q.y >= x.oy - 200 && q.y <= x.oy + x.g.Lg + 200);
       if(!b){ toast("동 안쪽을 눌러 주세요", 1600); return true; }
       const snap = (v, lines) => { const near = lines.reduce((a, c) => Math.abs(c - v) < Math.abs(a - v) ? c : a, lines[0]); return Math.abs(near - v) <= 400 ? near : Math.round(v / 100) * 100; };
       const lx = Math.min(b.g.W, Math.max(0, snap(q.x - b.ox, b.g.xs))), ly = Math.min(b.g.Lg, Math.max(0, snap(q.y - b.oy, b.g.ys))), t = state.dzColType || "ecol";
+      if(!DZ_CODE[t]){ toast("추가할 기둥 타입을 고르세요", 1600); return true; }
       if(b.colSlots.some(c => Math.abs(c.x - b.ox - lx) < 150 && Math.abs(c.y - b.oy - ly) < 150)){ toast("그 자리에는 이미 기둥 자리가 있습니다 — 그 기둥을 누르면 넣고 뺄 수 있습니다", 2400); return true; }
       dzSet(D => { const B = D.blocks[b.bi]; B.addCol = [...(B.addCol || []), `${lx}:${ly}:${t}`]; });
       toast(`${dzCode(dzDraft().D, t)} 기둥 추가 (X ${fmtQty(lx)}, Y ${fmtQty(ly)} mm)`, 1800); return true; } }
@@ -4502,7 +4535,7 @@ function dzExport(kind){
   } else if(kind === "steel"){ name = "철골 평면도";
     const zTop = new Map(G.blocks.map(b => [b.bi, b.zt])), hs0 = new Map(G.blocks.map(b => [b.bi, b.hs[0]]));
     G.L.forEach(m => {
-      if(["col", "scol", "ecol", "wcol"].includes(m.t)){ const hw = 62.5, hh = m.t === "ecol" || m.t === "wcol" ? 62.5 : 37.5, L = lay(m.t), x = m.a[0], y = fy(m.a[1]);
+      if(DZ_CODE[m.t] || m.t === "wcol"){ const hw = 62.5, hh = m.t === "ecol" || m.t === "wcol" ? 62.5 : 37.5, L = lay(m.t), x = m.a[0], y = fy(m.a[1]);
         ents.push(dxLine(L, [x - hw, y - hh, 0], [x + hw, y - hh, 0]), dxLine(L, [x + hw, y - hh, 0], [x + hw, y + hh, 0]), dxLine(L, [x + hw, y + hh, 0], [x - hw, y + hh, 0]), dxLine(L, [x - hw, y + hh, 0], [x - hw, y - hh, 0]));
         if(DZ_CODE[m.t]) ents.push(dxText(L, x + 200, y + 150, th * 0.45, String(dzCode(D, m.t)).replace(/[^\x20-\x7E]/g, "") || DZ_CODE[m.t]));
         return; }
