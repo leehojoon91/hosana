@@ -4136,7 +4136,7 @@ function dzSlots(D, G, tool){
   const out = [];
   G.blocks.forEach(b => { const { g, X, Y, B, bi } = b, gz = b.gz, zt = b.zt, zb = b.zb, z0 = 300, has = (a, k) => (B[a] || []).includes(k), p = bi + "|";
     const pre = D.blocks.length > 1 ? B.name + " " : "", nX = j => "X" + (j + 1), nY = i => "Y" + (i + 1), ns = g.ns, nb = g.nb;
-    if(tool === "col") b.colSlots.forEach(c => out.push({ k: p + c.k, on: c.on, segs: [[[c.x, c.y, 0], [c.x, c.y, c.top]]], label: `${pre}${dzCode(D, c.t)} ${DZ_TYPES[c.t].n}${c.add ? " (추가 · 누르면 지움)" : ""}` }));
+    if(tool === "col") b.colSlots.forEach(c => out.push({ k: p + c.k, t: c.t, on: c.on, segs: [[[c.x, c.y, 0], [c.x, c.y, c.top]]], label: `${pre}${dzCode(D, c.t)} ${DZ_TYPES[c.t].n}${c.add ? " (추가 · 누르면 지움)" : ""}` }));
     if(tool === "knee") for(let i = 0; i <= ns; i++) for(let j = 0; j <= nb; j++){ if(!g.colOn(i, j)) continue; const k = `${i}:${j}`;
       out.push({ k: p + k, on: has("kb", k), segs: [[[X[i], Y[j], zb - B.kneeL], [X[i], Y[j], zb]]], label: `${pre}${nY(i)} · ${nX(j)} 보강재` }); }
     if(tool === "truss") for(let j = 0; j <= nb; j++) for(let s = 0; s < ns; s++){ if(!g.rowOn(s, j)) continue; const k = `${s}:${j}`, zm = b.venlo ? (zt + zb) / 2 : gz + B.ridgeH / 2;
@@ -4333,13 +4333,14 @@ function dzDraw(cv, cam){
   if(tool){ const col = DZ_TYPES[DZ_TOOL_COLOR[tool]].c, segsOf = sl => sl.segs.slice(0, tool === "truss" ? 2 : undefined), dotR = tool === "col" ? 4.5 : 3;
     const dot = (p, r, fill) => { c.beginPath(); c.arc(p[0], p[1], r, 0, Math.PI * 2); if(fill){ c.fillStyle = fill; c.fill(); } c.stroke(); };
     // 빈 자리: 점선 + 속 빈 동그라미
-    c.setLineDash([5, 4]); c.strokeStyle = col; c.globalAlpha = 0.6; c.lineWidth = 1.6; c.beginPath();
-    cv._slots.forEach(sl => { if(sl.on) return; segsOf(sl).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); }); c.stroke(); c.setLineDash([]);
-    c.lineWidth = 1.2; cv._slots.forEach(sl => { if(sl.on) return; const q = S2(segsOf(sl)[0][0]); dot(q, dotR - 1, "#fff"); });
+    const colOf = sl => (sl.t && DZ_TYPES[sl.t] ? DZ_TYPES[sl.t].c : col);   // 기둥은 타입 색 그대로
+    c.setLineDash([5, 4]); c.globalAlpha = 0.6; c.lineWidth = 1.6;
+    cv._slots.forEach(sl => { if(sl.on) return; c.strokeStyle = colOf(sl); c.beginPath(); segsOf(sl).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); c.stroke(); }); c.setLineDash([]);
+    c.lineWidth = 1.2; cv._slots.forEach(sl => { if(sl.on) return; c.strokeStyle = colOf(sl); const q = S2(segsOf(sl)[0][0]); dot(q, dotR - 1, "#fff"); });
     // 있는 부재: 굵게 + 채운 동그라미
-    c.globalAlpha = 0.95; c.strokeStyle = col; c.lineWidth = tool === "col" ? 4 : 3; c.lineCap = "round"; c.beginPath();
-    cv._slots.forEach(sl => { if(!sl.on) return; segsOf(sl).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); }); c.stroke();
-    c.lineWidth = 1; cv._slots.forEach(sl => { if(!sl.on) return; const q = S2(segsOf(sl)[0][0]); c.strokeStyle = "#fff"; dot(q, dotR, col); });
+    c.globalAlpha = 0.95; c.lineWidth = tool === "col" ? 4 : 3; c.lineCap = "round";
+    cv._slots.forEach(sl => { if(!sl.on) return; c.strokeStyle = colOf(sl); c.beginPath(); segsOf(sl).forEach(([a, b]) => { const p = S2(a), q = S2(b); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }); c.stroke(); });
+    c.lineWidth = 1; cv._slots.forEach(sl => { if(!sl.on) return; const q = S2(segsOf(sl)[0][0]); c.strokeStyle = "#fff"; dot(q, dotR, colOf(sl)); });
     c.globalAlpha = 1;
     // 마우스 올린 자리: 훨씬 굵게 + 빛 + 양 끝 큰 동그라미 (넣기/빼기 안내는 기존 말풍선)
     const h = cam.hover && cv._slots.find(x => x.k === cam.hover.k);
