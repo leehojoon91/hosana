@@ -3923,10 +3923,15 @@ function eqFanLoop(R, n, lines, wallOff){
   return pts;
 }
 /* 훈증기: 대수 = 재배면적 ÷ (일반 500㎡ · 딸기 250㎡), 고르게 */
+/* 훈증기: 대수 = ⌈재배면적 ÷ 1대당 면적⌉, 구역을 가로 c × 세로 r 일정한 격자로 (칸 가운데 간격 = 폭÷c, 길이÷r).
+   c×r이 대수보다 크면 격자를 맞추려고 남는 대수(extra)를 더함 — 격자 칸이 정사각형에 가깝고 남는 대수가 적은 쪽 */
 function eqFog(R, p){
-  const per = p.crop === "딸기" ? p.perBerry : p.per, n = Math.max(1, Math.ceil(R.area / per) + (p.add || 0)), W = R.x1 - R.x0, L = R.y1 - R.y0;
-  const rows = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * L / W)))), pts = eqSpread(R, n, rows, false);
-  return { n, per, pts };
+  const per = p.crop === "딸기" ? p.perBerry : p.per, n0 = Math.max(1, Math.ceil(R.area / per) + (p.add || 0)), W = R.x1 - R.x0, L = R.y1 - R.y0;
+  let best = null;
+  for(let c = 1; c <= n0; c++){ const r = Math.ceil(n0 / c), cost = (c * r - n0) * 1.2 + Math.abs(Math.log((W / c) / (L / r))) * 2; if(!best || cost < best.cost) best = { c, r, cost }; }
+  const { c, r } = best, n = c * r, pts = [];
+  for(let k = 0; k < r; k++) for(let i = 0; i < c; i++) pts.push(eqSnapIn(R, R.x0 + (i + 0.5) * W / c, R.y0 + (k + 0.5) * L / r));
+  return { n, n0, extra: n - n0, per, pts, cols: c, rows: r, dx: W / c, dy: L / r };
 }
 /* 행잉거터 줄: 스팬마다 정한 줄 수(없으면 기본), 길이 방향으로 칸이 이어진 만큼. 복도가 지나는 칸은 제외 */
 const eqSpanRows = (P, b, s) => { const v = P.hg.spanRows[`${b.bi}:${s}`]; return v != null && v >= 0 ? v : P.hg.perSpan; };
@@ -3988,7 +3993,7 @@ function eqModel(D, G){
   const fan = { n: regs.reduce((a, R) => a + R.fan.n, 0), rows: [] }, fog = { n: regs.reduce((a, R) => a + R.fog.n, 0), rows: [] };
   const ad = (a, u) => a ? `+${N(a, u)}` : "", rg = f => regs.length ? regs.map(f).join(" + ") : N(0, "대");
   fan.rows = [["유동휀", P.fan.model, "ea", 0, "", rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}`)]];
-  fog.rows = [["유황훈증기", P.fog.model, "ea", 0, "", rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}`)]];
+  fog.rows = [["유황훈증기", P.fog.model, "ea", 0, regs.some(R => R.fog.extra) ? "격자 = 일정한 간격으로 놓으려고 더한 대수" : "", rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}${ad(R.fog.extra, "격자")}`)]];
   fan.rows.push(["유동휀, 유황훈증기 설치", "1인 하루 30대 · 2인 1조", "인", 0, "유동휀 + 훈증기 대수", `⌈(${N(fan.n, "대")}+${N(fog.n, "대")})÷${N(30, "대/일")}×${N(2, "인")}⌉`]);
   fan.rows = fxApply(fan.rows, "fan", fx); fog.rows = fxApply(fog.rows, "fog", fx); hg.rows = fxApply(hg.rows, "hgut", fx); wire.rows = fxApply(wire.rows, "wire", fx);
   return { P, regs, area, fan, fog, hg, wire, fx };
@@ -4006,7 +4011,7 @@ function dzEquipTab(sub, D, G, ed){
   } else if(sub === "fog"){
     params = `<div class="dz-dim"><span class="lb" style="width:auto">작물</span><select data-eqp="fog.crop" ${ro}>${["일반", "딸기"].map(v => `<option ${P.fog.crop === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
       <details class="dz-more"><summary>훈증기 기준</summary><div class="g2">${inp("fog", "per", "일반작물 (㎡/대)", 10)}${inp("fog", "perBerry", "딸기 (㎡/대)", 10)}${inp("fog", "add", "구역마다 더하기 (대)")}</div>${inp("fog", "model", "모델·규격", 1, "text")}</details>`;
-    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ ÷ ${R.fog.per}㎡ → <b>${R.fog.n}대</b></span></div>`).join("");
+    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ ÷ ${R.fog.per}㎡ = ${R.fog.n0}대 → 격자 ${R.fog.cols}×${R.fog.rows} <b>${R.fog.n}대</b> (간격 ${fmtQty(Math.round(R.fog.dx / 100) / 10)}m × ${fmtQty(Math.round(R.fog.dy / 100) / 10)}m)</span></div>`).join("");
     bom = Mo.fog.rows; summary = `재배면적 ${wonM(Mo.area)}㎡ · 유황훈증기 <b>${Mo.fog.n}대</b><br><span class="note">${P.fog.crop === "딸기" ? "딸기(업다운 재배주수 2배)" : "일반작물(5줄/8m)"} 기준 ${P.fog.crop === "딸기" ? P.fog.perBerry : P.fog.per}㎡당 1대</span>`;
   } else if(sub === "hgut"){
     params = `<div class="g2">${inp("hg", "perSpan", "기본 스팬당 줄 수")}${inp("hg", "pipeSets", "거터지지파이프 (세트)")}${inp("hg", "off", "첫 줄 위치 (기둥줄에서 mm)", 50)}</div>
