@@ -495,6 +495,7 @@ svg text{font-family:var(--sans)}
 .tbl-wrap{overflow-x:auto}
 .od{color:var(--bad);font-weight:700}
 .dz-plan.cvr rect[data-cvc]{cursor:crosshair}.dz-plan.cvr rect.cvw{fill:transparent;cursor:pointer;pointer-events:all}.dz-plan.cvr rect.cvw:hover{fill:rgba(30,136,229,.18)}.dz-plan.cvr rect.cvp:hover{fill:rgba(30,136,229,.28)}
+.dz-plan .eqpt{cursor:grab}.dz-plan .eqpt:hover circle,.dz-plan .eqpt:hover rect{stroke-width:3.5}
 .cvt-row{display:flex;align-items:center;gap:4px;margin-bottom:4px}.cvt-row input[type=color]{width:28px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none}.cvt-row select{font-size:11.5px;max-width:110px}
 #view tr.b td[data-bf]:hover{background:var(--accent-soft);cursor:pointer}
 @keyframes bfflash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
@@ -3988,15 +3989,19 @@ function eqWireBom(regs, P, p){
 function eqModel(D, G){
   const P = eqOf(D), regs = eqRegions(D, G), fx = (D.equip || {}).fx || {}, N = fxN;
   regs.forEach(R => { R.fan = eqFan(R, P.fan); R.fog = eqFog(R, P.fog); });
+  const PL = (D.equip || {}).place || {}, man = { fan: Array.isArray(PL.fan), fog: Array.isArray(PL.fog) };
+  const inR = (R, x, y) => [...R.set].some(k => { const [s, j] = k.split(":").map(Number); return x >= R.b.X[s] - 1 && x <= R.b.X[s + 1] + 1 && y >= R.b.Y[j] - 1 && y <= R.b.Y[j + 1] + 1; });
+  ["fan", "fog"].forEach(k => { if(man[k]){ regs.forEach(R => { R[k].pts = []; R[k].man = true; }); PL[k].forEach((q, idx) => { const R = regs.find(R => inR(R, q[0], q[1])); if(R) R[k].pts.push([q[0], q[1], q[2] == null ? -1 : q[2], idx]); }); regs.forEach(R => { R[k].n = R[k].pts.length; }); }
+    else { let idx = 0; regs.forEach(R => { R[k].pts = R[k].pts.map(q => [q[0], q[1], q[2] == null ? -1 : q[2], idx++]); }); } });
   const hg = eqHgBom(regs, P.hg, P), wire = eqWireBom(regs, P, P.wire);
   const area = regs.reduce((a, R) => a + R.area, 0);
   const fan = { n: regs.reduce((a, R) => a + R.fan.n, 0), rows: [] }, fog = { n: regs.reduce((a, R) => a + R.fog.n, 0), rows: [] };
   const ad = (a, u) => a ? `+${N(a, u)}` : "", rg = f => regs.length ? regs.map(f).join(" + ") : N(0, "대");
-  fan.rows = [["유동휀", P.fan.model, "ea", 0, "", rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}`)]];
-  fog.rows = [["유황훈증기", P.fog.model, "ea", 0, regs.some(R => R.fog.extra) ? "격자 = 일정한 간격으로 놓으려고 더한 대수" : "", rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}${ad(R.fog.extra, "격자")}`)]];
+  fan.rows = [["유동휀", P.fan.model, "ea", 0, man.fan ? "평면에서 직접 배치한 대수" : "", man.fan ? rg(R => N(R.fan.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}`)]];
+  fog.rows = [["유황훈증기", P.fog.model, "ea", 0, man.fog ? "평면에서 직접 배치한 대수" : regs.some(R => R.fog.extra) ? "격자 = 일정한 간격으로 놓으려고 더한 대수" : "", man.fog ? rg(R => N(R.fog.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}${ad(R.fog.extra, "격자")}`)]];
   fan.rows.push(["유동휀, 유황훈증기 설치", "1인 하루 30대 · 2인 1조", "인", 0, "유동휀 + 훈증기 대수", `⌈(${N(fan.n, "대")}+${N(fog.n, "대")})÷${N(30, "대/일")}×${N(2, "인")}⌉`]);
   fan.rows = fxApply(fan.rows, "fan", fx); fog.rows = fxApply(fog.rows, "fog", fx); hg.rows = fxApply(hg.rows, "hgut", fx); wire.rows = fxApply(wire.rows, "wire", fx);
-  return { P, regs, area, fan, fog, hg, wire, fx };
+  return { P, regs, area, fan, fog, hg, wire, fx, man };
 }
 const EQ_TABS = { fan: "유동휀", fog: "훈증기", hgut: "행잉거터", wire: "유인와이어", cover: "피복", alu: "알루미늄" };
 function dzEquipTab(sub, D, G, ed){
@@ -4034,7 +4039,30 @@ function dzEquipTab(sub, D, G, ed){
   const table = `<h3 style="font-size:13.5px;margin:12px 0 6px">${title} 수량산출</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th><th>비고</th></tr></thead><tbody>
     ${bom.map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td class="r num" ${r[6] ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r[2] === "m" ? Math.round(r[3] * 10) / 10 : Math.ceil(r[3] - 1e-9))}</td><td class="fx-cell">${fxHtml(r[5], `${sub}:${i}`, ed)}${r[6] && ed ? ` <button class="fx-rs" data-fxrs="${sub}:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r[4] || "")}</td></tr>`).join("")}</tbody></table></div>
     <p class="note">계산식은 참고 수량산출 엑셀(0110 · 0111 · 0112)과 같습니다. 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (빨간색 = 고친 값, ↺ = 되돌리기, 칸을 비우면 원래 값). ⌈ ⌉는 올림입니다.${bom.some(r => r[6]) && ed ? ` <button class="btn sm" data-fxrs="${sub}:*">이 탭 산출식 모두 되돌리기</button>` : ""}</p>`;
-  return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px"><div class="dz-zwrap">${zb}${eqSvg(G, Mo, sub)}</div>${table}</div></div>`;
+  const et = state.eqTool || "move", pk = sub === "fan" || sub === "fog";
+  const tools = ed && pk ? `<div class="dz-tools">${[["move", "옮기기"], ["add", "＋ 추가"], ["del", "삭제"], ...(sub === "fan" ? [["flip", "방향 바꾸기"]] : [])].map(([k, l]) => `<button data-eqtool="${k}" class="${et === k ? "on" : ""}">${l}</button>`).join("")}
+      ${Mo.man[sub] ? `<button class="btn sm" data-eqauto="${sub}" style="margin-left:8px">자동 배치로 되돌리기</button>` : ""}
+      <span class="note" style="margin:0 0 0 6px">${{ move: "끌어서 옮기기", add: "빈 곳을 눌러 추가", del: "눌러서 삭제", flip: "눌러서 바람 방향 뒤집기" }[et]} · ${Mo.man[sub] ? "직접 배치 중 (대수 = 평면에 놓인 수)" : "자동 배치 (고치면 직접 배치로 바뀜)"}</span></div>` : "";
+  return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${tools}<div class="dz-zwrap">${zb}${eqSvg(G, Mo, sub)}</div>${table}</div></div>`;
+}
+/* 유동휀·훈증기 직접 배치: 처음 고칠 때 지금 자동 배치를 E.place[탭]으로 복사한 뒤 고침 */
+function eqPlaceSetup(){
+  const svg = document.querySelector('.dz-plan[data-zk="eq-fan"], .dz-plan[data-zk="eq-fog"]'); if(!svg || !state.canEdit) return;
+  const sub = svg.dataset.zk.slice(3), tool = state.eqTool || "move", r10 = v => Math.round(v / 10) * 10;
+  const pt = e => { const q = svg.createSVGPoint(); q.x = e.clientX; q.y = e.clientY; return q.matrixTransform(svg.getScreenCTM().inverse()); };
+  const commit = (fn, msg) => { const D0 = dzDraft().D, Mo = eqModel(D0, dzBuild(D0)), base = Mo.regs.flatMap(R => R[sub].pts).sort((a, b) => a[3] - b[3]).map(q => [q[0], q[1], q[2]]);
+    dzSet(D => { const E = D.equip || (D.equip = {}), pl = { ...(E.place || {}) }, list = Array.isArray(pl[sub]) ? pl[sub].map(q => [...q]) : base; fn(list); pl[sub] = list; E.place = pl; }); if(msg) toast(msg, 1300); };
+  const done = () => { state.suppressClick = true; setTimeout(() => { state.suppressClick = false; }, 0); };
+  svg.onpointerdown = e => { if(e.button !== 0 || e.shiftKey) return; const it = e.target.closest("[data-eqpt]"), nm = EQ_TABS[sub];
+    if(tool === "add"){ if(it) return; e.preventDefault(); const q = pt(e); done(); commit(l => l.push([r10(q.x), r10(q.y), -1]), `${nm} 추가`); return; }
+    if(!it) return; e.preventDefault(); const idx = +it.dataset.eqpt;
+    if(tool === "del"){ done(); commit(l => l.splice(idx, 1), `${nm} 삭제`); return; }
+    if(tool === "flip"){ done(); commit(l => { if(l[idx]) l[idx][2] = l[idx][2] > 0 ? -1 : 1; }); return; }
+    const p0 = pt(e), x0 = +it.dataset.x, y0 = +it.dataset.y; let dx = 0, dy = 0; svg.style.cursor = "grabbing";
+    const mv = ev => { const q = pt(ev); dx = q.x - p0.x; dy = q.y - p0.y; it.setAttribute("transform", `translate(${dx} ${dy})`); };
+    const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); svg.style.cursor = ""; done();
+      if(Math.hypot(dx, dy) < 50){ it.removeAttribute("transform"); return; } commit(l => { if(l[idx]) l[idx] = [r10(x0 + dx), r10(y0 + dy), l[idx][2]]; }); };
+    window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); };
 }
 function fxHtml(t, rk, ed){
   return t.map(x => typeof x === "string" ? `<span class="fx-op">${esc(x)}</span>` : `<input class="fx-n${x.ov ? " ov" : ""}" inputmode="decimal" data-fx="${rk}:${x.k}" data-fxd="${x.d}" value="${x.v}" style="width:${String(x.v).length + 2.4}ch" ${ed ? "" : "disabled"} title="${x.ov ? `원래 값 ${fmtQty(x.d)}` : "고칠 수 있습니다"}">${x.u ? `<span class="fx-u">(${esc(x.u)})</span>` : ""}`).join("");
@@ -4051,9 +4079,9 @@ function eqSvg(G, Mo, sub){
     g.parts.forEach(k => { const [t, x, y] = k.split(":"), i = +x, j = +y; o += t === "v" ? ln([b.X[i], b.Y[j]], [b.X[i], b.Y[j + 1]], "#2E5D1E", 2.4, 'stroke-dasharray="9 4"') : ln([b.X[i], b.Y[j]], [b.X[i + 1], b.Y[j]], "#2E5D1E", 2.4, 'stroke-dasharray="9 4"'); }); });
   Mo.regs.forEach(R => {
     o += `<path d="${R.loops.map(l => "M" + l.map(q => q.join(" ")).join("L") + "Z").join("")}" fill-rule="evenodd" fill="${col}" fill-opacity=".06" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
-    if(sub === "fan") R.fan.pts.forEach(([x, y, dir]) => { const d = dir > 0 ? 1 : -1;   // 삼각형 = 바람 방향 (위 = X1 쪽)
-      o += `<g><circle cx="${x}" cy="${y}" r="${r * 1.4}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${x} ${y + d * r * 0.9}L${x + r * 0.6} ${y - d * r * 0.5}L${x - r * 0.6} ${y - d * r * 0.5}Z" fill="${col}"/><line x1="${x}" y1="${y + d * r * 1.4}" x2="${x}" y2="${y + d * r * 4}" stroke="${col}" stroke-width="1.4" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/><title>유동휀 · ${d > 0 ? "뒤쪽" : "앞쪽(X1)"}으로 송풍</title></g>`; });
-    if(sub === "fog") R.fog.pts.forEach(([x, y]) => { o += `<g><rect x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" rx="${r * 0.4}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="${x}" cy="${y}" r="${r * 0.45}" fill="${col}"/><title>유황훈증기</title></g>`; });
+    if(sub === "fan") R.fan.pts.forEach(([x, y, dir, idx]) => { const d = dir > 0 ? 1 : -1;   // 삼각형 = 바람 방향 (위 = X1 쪽)
+      o += `<g class="eqpt" data-eqpt="${idx}" data-x="${x}" data-y="${y}"><circle cx="${x}" cy="${y}" r="${r * 1.4}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${x} ${y + d * r * 0.9}L${x + r * 0.6} ${y - d * r * 0.5}L${x - r * 0.6} ${y - d * r * 0.5}Z" fill="${col}"/><line x1="${x}" y1="${y + d * r * 1.4}" x2="${x}" y2="${y + d * r * 4}" stroke="${col}" stroke-width="1.4" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/><title>유동휀 · ${d > 0 ? "뒤쪽" : "앞쪽(X1)"}으로 송풍</title></g>`; });
+    if(sub === "fog") R.fog.pts.forEach(([x, y, , idx]) => { o += `<g class="eqpt" data-eqpt="${idx}" data-x="${x}" data-y="${y}"><rect x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" rx="${r * 0.4}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="${x}" cy="${y}" r="${r * 0.45}" fill="${col}"/><title>유황훈증기</title></g>`; });
     if(sub === "hgut" || sub === "wire") R.corr.forEach(k => { const [s, j] = k.split(":").map(Number); o += `<rect x="${R.b.X[s]}" y="${R.b.Y[j]}" width="${R.g.sw[s]}" height="${R.g.bh[j]}" fill="#E8DCCB" opacity=".75"><title>복도가 지나는 칸 (거터 없음)</title></rect>`; });
     if(sub === "hgut") R.hg.forEach(l => { o += ln([l.x, l.y0], [l.x, l.y1], col, 1.6); });
     if(sub === "wire") R.hg.forEach(l => { o += ln([l.x - 120, l.y0 - 500], [l.x - 120, l.y1 + 500], col, 0.9) + ln([l.x + 120, l.y0 - 500], [l.x + 120, l.y1 + 500], col, 0.9) + ln([l.x, l.y0], [l.x, l.y1], "#9E9E9E", 0.6, 'opacity=".6"'); });
@@ -4100,6 +4128,8 @@ const fxXlQ = r => r.unit === "EA" ? `ROUNDUP(${fxXl(r.t)},0)` : `ROUND(${fxXl(r
 function eqClick(e){
   if(state.tab !== "design" || !EQ_TABS[state.dzSub]) return false;
   const x = e.target.closest("[data-eqxlsx]"); if(x){ eqExportXlsx(x.dataset.eqxlsx); return true; }
+  const et = e.target.closest("[data-eqtool]"); if(et){ state.eqTool = et.dataset.eqtool; render(); return true; }
+  const ea = e.target.closest("[data-eqauto]"); if(ea && state.canEdit){ const k = ea.dataset.eqauto; dzSet(D => { const E = D.equip || (D.equip = {}), pl = { ...(E.place || {}) }; delete pl[k]; E.place = pl; }); return true; }
   const cl = e.target.closest("[data-cvline]"); if(cl){ state.cvLine = cl.dataset.cvline; render(); return true; }
   const ct = e.target.closest("[data-cvtool]"); if(ct){ state.cvTool = ct.dataset.cvtool; render(); return true; }
   if(e.target.closest("[data-cvadd]") && state.canEdit){ const id = "m" + Date.now().toString(36), pal = ["#7CB342", "#8E24AA", "#00897B", "#F4511E", "#3949AB", "#C0CA33"];
@@ -4505,7 +4535,7 @@ function dzZoomSetup(){
   });
 }
 function dzAfter(){
-  dzZoomSetup(); cvSetup();
+  dzZoomSetup(); cvSetup(); eqPlaceSetup();
   scDrawSetup();
   vtSetup();
   dzFloorDrag();
