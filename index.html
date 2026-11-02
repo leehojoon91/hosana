@@ -3658,9 +3658,15 @@ function vtGeom(G, sec, p){
         const ridge = X[s] + (m + 0.5) * md; L.win.push(right ? [ridge, y0, ridge + w, y0 + l] : [ridge - w, y0, ridge, y0 + l]); } } }
   const len = segs => segs.reduce((a, [[ax, ay], [bx, by]]) => a + Math.hypot(bx - ax, by - ay), 0);
   const big = runs.reduce((bst, r) => r[1] - r[0] > bst[1] - bst[0] ? r : bst, runs[0] || [0, 0]);
+  // 모터 자리: 그 구동축의 이웃한 랙드라이브(랙피니언) 두 개 사이 가운데, 구동축 한가운데에 가장 가까운 칸. 한 대로 두 축을 돌리면 이웃한 두 종동축 줄 사이
+  const yc = (Y[big[0]] + Y[big[1] + 1]) / 2;
+  const mpos = x => { const ys = (Math.abs(x - xd) < 1 ? L.rd.map(q => q[1]) : L.rd.filter(q => Math.abs(q[0] - x) < 1).map(q => q[1])).sort((u, v) => u - v);
+    let best = null; for(let k = 1; k < ys.length; k++){ const m = (ys[k - 1] + ys[k]) / 2; if(best == null || Math.abs(m - yc) < Math.abs(best - yc)) best = m; }
+    if(best == null){ for(let j = big[0]; j <= big[1]; j++){ const m = (Y[j] + Y[j + 1]) / 2; if(best == null || Math.abs(m - yc) < Math.abs(best - yc)) best = m; } }
+    return [x, best == null ? yc : best]; };
   const lt = Math.min(...[...set].map(k => +k.split(":")[1])), topCells = [...set].filter(k => +k.split(":")[1] === lt).map(k => +k.split(":")[0]);
   return { sec: { ...sec, cells: [...set] }, set, manual, xd, xMin, xMax, area, L, split: [leftArea(xd), area - leftArea(xd)], loops: scLoops(b, set),
-    motor: [xd, (Y[big[0]] + Y[big[1] + 1]) / 2], motors: Number(p.motorEach) ? [[xa, (Y[big[0]] + Y[big[1] + 1]) / 2], [xb, (Y[big[0]] + Y[big[1] + 1]) / 2]] : [[xd, (Y[big[0]] + Y[big[1] + 1]) / 2]], lab: [(X[Math.min(...topCells)] + X[Math.max(...topCells) + 1]) / 2, Y[lt]], gut,
+    motor: mpos(xd), motors: Number(p.motorEach) ? [mpos(xa), mpos(xb)] : [mpos(xd)], lab: [(X[Math.min(...topCells)] + X[Math.max(...topCells) + 1]) / 2, Y[lt]], gut,
     rd: L.rd.length, win: L.win.length, pipes, drive: len(L.drive), pipeLen: len(L.pipe) };
 }
 function vtAll(D, G){ const V = vtOf(D), secs = V.sections || vtAuto(D, G);
