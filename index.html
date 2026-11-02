@@ -494,7 +494,7 @@ svg text{font-family:var(--sans)}
 /* Table */
 .tbl-wrap{overflow-x:auto}
 .od{color:var(--bad);font-weight:700}
-.dz-plan.cvr rect[data-cvc]{cursor:crosshair}.dz-plan.cvr rect.cvw{fill:transparent;cursor:pointer;pointer-events:all}.dz-plan.cvr rect.cvw:hover{fill:rgba(30,136,229,.18)}
+.dz-plan.cvr rect[data-cvc]{cursor:crosshair}.dz-plan.cvr rect.cvw{fill:transparent;cursor:pointer;pointer-events:all}.dz-plan.cvr rect.cvw:hover{fill:rgba(30,136,229,.18)}.dz-plan.cvr rect.cvp:hover{fill:rgba(30,136,229,.28)}
 .cvt-row{display:flex;align-items:center;gap:4px;margin-bottom:4px}.cvt-row input[type=color]{width:28px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none}.cvt-row select{font-size:11.5px;max-width:110px}
 #view tr.b td[data-bf]:hover{background:var(--accent-soft);cursor:pointer}
 @keyframes bfflash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
@@ -4147,35 +4147,45 @@ const cvRes = (T, v) => { v = cvNorm(v); return v === "n" ? "n" : T.some(t => t.
 const cvRoofOf = (E, P, T, bi, s, j) => cvRes(T, (E.coverMap || {})[`${bi}|${s}:${j}`] || P.roof);
 const cvWallOf = (E, P, T, key, gable) => cvRes(T, (E.wallMap || {})[key] || (gable ? P.gable : P.side));
 const cvColor = (T, id) => id === "n" ? CV_NONE : (T.find(t => t.id === id) || T[0]).color;
+const cvPartOf = (E, T, key) => cvRes(T, (E.wallMap || {})[key] || "n");   // 칸막이(안쪽 격자선): 칠하지 않으면 없음
 const cvName = (T, id) => id === "n" ? "없음" : (T.find(t => t.id === id) || T[0]).name;
 function cvModel(D, G){
   const P = eqOf(D).cover, E = D.equip || {}, T = cvTypes(E), N = fxN, fx = E.fx || {}, sp = E.cvSpec || {}, rows = [], r2 = v => Math.round(v * 100) / 100;
-  const area = {}, side = {}, gable = {};   // 재료 id → 면적 · [{len, h}] · [{wid, tri, h}] (동마다)
+  const area = {}, side = {}, gable = {}, pside = {}, pgable = {};   // 재료 id → 면적 · [{len, h}] · [{wid, tri, h}] (동마다) · 칸막이도 같은 꼴
   G.blocks.forEach(b => { const g = b.g, bi = b.bi, h = b.gz / 1000;
     for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++) if(g.inc(s, j)){ const m = cvRoofOf(E, P, T, bi, s, j); area[m] = (area[m] || 0) + g.sw[s] * g.bh[j] / 1e6; }
     const sd = {}, gb = {};
     for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)){ const m = cvWallOf(E, P, T, `${bi}|v:${i}:${j}`, false); sd[m] = (sd[m] || 0) + g.bh[j] / 1000; }
     for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)){ const m = cvWallOf(E, P, T, `${bi}|h:${s}:${j}`, true), o = gb[m] || (gb[m] = { wid: 0, tri: 0 });
       o.wid += g.sw[s] / 1000; o.tri += (b.venlo ? b.Rof(s) * b.modOf(s) : g.sw[s]) * b.ridgeH / 2 / 1e6; }
-    Object.entries(sd).forEach(([m, len]) => (side[m] || (side[m] = [])).push({ len: r2(len), h }));
-    Object.entries(gb).forEach(([m, o]) => (gable[m] || (gable[m] = [])).push({ wid: r2(o.wid), tri: r2(o.tri), h })); });
+    // 칸막이: 스팬 방향 격자선(측면과 나란함) = 길이 × 측고 · 폭 방향 격자선(전후면과 나란함) = 폭 × 측고 + 박공 삼각부
+    const psd = {}, pgb = {};
+    for(let i = 1; i < g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.inc(i - 1, j) && g.inc(i, j)){ const m = cvPartOf(E, T, `${bi}|pv:${i}:${j}`); if(m !== "n") psd[m] = (psd[m] || 0) + g.bh[j] / 1000; }
+    for(let s = 0; s < g.ns; s++) for(let j = 1; j < g.nb; j++) if(g.inc(s, j - 1) && g.inc(s, j)){ const m = cvPartOf(E, T, `${bi}|ph:${s}:${j}`); if(m === "n") continue; const o = pgb[m] || (pgb[m] = { wid: 0, tri: 0 });
+      o.wid += g.sw[s] / 1000; o.tri += (b.venlo ? b.Rof(s) * b.modOf(s) : g.sw[s]) * b.ridgeH / 2 / 1e6; }
+    [[sd, side], [psd, pside]].forEach(([a, o]) => Object.entries(a).forEach(([m, len]) => (o[m] || (o[m] = [])).push({ len: r2(len), h })));
+    [[gb, gable], [pgb, pgable]].forEach(([a, o2]) => Object.entries(a).forEach(([m, o]) => (o2[m] || (o2[m] = [])).push({ wid: r2(o.wid), tri: r2(o.tri), h }))); });
   T.forEach(t => { const K = CV_KIND[t.kind] || CV_KIND.glass;
     if(area[t.id] > 0) rows.push({ k: `r_${t.id}`, n: `지붕 ${t.name}`, rem: `평면적 × 1.08(경사 22°) × ${K[1]}(${K[2]})`, f: `${N(r2(area[t.id]), "㎡")}×${N(1.08, "경사")}×${N(K[1], K[2])}` }); });
   const wm = t => t.kind === "pc" ? ["", ""] : [`(`, `)×${N((CV_KIND[t.kind] || CV_KIND.glass)[1], (CV_KIND[t.kind] || CV_KIND.glass)[2])}`], wr = t => t.kind === "pc" ? "" : ` × ${(CV_KIND[t.kind] || CV_KIND.glass)[1]}(${(CV_KIND[t.kind] || CV_KIND.glass)[2]})`;
   T.forEach(t => { if(side[t.id]){ const [a, b] = wm(t); rows.push({ k: `s_${t.id}`, n: `측면 ${t.name}`, rem: `길이방향 × 측고${wr(t)}`, f: a + side[t.id].map(x => `${N(x.len, "m")}×${N(x.h, "m")}`).join("+") + b }); } });
   T.forEach(t => { if(gable[t.id]){ const [a, b] = wm(t); rows.push({ k: `g_${t.id}`, n: `전후면 ${t.name}`, rem: `(폭 × 측고 + 박공 삼각부)${wr(t)}`, f: a + gable[t.id].map(x => `${N(x.wid, "m")}×${N(x.h, "m")}+${N(x.tri, "㎡")}`).join("+") + b }); } });
+  T.forEach(t => { if(pside[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_s_${t.id}`, n: `칸막이 (측면) ${t.name}`, rem: `길이 × 측고${wr(t)}`, f: a + pside[t.id].map(x => `${N(x.len, "m")}×${N(x.h, "m")}`).join("+") + b }); } });
+  T.forEach(t => { if(pgable[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_g_${t.id}`, n: `칸막이 (전후면) ${t.name}`, rem: `(폭 × 측고 + 박공 삼각부)${wr(t)}`, f: a + pgable[t.id].map(x => `${N(x.wid, "m")}×${N(x.h, "m")}+${N(x.tri, "㎡")}`).join("+") + b }); } });
   // 행: [품명, 규격, 단위, 수량, 비고, 산출식, 고침, 행 키] — 고친 값은 행 키로 저장해 행이 늘거나 줄어도 따라감
   rows.forEach(r => { r.u = "㎡"; r.spec = sp[r.k] || ""; });   // 예전 E.cvSpec 값 (새 값은 E.specTx["cover:키"])
-  const main = fxKeyRows(rows, "cover", E), kindOf = k => (T.find(t => t.id === k.slice(2)) || {}).kind || "glass";
+  const main = fxKeyRows(rows, "cover", E), kindOf = k => (T.find(t => t.id === k.replace(/^(p_)?[a-z]_/, "")) || {}).kind || "glass";
   // 설치비용 (여유 없이: 지붕 = 평면적 × 1.08, 벽 = 길이 × 측고) · 수입 운송 컨테이너 (직영 시트: 유리 2,000㎡/20ft · PC 4,000㎡/40ft · 불소필름 20,000㎡/40ft)
   const ins = [];
   T.forEach(t => { if(area[t.id] > 0) ins.push({ k: `i_r_${t.id}`, n: "설치비용", spec: `지붕 ${t.name}`, u: "㎡", f: `${N(r2(area[t.id]), "㎡")}×${N(1.08, "경사")}`, rem: "평면적 × 1.08 (여유 제외)" }); });
   T.forEach(t => { const w = (side[t.id] || []).reduce((a, x) => a + x.len * x.h, 0) + (gable[t.id] || []).reduce((a, x) => a + x.wid * x.h + x.tri, 0);
-    if(w > 0) ins.push({ k: `i_w_${t.id}`, n: "설치비용", spec: `측면·전후면 ${t.name}`, u: "㎡", f: N(r2(w), "㎡"), rem: "측면 + 전후면 (여유 제외)" }); });
+    if(w > 0) ins.push({ k: `i_w_${t.id}`, n: "설치비용", spec: `측면·전후면 ${t.name}`, u: "㎡", f: N(r2(w), "㎡"), rem: "측면 + 전후면 (여유 제외)" });
+    const pw = (pside[t.id] || []).reduce((a, x) => a + x.len * x.h, 0) + (pgable[t.id] || []).reduce((a, x) => a + x.wid * x.h + x.tri, 0);
+    if(pw > 0) ins.push({ k: `i_p_${t.id}`, n: "설치비용", spec: `칸막이 ${t.name}`, u: "㎡", f: N(r2(pw), "㎡"), rem: "칸막이 (여유 제외)" }); });
   const tot = { glass: 0, pc: 0, film: 0 }; main.forEach(r => { tot[kindOf(r[7])] += r[3]; });
   const ct = [["glass", 2000, "유리 20ft"], ["pc", 4000, "PC 40ft"], ["film", 20000, "불소필름 40ft"]].filter(([k]) => tot[k] > 0);
   if(ct.length) ins.push({ k: "ship", n: "통관 수수료, 내륙 운송비 등", spec: "수입 시", u: "대", f: ct.map(([k, c, l]) => `⌈${N(Math.round(tot[k]), "㎡")}÷${N(c, `㎡/${l}`)}⌉`).join("+"), rem: "컨테이너 1대당 적재: 유리 2,000㎡(20ft) · PC 4,000㎡(40ft) · 불소필름 20,000㎡(40ft)" });
-  return { P, T, area: G.area, roof: area, side, gable, rows: [...main, ...fxKeyRows(ins, "cover", E)] };
+  return { P, T, area: G.area, roof: area, side, gable, pside, pgable, rows: [...main, ...fxKeyRows(ins, "cover", E)] };
 }
 function cvSvg(D, G, ed){
   const P = eqOf(D).cover, E = D.equip || {}, T = cvTypes(E), all = G.blocks.flatMap(b => [...b.g.sw, ...b.g.bh]), base = Math.min(...all), pad = Math.max(...all) * 0.9, fs = Math.max(base * 0.22, Math.max(G.W, G.Lg) * 0.013);
@@ -4188,6 +4198,11 @@ function cvSvg(D, G, ed){
     const wl = (x1, y1, x2, y2, key, gab) => { const m = cvWallOf(E, P, T, key, gab), c = cvColor(T, m);
       return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${m === "n" ? 2 : 5}" ${m === "n" ? 'stroke-dasharray="6 4"' : ""} vector-effect="non-scaling-stroke" pointer-events="none"/>` +
         (ed ? `<rect class="cvw" x="${Math.min(x1, x2) - (x1 === x2 ? hw : 0)}" y="${Math.min(y1, y2) - (y1 === y2 ? hw : 0)}" width="${x1 === x2 ? hw * 2 : Math.abs(x2 - x1)}" height="${y1 === y2 ? hw * 2 : Math.abs(y2 - y1)}" data-cvw="${key}"><title>${gab ? "전후면" : "측면"} 벽 · ${esc(cvName(T, m))}</title></rect>` : ""); };
+    const pl = (x1, y1, x2, y2, key, gab) => { const m = cvPartOf(E, T, key);
+      return (m !== "n" ? `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${cvColor(T, m)}" stroke-width="4" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "") +
+        (ed ? `<rect class="cvw cvp" x="${Math.min(x1, x2) - (x1 === x2 ? hw * 0.7 : 0)}" y="${Math.min(y1, y2) - (y1 === y2 ? hw * 0.7 : 0)}" width="${x1 === x2 ? hw * 1.4 : Math.abs(x2 - x1)}" height="${y1 === y2 ? hw * 1.4 : Math.abs(y2 - y1)}" data-cvw="${key}"><title>칸막이 (${gab ? "전후면" : "측면"} 방향) · ${esc(cvName(T, m))}</title></rect>` : ""); };
+    for(let i = 1; i < g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.inc(i - 1, j) && g.inc(i, j)) o += pl(b.X[i], b.Y[j], b.X[i], b.Y[j + 1], `${bi}|pv:${i}:${j}`, false);
+    for(let s = 0; s < g.ns; s++) for(let j = 1; j < g.nb; j++) if(g.inc(s, j - 1) && g.inc(s, j)) o += pl(b.X[s], b.Y[j], b.X[s + 1], b.Y[j], `${bi}|ph:${s}:${j}`, true);
     for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)) o += wl(b.X[i], b.Y[j], b.X[i], b.Y[j + 1], `${bi}|v:${i}:${j}`, false);
     for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)) o += wl(b.X[s], b.Y[j], b.X[s + 1], b.Y[j], `${bi}|h:${s}:${j}`, true);
     o += `<text x="${b.ox + g.W / 2}" y="${b.oy - pad * 0.25}" font-size="${fs}" text-anchor="middle" fill="#1B2B24" font-weight="700" pointer-events="none">${esc(dzBlkLabel(b.B))}</text>`; });
@@ -4236,7 +4251,7 @@ function dzCoverTab(D, G, ed){
       <p class="note" style="margin:0 0 6px">칠하지 않은 칸·벽의 기본값</p>
       ${sel("roof", "지붕", false)}${sel("side", "측면", true)}${sel("gable", "전후면", true)}
       <div class="dz-area" style="margin-top:8px">지붕 평면적 <b>${wonM(Mo.area)}㎡</b><br>
-        ${[...T.filter(t => Mo.roof[t.id] > 0), ...(Mo.roof.n > 0 ? [{ id: "n", name: "없음", color: CV_NONE }] : [])].map(t => `<span style="color:${t.color}">■</span> ${esc(t.name)} ${wonM(Mo.roof[t.id])}㎡`).join(" · ")}<br>측벽: ${sum(Mo.side)}<br>전후면: ${sum(Mo.gable)}</div>
+        ${[...T.filter(t => Mo.roof[t.id] > 0), ...(Mo.roof.n > 0 ? [{ id: "n", name: "없음", color: CV_NONE }] : [])].map(t => `<span style="color:${t.color}">■</span> ${esc(t.name)} ${wonM(Mo.roof[t.id])}㎡`).join(" · ")}<br>측벽: ${sum(Mo.side)}<br>전후면: ${sum(Mo.gable)}${Object.keys(Mo.pside).length || Object.keys(Mo.pgable).length ? `<br>칸막이: ${sum(Object.fromEntries(T.filter(t => Mo.pside[t.id] || Mo.pgable[t.id]).map(t => [t.id, [...(Mo.pside[t.id] || []), ...(Mo.pgable[t.id] || [])]])))}` : ""}</div>
       ${ed && (Object.keys(E.coverMap || {}).length || Object.keys(E.wallMap || {}).length) ? `<button class="btn sm" id="cv-reset" style="margin-top:6px">칠한 범위 모두 지우기 (기본값으로)</button>` : ""}
       ${mats}
       <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><button class="btn" data-eqxlsx="cover">산출서 엑셀</button></div></div>`;
@@ -4244,9 +4259,9 @@ function dzCoverTab(D, G, ed){
   const table = fxKeyTable(bom, sub, ed, "피복 수량산출", "직영 시트 기준: 지붕 유리 ×1.08×1.03 · 불소필름 ×1.08×1.15, 벽 유리 ×1.03 · PC 여유 없음. 평면도(칸 빼기·관리동·동 붙이기)가 바뀌면 면적·길이가 자동으로 바뀝니다.");
   const tool = state.cvTool && (state.cvTool === "n" || T.some(t => t.id === state.cvTool)) ? state.cvTool : T[0].id;
   const tools = ed ? `<div class="dz-tools">${[...T.map(t => [t.id, t.name, t.color]), ["n", "없음", CV_NONE]].map(([k, l, c]) => `<button data-cvtool="${esc(k)}" class="${tool === k ? "on" : ""}"><i style="background:${c}"></i>${esc(l)}</button>`).join("")}
-      <span class="note" style="margin:0 0 0 6px">지붕: 끌어서 사각형 범위로 칠하기 · 벽: 바깥 굵은 선을 누르거나 따라 끌기</span></div>` : "";
+      <span class="note" style="margin:0 0 0 6px">지붕: 끌어서 사각형 범위로 칠하기 · 벽·칸막이: 바깥 굵은 선이나 안쪽 격자선을 누르거나 따라 끌기 (‘없음’으로 지우기)</span></div>` : "";
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
-  const legend = `<div class="dz-legend">${T.map(t => `<span><i style="background:${t.color};opacity:.6"></i>${esc(t.name)}</span>`).join("")}<span><i style="background:${CV_NONE};opacity:.5"></i>없음</span><span class="note" style="margin:0">칸 = 지붕 · 굵은 선 = 벽 (점선 = 없음)</span></div>`;
+  const legend = `<div class="dz-legend">${T.map(t => `<span><i style="background:${t.color};opacity:.6"></i>${esc(t.name)}</span>`).join("")}<span><i style="background:${CV_NONE};opacity:.5"></i>없음</span><span class="note" style="margin:0">칸 = 지붕 · 바깥 굵은 선 = 벽 (점선 = 없음) · 안쪽 격자선 = 칸막이</span></div>`;
   return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${tools}<div class="dz-zwrap">${zb}${cvSvg(D, G, ed)}</div>${legend}${table}</div></div>`;
 }
 /* ---------- 설계도 · 알루미늄 (직영 시트 0104) ----------
