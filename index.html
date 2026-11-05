@@ -496,6 +496,7 @@ svg text{font-family:var(--sans)}
 .od{color:var(--bad);font-weight:700}
 .dz-plan.cvr rect[data-cvc]{cursor:crosshair}.dz-plan.cvr rect.cvw{fill:transparent;cursor:pointer;pointer-events:all}.dz-plan.cvr rect.cvw:hover{fill:rgba(30,136,229,.18)}.dz-plan.cvr rect.cvp:hover{fill:rgba(30,136,229,.28)}
 .dz-plan .eqpt{cursor:grab}.dz-plan .eqpt:hover circle,.dz-plan .eqpt:hover rect{stroke-width:3.5}
+td.pn{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#37474F;white-space:nowrap}
 .cvt-row{display:flex;align-items:center;gap:4px;margin-bottom:4px}.cvt-row input[type=color]{width:28px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none}.cvt-row select{font-size:11.5px;max-width:110px}
 #view tr.b td[data-bf]:hover{background:var(--accent-soft);cursor:pointer}
 @keyframes bfflash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
@@ -3083,6 +3084,7 @@ function renderDesign(){
   const Z = dzDraft(), D = Z.D, G = dzBuild(D), ed = state.canEdit, sub = state.dzSub || "plan";
   const subs = `<div class="dz-subs" role="tablist">${DZ_SUBS.map(([k, l]) => `<button role="tab" data-dzsub="${k}" aria-selected="${sub === k}">${l}</button>`).join("")}
     <span class="note" style="margin:0 0 0 auto">${D.blocks.length}개 동 · 전체 ${fmtQty(G.W / 1000)}m × ${fmtQty(G.Lg / 1000)}m · ${wonM(G.area)}㎡</span>
+    <button class="btn sm" id="dz-pnxlsx" title="모든 공종 수량을 품번과 함께 한 파일로 (단가 칸 포함)">전체 수량 엑셀 (품번)</button>
     ${ed ? `<button class="btn primary sm" id="dz-save">${Z.dirty ? "설계 저장 *" : "저장됨"}</button>` : ""}</div>`;
   let body;
   if(sub === "plan") body = dzPlanTab(D, G, ed);
@@ -3454,8 +3456,8 @@ function dzScreenTab(D, G, ed){
       <span class="note" style="margin:0 0 0 6px">${tool === "draw" ? "평면에서 끌어서 사각형으로 구역을 그립니다 (그 칸은 다른 구역에서 빠짐)." : "빨간 구동축을 위아래로 끌어 옮깁니다 (칸 줄에 붙고 위·아래 면적 표시). 구역을 누르면 왼쪽 목록에서 강조됩니다."}</span></div>` : "";
   const legend = `<div class="dz-legend"><span><i style="background:${SC_COL.area};opacity:.4"></i>스크린 구역 (모터 1대)</span><span><i style="background:${SC_COL.drive}"></i>구동파이프</span><span><b style="display:inline-block;width:12px;height:12px;border:2px solid ${SC_COL.rp};border-radius:50%;vertical-align:-2px;margin-right:4px;background:#fff;font-size:9px;line-height:9px;text-align:center;color:${SC_COL.rp};font-weight:700">✕</b>랙피니언</span><span><i style="background:${SC_COL.shaft}"></i>종동파이프</span><span><i style="background:${SC_COL.bar}"></i>알루미늄 스크린바</span><span><i style="background:${SC_COL.pocket}"></i>포켓</span></div>`;
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
-  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">스크린 수량산출서</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>NO</th><th>품명</th><th>영문</th><th>규격</th><th class="r">수량</th><th>단위</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
-    ${B.rows.map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r.n)}</td><td style="color:var(--ink-3);font-size:11.5px">${esc(r.en)}</td><td>${esc(r.spec)}</td><td class="r num" ${r.ov ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r.q)}</td><td>${r.unit}</td><td class="fx-cell">${fxHtml(r.t, `screen:${i}`, ed)}${r.ov && ed ? ` <button class="fx-rs" data-fxrs="screen:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:${r.rem === "모터사양체크" ? "var(--crit)" : "var(--ink-3)"}">${esc(r.rem)}</td></tr>`).join("")}</tbody></table></div>
+  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">스크린 수량산출서</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>NO</th><th>품번</th><th>품명</th><th>영문</th><th>규격</th><th class="r">수량</th><th>단위</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
+    ${(pns => B.rows.map((r, i) => `<tr><td class="num">${i + 1}</td><td class="pn">${esc(pns[i])}</td><td>${esc(r.n)}</td><td style="color:var(--ink-3);font-size:11.5px">${esc(r.en)}</td><td>${esc(r.spec)}</td><td class="r num" ${r.ov ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r.q)}</td><td>${r.unit}</td><td class="fx-cell">${fxHtml(r.t, `screen:${i}`, ed)}${r.ov && ed ? ` <button class="fx-rs" data-fxrs="screen:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:${r.rem === "모터사양체크" ? "var(--crit)" : "var(--ink-3)"}">${esc(r.rem)}</td></tr>`).join(""))(scPns(B.rows))}</tbody></table></div>
     <p class="note">계산식은 ‘스크린_랙피니언 시스템.xlsx’ 템플릿과 같습니다. 낱개 품목은 올림, m·㎡ 품목은 소수 1자리. 구역마다 정한 층수만큼 부재가 한 벌씩 더해지고, 스크린지는 층별로 그 층이 있는 구역 면적만 셉니다. 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (빨간색 = 고친 값, ↺ = 되돌리기, 칸을 비우면 원래 값, ⌈ ⌉ = 올림).${B.rows.some(r => r.ov) && ed ? ` <button class="btn sm" data-fxrs="screen:*">스크린 산출식 모두 되돌리기</button>` : ""}</p>`;
   return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${tools}<div class="dz-zwrap">${zb}${scSvg(D, G, list, sel, tool)}</div>${legend}${bom}</div></div>`;
 }
@@ -3759,8 +3761,8 @@ function dzVentTab(D, G, ed){
       <span class="note" style="margin:0 0 0 6px">${tool === "draw" ? "평면에서 끌어서 사각형으로 구역을 그립니다 (그 칸은 다른 구역에서 빠짐)." : "빨간 구동축을 좌우로 끌어 옮깁니다 (기둥 라인에만 붙고 좌·우 면적 표시)."}</span></div>` : "";
   const legend = `<div class="dz-legend"><span><i style="background:${VT_COL.area};opacity:.4"></i>천창 구역 (모터 1대)</span><span><i style="background:${VT_COL.win}"></i>천창</span><span><i style="background:${VT_COL.drive}"></i>구동축 (2줄)</span><span><b style="display:inline-block;width:12px;height:12px;border:2px solid ${VT_COL.rd};vertical-align:-2px;margin-right:4px;background:#fff"></b>랙드라이브 (RRD)</span><span><i style="background:${VT_COL.pipe}"></i>종동축</span></div>`;
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
-  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">천창시스템 수량산출서 <span class="note" style="font-weight:400">패킹리스트 기준</span></h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th class="r">여유</th><th class="r">총계</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
-    ${B.rows.map((r, i) => `<tr ${r.acc ? 'style="background:#F1F3F2"' : ""}><td class="num">${i + 1}</td><td>${r.acc ? '<span class="note" style="margin:0">귀속품</span> ' : ""}${esc(r.n)}</td><td>${esc(r.spec)}</td><td>${r.unit}</td>
+  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">천창시스템 수량산출서 <span class="note" style="font-weight:400">패킹리스트 기준</span></h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품번</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th class="r">여유</th><th class="r">총계</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
+    ${B.rows.map((r, i) => `<tr ${r.acc ? 'style="background:#F1F3F2"' : ""}><td class="num">${i + 1}</td><td class="pn">${pnCode("vent", r.k, r.spec)}</td><td>${r.acc ? '<span class="note" style="margin:0">귀속품</span> ' : ""}${esc(r.n)}</td><td>${esc(r.spec)}</td><td>${r.unit}</td>
       <td class="r num" ${r.ov ? 'style="color:#C62828;font-weight:700"' : r.warn ? 'style="color:var(--crit)"' : ""}>${fmtQty(r.q)}</td>
       <td class="r">${ed ? `<input type="number" min="0" step="1" data-vtsp="${r.k}" value="${r.spare || ""}" placeholder="0" style="width:58px;text-align:right${r.spOv ? ";color:#C62828;font-weight:700" : ""}" title="${r.spOv ? "직접 넣은 여유 (비우면 자동)" : "자동 여유 · 고칠 수 있음"}">` : r.spare || ""}</td>
       <td class="r num" style="font-weight:700">${fmtQty(r.tot)}</td>
@@ -4075,8 +4077,8 @@ function dzEquipTab(sub, D, G, ed){
       <div class="dz-area" style="margin-top:8px">${summary}</div>
       <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><button class="btn" data-eqxlsx="${sub}">산출서 엑셀</button></div></div>`;
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
-  const table = `<h3 style="font-size:13.5px;margin:12px 0 6px">${title} 수량산출</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th><th>비고</th></tr></thead><tbody>
-    ${bom.map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td class="r num" ${r[6] ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r[2] === "m" ? Math.round(r[3] * 10) / 10 : Math.ceil(r[3] - 1e-9))}</td><td class="fx-cell">${fxHtml(r[5], `${sub}:${i}`, ed)}${r[6] && ed ? ` <button class="fx-rs" data-fxrs="${sub}:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r[4] || "")}</td></tr>`).join("")}</tbody></table></div>
+  const table = `<h3 style="font-size:13.5px;margin:12px 0 6px">${title} 수량산출</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품번</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th><th>비고</th></tr></thead><tbody>
+    ${bom.map((r, i) => `<tr><td class="num">${i + 1}</td><td class="pn">${pnCode(sub, i)}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td class="r num" ${r[6] ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r[2] === "m" ? Math.round(r[3] * 10) / 10 : Math.ceil(r[3] - 1e-9))}</td><td class="fx-cell">${fxHtml(r[5], `${sub}:${i}`, ed)}${r[6] && ed ? ` <button class="fx-rs" data-fxrs="${sub}:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r[4] || "")}</td></tr>`).join("")}</tbody></table></div>
     <p class="note">계산식은 참고 수량산출 엑셀(0110 · 0111 · 0112)과 같습니다. 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (빨간색 = 고친 값, ↺ = 되돌리기, 칸을 비우면 원래 값). ⌈ ⌉는 올림입니다.${bom.some(r => r[6]) && ed ? ` <button class="btn sm" data-fxrs="${sub}:*">이 탭 산출식 모두 되돌리기</button>` : ""}</p>`;
   const et = state.eqTool || "move", pk = sub === "fan" || sub === "fog";
   const tools = ed && pk ? `<div class="dz-tools">${[["move", "옮기기"], ["add", "＋ 추가"], ["del", "삭제"], ...(sub === "fan" ? [["flip", "방향 바꾸기"]] : [])].map(([k, l]) => `<button data-eqtool="${k}" class="${et === k ? "on" : ""}">${l}</button>`).join("")}
@@ -4148,15 +4150,42 @@ function fxInput(e){
     if(Object.keys(o).length) fx[rk] = o; else delete fx[rk]; E.fx = fx; }); return true;
 }
 /* 스크린·천창 행 { n, en, spec, q, unit, f(산출식) } → 산출식으로 수량 다시 계산 (EA는 올림, m·㎡는 소수 1자리) */
+/* ---------- 품번 (원가 단가표와 맞추는 코드) ----------
+   공종 머리글자 - 3자리 번호 [- 규격 구분]. 같은 품번 = 같은 단가.
+   ST 철골(부재 kg 단가, 9xx 부대) · AL 알루미늄 · CV 피복(1xx 자재, 2xx 설치, 3xx 운송 - 재료 이름) · VT 천창 · SC 스크린 · FN 유동휀 · FG 훈증기 · HG 행잉거터 · WR 유인와이어
+   모터·랙드라이브·모터브라켓·스크린지처럼 규격마다 값이 다른 품목은 뒤에 규격(예: VT-001-RW243) */
+const PN_PFX = { steel: "ST", stx: "ST", alu: "AL", cover: "CV", vent: "VT", screen: "SC", fan: "FN", fog: "FG", hgut: "HG", wire: "WR" };
+const PN_KEYS = {
+  vent: ["motor", "rpu", "chain", "wheel", "mb1", "mb2", "b8100", "n8100", "rrd", "clamp", "rack", "sgc", "rpj", "roller", "b870", "n870", "pbl", "pbc", "b645", "n6", "b840", "nn8", "imp", "rivet", "pipe", "half", "dA", "dB", "dS", "wj", "cc"],
+  alu: ["ridge_glass", "ridge_film", "gutter_glass", "gutter_film", "gutpvc", "raf_glass", "raf_film", "rafpvc", "raftri", "gab_glass", "gab_film", "gab_pc", "gabpvc", "vent_g", "ventpvc", "vent_f", "ventsup", "ventcov", "fcover",
+    "top_glass", "top_pc", "top_film", "mul_glass", "mul_pc", "mulpvc_glass", "mulpvc_pc", "bot_glass", "bot_pc", "corner", "box", "dpipe", "elbow", "dfix", "gend", "inst"],
+  stx: ["tb", "plate", "galv", "fab", "erect"],
+  steel: ["col", "scol", "ecol", "wcol", "chord", "web", "tv", "mp", "gutter", "rpur", "girt", "scp", "pgirt", "knee", "sch", "hbr", "gb", "vbr", "bb", "ebr"] };
+const PN_VAR = { vent: ["motor", "rrd", "mb1"] };
+const PN_SAME = { vent: { n870: "n8100", nn8: "nn8" } };   // 같은 자재는 같은 품번 (천창 육각 너트 SUS M8)
+const pnVar = v => String(v || "").trim().split(/[\s,(]/)[0].replace(/[^0-9A-Za-z가-힣._×\-]/g, "").slice(0, 24);
+const pn3 = n => String(n).padStart(3, "0");
+function pnCode(sub, key, spec){
+  const P = PN_PFX[sub] || sub.toUpperCase(), k0 = sub === "vent" ? String(key).replace(/^motor\d+$/, "motor") : String(key), k = (PN_SAME[sub] || {})[k0] || k0, L = PN_KEYS[sub];
+  if(sub === "steel"){ const T = DZ_TYPES[k] || {}, i = L.indexOf(k);
+    if(i >= 0) return `ST-${pn3(i + 1)}`;
+    if(T.truss) return `ST-1${T.trk + 1}${{ top: 1, bot: 2, web: 3, tv: 4 }[T.truss]}`;   // TR1 상현재 ST-111 · 하현재 112 · 사재 113 · 직복재 114
+    if(T.custom) return `ST-2${String(Object.keys(DZ_TYPES).filter(t => DZ_TYPES[t].custom).indexOf(k) + 1).padStart(2, "0")}`;   // 추가 기둥 타입 C4… ST-201…
+    return `ST-${pnVar(k).toUpperCase()}`; }
+  if(L){ const i = L.indexOf(k); if(i < 0) return `${P}-${pnVar(k).toUpperCase()}`; return `${P}-${pn3(sub === "stx" ? 901 + i : i + 1)}${(PN_VAR[sub] || []).includes(k) ? "-" + pnVar(spec) : ""}`; }
+  return `${P}-${pn3(Number(k) + 1)}`;   // 유동휀·훈증기·행잉거터·유인와이어: 행 순서
+}
+/* 스크린: 고정 행은 순서대로 SC-001…, 스크린지 n층 SC-10n-원단, 포켓스크린지 n층 SC-11n */
+const scPns = rows => { let f = 0, k = 0; return rows.map((r, i) => /^포켓스크린지/.test(r.n) ? `SC-11${++k}` : /^스크린지/.test(r.n) ? `SC-10${++f}-${pnVar(r.spec)}` : `SC-${pn3(i + 1)}${i < 3 ? "-" + pnVar(r.spec) : ""}`); };
 /* 행 키 방식 산출 행 { k, n, spec, u, f, rem } → [품명, 규격, 단위, 수량, 비고, 산출식, 고침, 키]. 고친 값 = fx["탭:키"], 고친 규격 = E.specTx["탭:키"] */
 function fxKeyRows(rows, sub, E){
   const fx = E.fx || {}, st = E.specTx || {};
-  return rows.map(r => { const t = fxParse(r.f, fx[`${sub}:${r.k}`] || {}); return [r.n, st[`${sub}:${r.k}`] != null ? st[`${sub}:${r.k}`] : (r.spec || ""), r.u, fxEval(t), r.rem || "", t, t.some(x => x.ov), r.k]; });
+  return rows.map(r => { const t = fxParse(r.f, fx[`${sub}:${r.k}`] || {}); return [r.n, st[`${sub}:${r.k}`] != null ? st[`${sub}:${r.k}`] : (r.spec || ""), r.u, fxEval(t), r.rem || "", t, t.some(x => x.ov), r.k, r.pn || pnCode(sub, r.k, r.spec)]; });
 }
 const fxQty = (v, u) => u === "ton" ? Math.round(v * 100) / 100 : ["m", "㎡", "평", "kg", "식"].includes(u) ? Math.round(v * 10) / 10 : Math.ceil(v - 1e-9);
 function fxKeyTable(bom, sub, ed, title, note){
-  return `<h3 style="font-size:13.5px;margin:12px 0 6px">${title}</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th><th>비고</th></tr></thead><tbody>
-    ${bom.map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r[0])}</td><td>${ed ? `<input type="text" data-fxspec="${sub}:${esc(r[7])}" value="${esc(r[1])}" placeholder="규격 입력" style="width:150px">` : esc(r[1])}</td><td>${esc(r[2])}</td><td class="r num" ${r[6] ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(fxQty(r[3], r[2]))}</td><td class="fx-cell">${fxHtml(r[5], `${sub}:${r[7]}`, ed)}${r[6] && ed ? ` <button class="fx-rs" data-fxrs="${sub}:${r[7]}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r[4] || "")}</td></tr>`).join("")}</tbody></table></div>
+  return `<h3 style="font-size:13.5px;margin:12px 0 6px">${title}</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품번</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th><th>비고</th></tr></thead><tbody>
+    ${bom.map((r, i) => `<tr><td class="num">${i + 1}</td><td class="pn">${esc(r[8] || "")}</td><td>${esc(r[0])}</td><td>${ed ? `<input type="text" data-fxspec="${sub}:${esc(r[7])}" value="${esc(r[1])}" placeholder="규격 입력" style="width:150px">` : esc(r[1])}</td><td>${esc(r[2])}</td><td class="r num" ${r[6] ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(fxQty(r[3], r[2]))}</td><td class="fx-cell">${fxHtml(r[5], `${sub}:${r[7]}`, ed)}${r[6] && ed ? ` <button class="fx-rs" data-fxrs="${sub}:${r[7]}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r[4] || "")}</td></tr>`).join("")}</tbody></table></div>
     <p class="note">${note} 규격 칸은 직접 고칠 수 있고, 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (빨간색 = 고친 값, ↺ = 되돌리기).${bom.some(r => r[6]) && ed ? ` <button class="btn sm" data-fxrs="${sub}:*">산출식 모두 되돌리기</button>` : ""}</p>`;
 }
 function fxApplyObj(rows, sub, fx = {}){
@@ -4257,7 +4286,9 @@ function cvModel(D, G){
   T.forEach(t => { if(pside[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_s_${t.id}`, n: `칸막이 (측면) ${t.name}`, rem: `길이 × 측고${wr(t)}`, f: a + pside[t.id].map(x => `${N(x.len, "m")}×${N(x.h, "m")}`).join("+") + b }); } });
   T.forEach(t => { if(pgable[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_g_${t.id}`, n: `칸막이 (전후면) ${t.name}`, rem: `(폭 × 측고 + 박공 삼각부)${wr(t)}`, f: a + pgable[t.id].map(x => `${N(x.wid, "m")}×${N(x.h, "m")}+${N(x.tri, "㎡")}`).join("+") + b }); } });
   // 행: [품명, 규격, 단위, 수량, 비고, 산출식, 고침, 행 키] — 고친 값은 행 키로 저장해 행이 늘거나 줄어도 따라감
-  rows.forEach(r => { r.u = "㎡"; r.spec = sp[r.k] || ""; });   // 예전 E.cvSpec 값 (새 값은 E.specTx["cover:키"])
+  const cvPn = k => { const m = k.match(/^(p_s|p_g|i_r|i_w|i_p|r|s|g)_(.+)$/); if(!m) return `CV-${pnVar(k).toUpperCase()}`; const t = T.find(x => x.id === m[2]);
+    return `CV-${{ r: 101, s: 102, g: 103, p_s: 104, p_g: 105, i_r: 201, i_w: 202, i_p: 203 }[m[1]]}-${pnVar(t ? t.name : m[2])}`; };
+  rows.forEach(r => { r.u = "㎡"; r.spec = sp[r.k] || ""; r.pn = cvPn(r.k); });   // 예전 E.cvSpec 값 (새 값은 E.specTx["cover:키"])
   const main = fxKeyRows(rows, "cover", E), kindOf = k => (T.find(t => t.id === k.replace(/^(p_)?[a-z]_/, "")) || {}).kind || "glass";
   // 설치비용 (여유 없이: 지붕 = 평면적 × 1.08, 벽 = 길이 × 측고) · 수입 운송 컨테이너 (직영 시트: 유리 2,000㎡/20ft · PC 4,000㎡/40ft · 불소필름 20,000㎡/40ft)
   const ins = [];
@@ -4269,6 +4300,7 @@ function cvModel(D, G){
   const tot = { glass: 0, pc: 0, film: 0 }; main.forEach(r => { tot[kindOf(r[7])] += r[3]; });
   const ct = [["glass", 2000, "유리 20ft"], ["pc", 4000, "PC 40ft"], ["film", 20000, "불소필름 40ft"]].filter(([k]) => tot[k] > 0);
   if(ct.length) ins.push({ k: "ship", n: "통관 수수료, 내륙 운송비 등", spec: "수입 시", u: "대", f: ct.map(([k, c, l]) => `⌈${N(Math.round(tot[k]), "㎡")}÷${N(c, `㎡/${l}`)}⌉`).join("+"), rem: "컨테이너 1대당 적재: 유리 2,000㎡(20ft) · PC 4,000㎡(40ft) · 불소필름 20,000㎡(40ft)" });
+  ins.forEach(r => { r.pn = r.k === "ship" ? "CV-301" : cvPn(r.k); });
   return { P, T, area: G.area, roof: area, side, gable, pside, pgable, rows: [...main, ...fxKeyRows(ins, "cover", E)] };
 }
 function cvSvg(D, G, ed){
@@ -4428,6 +4460,41 @@ function dzAluTab(D, G, ed){
       <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><button class="btn" data-eqxlsx="alu">산출서 엑셀</button></div></div>`;
   return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${fxKeyTable(Mo.rows, "alu", ed, "알루미늄 수량산출", "직영 시트(0104 알루미늄공사) 기준입니다. 관리동 판넬 마감바(용마루·거터·덮개바)와 가로대는 필요하면 산출식 칸에 직접 넣어 주세요.")}</div></div>`;
 }
+/* 전체 수량 + 품번: ‘수량’ 시트(공종·품번·품명·규격·단위·수량·단가·금액) + ‘품번표’ 시트(품번마다 한 줄, 단가 칸). 단가는 품번표에 넣으면 수량 시트에 VLOOKUP으로 들어옴 */
+function pnAllRows(D, G){
+  const out = [], push = (gong, pn, n, spec, u, q, rem) => { if(q > 0) out.push([gong, pn, n, spec || "", u, q, rem || ""]); };
+  const bom = dzBom(D, G); bom.rows.forEach(r => { if(!r.ref) push("철골", pnCode("steel", r.t), r.n, r.spec, "kg", Math.round(r.kg), `${r.cnt}개 · ${fmtQty(Math.round(r.len * 10) / 10)}m · ${r.kgm}kg/m`); });
+  stxRows(D, bom, G).forEach(r => push("철골", r[8], r[0], r[1], r[2], fxQty(r[3], r[2]), r[4]));
+  aluModel(D, G).rows.forEach(r => push("알루미늄", r[8], r[0], r[1], r[2], fxQty(r[3], r[2]), r[4]));
+  cvModel(D, G).rows.forEach(r => push("피복", r[8], r[0], r[1], r[2], fxQty(r[3], r[2]), r[4]));
+  const fx = (D.equip || {}).fx || {}, V = vtAll(D, G); vtBom(V.list, V.V.p, fx).rows.forEach(r => push("천창", pnCode("vent", r.k, r.spec), r.n, r.spec, r.unit, r.tot, r.rem));
+  const S = scAll(D, G), SB = scBom(S.list, S.S.p, fx).rows, sp = scPns(SB); SB.forEach((r, i) => push("스크린", sp[i], r.n, r.spec, r.unit, r.q, r.rem));
+  const Mo = eqModel(D, G); [["fan", "유동휀", Mo.fan.rows], ["fog", "훈증기", Mo.fog.rows], ["hgut", "행잉거터", Mo.hg.rows], ["wire", "유인와이어", Mo.wire.rows]].forEach(([k, g, rows]) => rows.forEach((r, i) => push(g, pnCode(k, i), r[0], r[1], r[2], fxQty(r[3], r[2]), r[4])));
+  return out;
+}
+async function pnExportAll(){
+  let ExcelJS; try{ ExcelJS = await loadExcelJS(); }catch(err){ toast(err.message, 5000); return; }
+  const D = dzDraft().D, G = dzBuild(D), rows = pnAllRows(D, G), pname = (state.M && state.M.p.name) || proj().name || "온실";
+  const wb = new ExcelJS.Workbook(), F = "맑은 고딕", thin = { style: "thin", color: { argb: "FF999999" } }, BOX = { top: thin, left: thin, bottom: thin, right: thin };
+  const head = (ws, r, hs) => hs.forEach((h, c) => { const x = ws.getCell(r, c + 1); x.value = h; x.font = { name: F, bold: true, size: 10 }; x.border = BOX; x.alignment = { horizontal: "center" }; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }; });
+  const ws = wb.addWorksheet("수량"); ws.columns = [{ width: 10 }, { width: 18 }, { width: 26 }, { width: 30 }, { width: 7 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 40 }];
+  ws.getCell("A1").value = `${pname} 전체 수량 (품번)`; ws.getCell("A1").font = { name: F, size: 14, bold: true }; ws.getCell("A2").value = `${localToday()} · 단가는 ‘품번표’ 시트(또는 내 단가 파일)의 품번으로 찾습니다`; ws.getCell("A2").font = { name: F, size: 9, color: { argb: "FF777777" } };
+  head(ws, 4, ["공종", "품번", "품명", "규격", "단위", "수량", "단가", "금액", "비고"]);
+  rows.forEach((r, i) => { const R = 5 + i; [r[0], r[1], r[2], r[3], r[4], r[5], { formula: `IFERROR(VLOOKUP(B${R},품번표!A:F,6,FALSE),"")` }, { formula: `IF(G${R}="","",F${R}*G${R})` }, r[6]].forEach((v, c) => { const x = ws.getCell(R, c + 1); x.value = v; x.font = { name: F, size: 10 }; x.border = BOX; if(c >= 5 && c <= 7) x.numFmt = c === 5 && ["m", "㎡", "평", "kg", "ton"].includes(r[4]) ? "#,##0.0#" : "#,##0"; }); });
+  const T = 5 + rows.length; ws.getCell(T, 7).value = "합계"; ws.getCell(T, 7).font = { name: F, bold: true }; ws.getCell(T, 8).value = { formula: `SUM(H5:H${T - 1})` }; ws.getCell(T, 8).numFmt = "#,##0"; ws.getCell(T, 8).font = { name: F, bold: true };
+  ws.views = [{ state: "frozen", ySplit: 4 }]; ws.autoFilter = { from: "A4", to: `I${T - 1}` };
+  // 공종별 합계
+  const gs = [...new Set(rows.map(r => r[0]))]; ws.getCell(T + 2, 1).value = "공종별"; ws.getCell(T + 2, 1).font = { name: F, bold: true };
+  gs.forEach((g, k) => { ws.getCell(T + 3 + k, 1).value = g; ws.getCell(T + 3 + k, 8).value = { formula: `SUMIF(A5:A${T - 1},"${g}",H5:H${T - 1})` }; ws.getCell(T + 3 + k, 8).numFmt = "#,##0"; });
+  const w2 = wb.addWorksheet("품번표"); w2.columns = [{ width: 18 }, { width: 10 }, { width: 26 }, { width: 30 }, { width: 7 }, { width: 12 }, { width: 30 }];
+  head(w2, 1, ["품번", "공종", "품명", "규격", "단위", "단가", "메모"]);
+  const seen = new Map(); rows.forEach(r => { if(!seen.has(r[1])) seen.set(r[1], r); });
+  [...seen.values()].sort((a, b) => a[1].localeCompare(b[1])).forEach((r, i) => { [r[1], r[0], r[2], r[3], r[4], null, ""].forEach((v, c) => { const x = w2.getCell(2 + i, c + 1); x.value = v; x.font = { name: F, size: 10 }; x.border = BOX; if(c === 5){ x.numFmt = "#,##0"; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF8E1" } }; } }); });
+  w2.views = [{ state: "frozen", ySplit: 1 }];
+  const buf = await wb.xlsx.writeBuffer(), a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  a.download = `${pname} 전체 수량(품번).xlsx`.replace(/[\\/:*?"<>|]/g, "_"); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`전체 수량 ${rows.length}행 · 품번 ${seen.size}개를 엑셀로 만들었습니다`);
+}
 async function eqExportXlsx(sub){
   let ExcelJS; try{ ExcelJS = await loadExcelJS(); }catch(err){ toast(err.message, 5000); return; }
   const D = dzDraft().D, G = dzBuild(D), Mo = sub === "cover" ? cvModel(D, G) : sub === "alu" ? aluModel(D, G) : eqModel(D, G), pname = (state.M && state.M.p.name) || proj().name || "온실";
@@ -4456,6 +4523,9 @@ function dzSoonTab(sub, D, G){
 }
 /* 철골 부대 항목 (직영 시트 0103): 턴버클 = 환봉 브레싱 개수, 플레이트·부자재 = 주재료의 18%, 용융아연도금·가공제작 = 주재료 톤, 조립설치 = 평 */
 function dzSteelExtra(D, bom, G){
+  return fxKeyTable(stxRows(D, bom, G), "stx", state.canEdit, "부대 항목", "직영 시트(0103 철골공사) 기준입니다. 단위중량은 위 표의 규격에서 자동 계산(각관 0.0157×t×(A+B−3.287t), 환봉 π/4×d²×7.85)되고, 길이 가중치·비율은 산출식 칸에서 고칠 수 있습니다.");
+}
+function stxRows(D, bom, G){
   const N = fxN, E = D.equip || {}, kg = Math.round(bom.kg), rod = bom.rows.filter(r => /환봉|Ø|Φ|봉강/.test(r.spec)), rodN = rod.reduce((a, r) => a + r.cnt, 0);
   const rows = [];
   if(rodN) rows.push({ k: "tb", n: "턴버클(아연도금)", spec: "12mm", u: "ea", f: rod.map(r => N(r.cnt, "개")).join("+"), rem: `환봉 브레싱 개수 (${rod.map(r => r.n.replace(/\s*\(.*\)$/, "")).join(" · ")})` });
@@ -4463,18 +4533,18 @@ function dzSteelExtra(D, bom, G){
     { k: "galv", n: "용융아연도금", spec: "", u: "ton", f: `${N(kg, "kg")}÷${N(1000, "kg/ton")}`, rem: "주재료 중량" },
     { k: "fab", n: "가공제작", spec: "", u: "ton", f: `${N(kg, "kg")}÷${N(1000, "kg/ton")}`, rem: "주재료 중량" },
     { k: "erect", n: "경량형강철골조 조립설치", spec: "비내력식", u: "평", f: `${N(Math.round(G.area), "㎡")}×${N(0.3025, "평/㎡")}`, rem: `평당 ${G.area ? (kg / (G.area * 0.3025)).toFixed(1) : 0} kg` });
-  return fxKeyTable(fxKeyRows(rows, "stx", E), "stx", state.canEdit, "부대 항목", "직영 시트(0103 철골공사) 기준입니다. 단위중량은 위 표의 규격에서 자동 계산(각관 0.0157×t×(A+B−3.287t), 환봉 π/4×d²×7.85)되고, 길이 가중치·비율은 산출식 칸에서 고칠 수 있습니다.");
+  return fxKeyRows(rows, "stx", E);
 }
 function dzBomHtml(D, bom, ed, G){
-  const rows = bom.rows.map(r => `<tr><td>${esc(r.n)}</td>
+  const rows = bom.rows.map(r => `<tr><td class="pn">${r.ref ? "" : pnCode("steel", r.t)}</td><td>${esc(r.n)}</td>
       <td>${ed ? `<input type="text" data-dzspec="${r.t}" data-dzsf="0" value="${esc(r.spec)}" style="width:170px">` : esc(r.spec)}</td>
       <td class="r num">${r.cnt}</td><td class="r num">${fmtQty(Math.round(r.len * 10) / 10)}</td>
       <td class="r">${ed && !r.ref ? `<input type="number" step="0.01" data-dzspec="${r.t}" data-dzsf="1" value="${r.kgm}" style="width:80px;text-align:right">` : r.kgm}</td>
       <td class="r num">${r.ref ? "–" : wonM(r.kg)}</td></tr>`).join("");
-  const blk = bom.byBlk.map(x => `<tr><td colspan="2">${esc(x.name)}</td><td></td><td class="r num">${wonM(x.area)}㎡</td><td class="r num">${x.area ? (x.kg / x.area).toFixed(1) + " kg/㎡" : ""}</td><td class="r num">${wonM(x.kg)}</td></tr>`).join("");
-  return `<div class="tbl-wrap"><table class="dzt"><thead><tr><th>부재</th><th>규격</th><th class="r">개수</th><th class="r">총 길이 (m)</th><th class="r">단위중량 (kg/m)</th><th class="r">중량 (kg)</th></tr></thead>
-    <tbody>${rows}<tr class="tot"><td>합계</td><td>트러스 ${bom.trussN}개</td><td></td><td></td><td></td><td class="r num">${wonM(bom.kg)}</td></tr>
-    ${D.blocks.length > 1 ? `<tr><td colspan="6" style="font-weight:600;padding-top:10px">동별</td></tr>${blk}` : ""}</tbody></table></div>
+  const blk = bom.byBlk.map(x => `<tr><td colspan="3">${esc(x.name)}</td><td></td><td class="r num">${wonM(x.area)}㎡</td><td class="r num">${x.area ? (x.kg / x.area).toFixed(1) + " kg/㎡" : ""}</td><td class="r num">${wonM(x.kg)}</td></tr>`).join("");
+  return `<div class="tbl-wrap"><table class="dzt"><thead><tr><th>품번</th><th>부재</th><th>규격</th><th class="r">개수</th><th class="r">총 길이 (m)</th><th class="r">단위중량 (kg/m)</th><th class="r">중량 (kg)</th></tr></thead>
+    <tbody>${rows}<tr class="tot"><td></td><td>합계</td><td>트러스 ${bom.trussN}개</td><td></td><td></td><td></td><td class="r num">${wonM(bom.kg)}</td></tr>
+    ${D.blocks.length > 1 ? `<tr><td colspan="7" style="font-weight:600;padding-top:10px">동별</td></tr>${blk}` : ""}</tbody></table></div>
     <p class="note">개수는 부재 토막 수(트러스는 현재·웹재 낱개)입니다. 규격과 단위중량은 고칠 수 있고, 설계 저장 시 함께 저장됩니다. 지붕 참고선은 중량에 넣지 않습니다.</p>${G ? dzSteelExtra(D, bom, G) : ""}`;
 }
 function dzPlanSvg(D, G, tool, ed){
@@ -4887,6 +4957,7 @@ function designClick(e){
   if(e.target.closest("#dz-allin")){ dzSet(D => { D.blocks[state.dzBlk].off = []; }); return true; }
   if(e.target.closest("#dz-defbrace")){ dzSet(D => Object.assign(D.blocks[state.dzBlk], dzDefaultBraces(D.blocks[state.dzBlk]))); toast("브레싱을 기본 위치로 놓았습니다. 저장해야 남습니다."); return true; }
   if(e.target.closest("#dz-reset")){ dzSet(D => Object.assign(D.blocks[state.dzBlk], { rmCol: [], rmTr: [], rmMp: [], kb: [], noGirt: [], noGb: [] })); return true; }
+  if(e.target.closest("#dz-pnxlsx")){ pnExportAll(); return true; }
   if(e.target.closest("#dz-save")){ const Z = dzDraft(); commit(d => { d.design = clone(Z.D); }, "설계를 저장했습니다").then(ok => { if(ok){ Z.dirty = false; render(); } }); return true; }
   return false;
 }
