@@ -2904,10 +2904,10 @@ const dzGbReach = (B, g, s, left) => { const v = String(B.gbReach || "").split(/
   return Math.min(g.sw[s], r > 0 ? r : g.sw[s] <= 8000 + 1 ? g.sw[s] : Math.round(g.sw[s] * 2 / 3)); };   // 기본: 8m 이하 스팬은 끝까지, 넓은 스팬(9.6m)은 2/3 (S-005 브레싱 구조평면도)
 function dzDefaultBraces(B){
   const g = dzGrid(B), nb = g.nb, venlo = B.kind !== "gable", R = s => dzRoofs(B, g, s);
-  // 브레싱 칸: 재배 칸(관리동 아님) 중 양 끝에서 둘째 칸, 그 사이는 5칸을 넘지 않게 고르게
+  // 브레싱 칸: 재배 칸(관리동 아님) 중 양 끝에서 둘째 칸, 그 사이는 B.brGap(기본 5)칸을 넘지 않게 고르게
   const grow = []; for(let j = 0; j < nb; j++){ let ok = false; for(let s = 0; s < g.ns; s++) if(g.inc(s, j) && !g.isMg(s, j)) ok = true; if(ok) grow.push(j); }
   const L0 = grow.length ? grow : [...Array(nb).keys()], a = L0.length > 3 ? L0[1] : L0[0], z = L0.length > 3 ? L0[L0.length - 2] : L0[L0.length - 1];
-  const k = Math.max(1, Math.ceil((z - a) / 5)), bays = [...new Set(Array.from({ length: k + 1 }, (_, t) => { const v = a + (z - a) * t / k; return t * 2 < k ? Math.floor(v + 1e-9) : t * 2 > k ? Math.ceil(v - 1e-9) : Math.round(v); }))].filter(j => j >= 0 && j < nb);   // 가운데 기준 대칭 (끝 쪽으로 반올림)
+  const k = Math.max(1, Math.ceil((z - a) / Math.max(2, num(B.brGap) || 5))), bays = [...new Set(Array.from({ length: k + 1 }, (_, t) => { const v = a + (z - a) * t / k; return t * 2 < k ? Math.floor(v + 1e-9) : t * 2 > k ? Math.ceil(v - 1e-9) : Math.round(v); }))].filter(j => j >= 0 && j < nb);   // 가운데 기준 대칭 (끝 쪽으로 반올림)
   const hb = [], vb = [], eb = [], gbOn = venlo && B.gbOn !== false;
   bays.forEach(j => {
     for(let s = 0; s < g.ns; s++){ if(!g.inc(s, j) || g.isMg(s, j)) continue;
@@ -3088,13 +3088,18 @@ function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
       if(c - a > 1){ add(t, [a, ys[j], zt], [c, ys[j + 1], zt]); add(t, [c, ys[j], zt], [a, ys[j + 1], zt]); } return; }
     const p = k.split(":").map(Number), s = p[0], j = p[p.length - 1], ms = p.length === 3 ? [p[1]] : [...Array(Rof(s)).keys()]; if(!inc(s, j)) return;
     ms.forEach(m => { if(m >= Rof(s)) return; const a = xs[s] + m * modOf(s), c = a + modOf(s), t = dzMemT(B, "hbr", `${s}:${m}:${j}`, "hbr"); add(t, [a, ys[j], zt], [c, ys[j + 1], zt]); add(t, [c, ys[j], zt], [a, ys[j + 1], zt]); }); });
-  // 측면 수평 브레싱 보강재(GB): 측벽 기둥 → 이웃 트러스(스팬 안쪽 GB 거리)로 지그재그, 트러스 하현 높이
+  // 측면 수평 브레싱 보강재(GB): 측벽 기둥 → 이웃 트러스(스팬 안쪽 GB 거리)로 지그재그, 지붕 수평 브레싱과 같은 높이(상현) · 지붕(모듈) 줄마다 한 토막 (유지연 온실 3D)
   if(venlo && B.gbOn !== false) for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++){ if(!g.vOut(i, j) || has("noGb", `${i}:${j}`) || g.isMg(inc(i, j) ? i : i - 1, j)) continue;   // 관리동 칸은 제외
     const s = inc(i, j) ? i : i - 1, dir = inc(i, j) ? 1 : -1, r = dzGbReach(B, g, s, dir > 0), wl = j % 2 === 0 ? j : j + 1, tl = j % 2 === 0 ? j + 1 : j;
-    if(g.rowOn(s, tl)) add(dzMemT(B, "gb", `${i}:${j}`, "gb"), [xs[i], ys[wl], zb], [xs[i] + dir * r, ys[tl], zb]); }
-  const z0 = 300, zv = 600;
+    if(g.rowOn(s, tl)){ const tg = dzMemT(B, "gb", `${i}:${j}`, "gb"), x0 = xs[i], x1 = xs[i] + dir * r, cuts = [0];
+      for(let m = 1; m < Rof(s); m++){ const xm = xs[s] + m * modOf(s), t = (xm - x0) / (x1 - x0); if(t > 0.02 && t < 0.98) cuts.push(t); } cuts.push(1); cuts.sort((p, q) => p - q);
+      for(let c = 0; c + 1 < cuts.length; c++){ const ta = cuts[c], tb = cuts[c + 1]; add(tg, [x0 + (x1 - x0) * ta, ys[wl] + (ys[tl] - ys[wl]) * ta, zt], [x0 + (x1 - x0) * tb, ys[wl] + (ys[tl] - ys[wl]) * tb, zt]); } } }
+  const z0 = 300, zv = 400, vbK = (num(B.vbSide) || (B.sideMid ? 2 : 1)) === 2;
   (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(!(i <= ns && j < nb && g.lineOn(i, j))) return;
-    const tv0 = dzMemT(B, "vbr", `${i}:${j}`, "vbr"); add(tv0, [xs[i], ys[j], zv], [xs[i], ys[j + 1], zb]); add(tv0, [xs[i], ys[j + 1], zv], [xs[i], ys[j], zb]);
+    const tv0 = dzMemT(B, "vbr", `${i}:${j}`, "vbr");
+    if(vbK && g.vEdge(i, j)){ const ym = (ys[j] + ys[j + 1]) / 2, zl = z0, zh = zb, zm = (zl + zh) / 2, gp = 65;   // 측벽: 끝 기둥 ↔ 샛기둥 반 칸, 아래·위 2단 (꺾쇠 모양)
+      [ys[j], ys[j + 1]].forEach(ye => { add(tv0, [xs[i], ye, zl], [xs[i], ym, zm - gp]); add(tv0, [xs[i], ym, zm + gp], [xs[i], ye, zh]); }); }
+    else { add(tv0, [xs[i], ys[j], zv], [xs[i], ys[j + 1], zb]); add(tv0, [xs[i], ys[j + 1], zv], [xs[i], ys[j], zb]); }
     if(!g.vEdge(i, j) && !has("noBb", `${i}:${j}`)){ const tb = dzMemT(B, "bb", `${i}:${j}`, "bb"); add(tb, [xs[i], ys[j], zv], [xs[i], ys[j + 1], zv]); add(tb, [xs[i], ys[j], zb], [xs[i], ys[j + 1], zb]); } });   // 안쪽 줄: 위·아래 보강재(BB)
   // 전후면 브레싱: 지붕(모듈) 칸 하나에 X
   (B.eb || []).forEach(k => { const p = k.split(":"), s = Number(p[1]), j = Number(p[p.length - 1]), ms = p.length === 4 ? [Number(p[2])] : [...Array(Rof(s)).keys()]; if(!(s < ns && j <= nb && g.hOut(s, j))) return;
@@ -3326,6 +3331,9 @@ function dzSteelTab(D, G, ed, Z){
       ${B.kind !== "gable" ? (() => { const md = num(B.module) || 4000, n = dzWebN(B, md), pt = md / n, gp = B.webGap == null ? 68 : num(B.webGap), ch = B.chordH == null ? 45 : num(B.chordH), hc = num(B.trussD) - 2 * ch, run = pt - gp;
         return `<div class="note" style="margin:6px 0 0">사재: 8m당 <b>${dzWebN(B, 8000)}개</b> (지붕 ${fmtQty(md)}마다 ${n}개, 간격 ${fmtQty(Math.round(pt))}) · 가로 ${fmtQty(Math.round(run))} × 세로 ${fmtQty(hc)} → 각도 약 <b>${run > 0 ? Math.round(Math.atan2(hc, run) * 180 / Math.PI * 10) / 10 : "–"}°</b> · 길이 약 ${fmtQty(Math.round(Math.hypot(run, hc)))}mm · 직복재 자리는 절점으로 비움</div>`; })() : ""}
       <div class="note" style="margin:8px 0">평면: ${esc(B.spans)} / ${esc(B.bays)} (‘평면도’ 탭에서 바꿈)<br>${bom.byBlk.map(x => `${esc(x.name)} ${wonM(x.kg / 100) / 10}톤`).join(" · ")}<br>전체 트러스 ${bom.trussN}개 · 강재 약 <b>${wonM(bom.kg / 100) / 10}톤</b> (${wonM(bom.kg / Math.max(1, G.area) * 10) / 10}kg/㎡)</div>
+      ${B.kind !== "gable" ? `<div class="g2" style="margin-top:6px"><div class="field"><label for="dzp-brGap">브레싱 칸 간격 (최대 칸 수)</label><input type="number" id="dzp-brGap" data-dzp="brGap" min="2" step="1" value="${num(B.brGap) || 5}" ${ro}></div>
+        <div class="field"><label for="dzp-vbSide">측벽 수직 브레싱</label><select id="dzp-vbSide" data-dzp="vbSide" ${ro}><option value="2" ${(num(B.vbSide) || (B.sideMid ? 2 : 1)) === 2 ? "selected" : ""}>반 칸 2단 (샛기둥)</option><option value="1" ${(num(B.vbSide) || (B.sideMid ? 2 : 1)) === 1 ? "selected" : ""}>한 칸 X</option></select></div></div>
+        <p class="note" style="margin:-2px 0 6px">브레싱 칸 간격은 ‘브레싱 기본 배치’에 씁니다 (양 끝 둘째 칸 + 그 사이 이 칸 수 이내마다). 예) 21칸·5 → 2·6·11·16·20번째, 15칸·6 → 2·8·14번째</p>` : ""}
       ${ed ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="dz-defbrace" title="S-005 브레싱 구조평면도 기준으로 다시 놓습니다: 양 끝 둘째 칸부터 5칸 이내마다(가운데 기준 대칭) · 안쪽 스팬은 지붕마다 X, 측벽 쪽 스팬은 GB가 닿고 남은 부분만 X · 모든 기둥줄 수직 · 전후면은 안쪽 스팬 쪽 지붕 칸 하나씩">브레싱 기본 배치 (S-005)</button><button class="btn sm" id="dz-reset" title="이 동에서 뺀 부재·보강재를 모두 되돌립니다">부재 초기화</button></div>` : ""}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><button class="btn" id="dz-dxf3">3D DXF</button><button class="btn" id="dz-dxf2">철골 평면 DXF</button></div>
       <p class="note" style="margin-top:6px">DXF는 모든 동을 한 도면에 넣습니다 (mm, 부재별 레이어). 맞붙은 벽의 같은 부재는 하나만 넣습니다.</p></div>`;
