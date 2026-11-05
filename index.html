@@ -3387,41 +3387,86 @@ function scGeom(G, sec, p){
   let aBefore = 0; for(let a = 0; a < nA; a++) for(let c = 0; c < nB; c++) if(has(a, c) && Bv[c + 1] <= bd + 1) aBefore += (A[a + 1] - A[a]) * (Bv[c + 1] - Bv[c]);
   const split = [aBefore / 1e6, area - aBefore / 1e6];
   return { split, manual, bd, bMin, bMax, sec: { ...sec, cells: [...set] }, set, x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: Math.min(y0, y1), y1: Math.max(y0, y1), loops: scLoops(b, set),
-    lab: [(b.X[Math.min(...topCells)] + b.X[Math.max(...topCells) + 1]) / 2, b.Y[lt]], area, L, model, over, pick, rp: L.rp.length, drive: len(L.drive), shaft: len(L.shaft), bar: len(L.bar), pocket: len(L.pocket) };
+    lab: [(b.X[Math.min(...topCells)] + b.X[Math.max(...topCells) + 1]) / 2, b.Y[lt]], area, L, model, over, pick, rp: L.rp.length, drive: len(L.drive), shaft: len(L.shaft), bar: len(L.bar), pocket: len(L.pocket),
+    trussD: b.B.trussD, W: (aMax - aMin) / 1000, Ly: (bMax - bMin) / 1000, bays: new Set([...set].map(k => +k.split(":")[1])).size };
 }
 function scAll(D, G){ const S = scOf(D), secs = S.sections || scAuto(D, G); return { S, list: secs.map(s => scGeom(G, s, S.p)).filter(Boolean).map(x => ({ ...x, NL: Math.max(1, Math.min(3, Number(x.sec.layers) || S.p.layers || 1)) })) }; }
-/* 산출서 52개 품목 (템플릿 '스크린_랙피니언 시스템.xlsx' 수식 그대로) */
-function scBom(list, p, fx){
-  const NL = Math.max(1, ...list.map(x => x.NL)), m = [0, 0, 0], names = (list[0] && list[0].pick.names) || ["RW245", "RW405", "RW605"]; list.forEach(x => { m[x.pick.cls] += x.NL; });   // 구역마다 층수만큼 한 벌씩
-  const sm = f => list.reduce((a, x) => a + f(x) * x.NL, 0);
-  const M = sm(() => 1), RP = sm(x => x.rp), DS = sm(x => x.drive) / 1000, SP = sm(x => x.shaft) / 1000, AB = sm(x => x.bar) / 1000, PK = sm(x => x.pocket), AREA = sm(x => x.area), A1 = list.reduce((a, x) => a + x.area, 0), K = p.trussW, Lt = p.trussH;
-  const layerArea = k => list.filter(x => x.NL > k).reduce((a, x) => a + x.area, 0);   // k층 스크린지 = 그 층이 있는 구역 면적
-  const over = list.some(x => x.over), N = fxN, r1 = v => Math.round(v * 1000) / 1000;
-  // 산출식 재료 (값은 고칠 수 있는 칸): 모터·랙피니언 개수, 길이(m)
-  const nM = N(M, "대"), nRP = N(RP, "개"), nDS = N(r1(DS), "m"), nSP = N(r1(SP), "m"), nAB = N(r1(AB), "m"), nPK = N(r1(PK / 1000), "m");
-  const r23 = `${nSP}÷${N(4.5, "m")}`, r27 = `${nAB}÷${N(0.8, "m")}`, r33 = `${nSP}÷${N(4.5, "m")}+${nRP}`, r47 = `${nPK}÷${N(4.5, "m")}`;
+/* 스크린 수량산출 = 실제 패킹리스트(박종국 제2온실 2026.10.07) 품목·순서·REMARK 식.
+   구역마다: 가로 W(구동축 방향 m) · 세로 L(스크린 이동 방향 m) · 베이 수 n(=세로÷4.5) · 층수 NL(=REMARK의 2(상하)) · 랙피니언 rp(층마다, =가로÷4+1)
+   여유 = ⌈수량 × (1+p%) ÷ 단위⌉ × 단위 − 수량 (패킹리스트 값에 맞춘 규칙) · p.spare[키]로 직접 고침 */
+const SC_SP = (q, r) => { if(!r || q <= 0) return 0; const t = Math.ceil(q * (1 + (r.p || 0) / 100) / (r.s || 1) - 1e-9) * (r.s || 1); return Math.max(0, t - q); };
+function scBom(list, p, fx = {}){
+  const NL = Math.max(1, ...list.map(x => x.NL)), m = [0, 0, 0], names = (list[0] && list[0].pick.names) || ["RW245", "RW405", "RW605"]; list.forEach(x => { m[x.pick.cls] += x.NL; });
+  const sm = f => list.reduce((a, x) => a + f(x), 0), r2 = v => Math.round(v * 100) / 100, N = fxN;
+  const Z = list.length, M = sm(x => x.NL), RP = sm(x => x.rp * x.NL), BL = sm(x => x.bays * x.NL), B1 = sm(x => x.bays), RB = sm(x => x.rp * x.NL * x.bays);
+  const MW = sm(x => x.W / 4 * x.NL), MB = sm(x => x.W / 4 * x.bays * x.NL), ML = sm(x => x.W / 4 * (x.Ly + 4) * x.NL), SB = sm(x => x.W / 8 * x.bays * x.NL), W8 = sm(x => x.W / 8 * x.NL);
+  const L4 = sm(x => x.Ly + 4), L4N = sm(x => (x.Ly + 4) * x.NL), RL = sm(x => x.rp * x.NL * Math.max(0, x.Ly - 9)), TOW = sm(x => Math.trunc(x.Ly + 2) * x.NL);
+  const DS = sm(x => x.drive * x.NL) / 1000, SP = sm(x => x.shaft * x.NL) / 1000, AB = sm(x => x.bar * x.NL) / 1000, PK = sm(x => x.pocket * x.NL), AREA = sm(x => x.area * x.NL), A1 = sm(x => x.area);
+  const td = (list[0] && list[0].trussD) || 500, Lt = p.trussH, K = p.trussW, maxW = Math.max(0, ...list.map(x => x.W));
+  const nZ = N(Z, "구역"), nM = N(M, "대"), nRP = N(RP, "개"), nBL = N(r2(BL), "베이·층"), nSB = N(r2(SB), "본"), nMW = N(r2(MW), "칸·층");
+  const wsup = `${nMW}×${N(10, "")}×${N(2, "앞뒤")}`, sclip = `${nSB}×${N(20, "")}`, pal = `(${nBL}+${nM})×${N(2, "좌우")}`, strn = `${nZ}×${N(24, "")}+${nRP}×${N(2, "")}`;
   const rows = [
-    ["모터", "MOTER", names[0], N(m[0], "대")], ["모터", "MOTER", names[1], N(m[1], "대")], ["모터", "MOTER", names[2], N(m[2], "대"), over ? "모터사양체크" : ""],
-    ["RPU", "RPU", "POTENTIOMETER 24V/4-20mA", nM], ["체인카플링", "CHAIN COUPLING", "5/8/Z16/S/B5/4", `${nM}×2`], ["모터설치대-상", "MOTER BRACKET", "", nM], ["모터설치대-하", "MOTER BRACKET", "", nM],
-    ["모터브라켓 볼트/너트", "MOTER BRACKET BOLT NUT", `M8 x ${Lt + 25}`, `${nM}×4+${nM}×2`],
-    ["랙 피니언", "PINION", "RSD250-40/RR UNIT", nRP], ["사각와샤", "SQUARE WASHER", "", `${nRP}×2`], ["볼트(랙피니언+트러스)", "BOLT", `M8 x ${Lt + 25}`, `${nRP}×2`], ["너트(랙피니언+트러스)", "NUT", "M8", `${nRP}×2`],
-    ["랙", "RACK", "40-3/L4446", nRP], ["볼트(랙+랙조인트)", "BOLT", "M6x25", `${nRP}×4`], ["너트(랙+랙조인트)", "NUT", "M6", `${nRP}×4`],
-    ["샤프트가딩크립", "SHAFT GUARDING CLIP", "RVS/P26.5, TRN용", `${nRP}×2−${nM}×2`], ["슬라이드웰드조인트", "SLIDE WELDING JOIN", "32A, B5/4/P26.5", `${nRP}×2−${nM}×2`],
-    ["구동파이프", "SHAFT PIPE", "32A", nDS, "", "m"], ["종동파이프", "SLIDE PIPE", "31.8x1.5", nSP, "", "m"], ["랙파이프연결구", "RACK PIPE JOINT", "PH40-3/B32", `${nRP}×2`],
-    ["반달볼트 M6 x 27/32 galv.", "FLANGED BOLT", "M6 x 27/32 galv.", `⌈${nSP}÷${N(8, "m")}⌉`], ["반달너트 27/32 mm. galv.", "FLANGED NUT", "27/32 mm. galv.", `⌈${nSP}÷${N(8, "m")}⌉`],
-    ["파이프로라 주심", "PIPE ROLLER", "63mm", r23], ["파이프로라고정구", "PIPE ROLLER CLAMP", `${K} x ${Lt} 용`, r23], ["볼트(파이프로라 고정구)", "BOLT", `M6 x ${K + 20}`, r23], ["너트(파이프로라 고정구)", "NUT", "M6", r23],
-    ["가이드크립(상) @800", "GUIDE CLIP(上)", "", r27], ["가이드크립(하) @400", "GUIDE CLIP(下)", "", `${r27}×2`], ["S/S 스크린크립 @400", "SCREEN CLIP", "", `${r27}×2`],
-    ["알루미늄 스크린바", "SCREEN BAR", "(국산)", nAB, "", "m"], ["바가스켓", "SCREEN BAR RUBBER", "200M", `⌈${nAB}÷${N(200, "m")}⌉`], ["스크린바 연결구 \"I\" 형", "SCREEN BAR JOINT", "BOLT SET M5 x 12", `${nAB}÷${N(8, "m")}`],
-    ["조리개클램프", "TABLE CLAMP", "32mm", r33], ["함마볼트 (조리개 클램프)", "HAMMERHEAD BOLT", "M6 x 75", r33], ["너트(조리개 클램프)", "NUT", "M6", r33],
-    ["S/S 트러스크립 @400", "TRUSS CLIP", `${Lt} mm. type A`, `${r27}×2`], ["S/S 스크린스토퍼 @800", "SCREEN STOPPER", "type A", r27],
-    ["서스와이어", "SUS WIRE", "Ø3,0 mm. 7x7 (500 mtr.), 5.03kN", `⌈(${nPK}×3+${nM}×${N(30, "m")}+${nRP}×${N(30, "m")})÷${N(500, "m")}⌉`], ["플라스틱훅", "HOOK", "", `${nPK}÷${N(4.5, "m")}×9`],
-    ["프로파일카바", "PROFILE COVER", "", r47], ["PVC튜브", "PVC TUBE", "L=4500 mm. pvc", r47], ["체인웨이트", "VICTORCHAIN", "No. 27 (30 mtr.)", `${nPK}÷${N(30, "m")}`], ["양면테이프", "FIXING TAPE", "50m", `${nPK}÷${N(50, "m")}`],
-    ["받침선 Φ2.2x1800M", "POLYESTER WIRE", "", `⌈${N(r1(AREA), "㎡")}×${N(3.75, "m/㎡")}÷${N(1800, "m")}⌉`], ["코팅와이어", "COATED STEEL CABLE", "Ø1,7/2,5 mm. 1x7 (500 mtr.)", `⌈${nPK}×3÷${N(500, "m")}⌉`], ["S/S 스크린집게 @400", "WIRE PEG", "", `${nPK}÷${N(0.4, "m")}`],
-    ["포켓설치알미늄", "SUSPENTION STRIP", "", r47], ["알루미늄스트립", "STRIP", "", r47], ["스크류볼트", "SCREW BOLT", "", `${r47}×4`], ["와이어스트레이너 (소)", "WIRE TENSIONER", "", `${nM}×8+${nRP}×4`],
-    ...Array.from({ length: NL }, (_, k) => [`스크린지${NL > 1 ? ` (${k + 1}층)` : ""}`, "screen sheet", p[k ? `fabric${k + 1}` : "fabric"], `${N(r1(layerArea(k)), "㎡")}×${N(4.8, "m")}÷${N(4.5, "m")}`, "", "㎡"]),
-    ...Array.from({ length: NL }, (_, k) => [`포켓스크린지${NL > 1 ? ` (${k + 1}층)` : ""}`, "pocket screen", p[k ? `fabric${k + 1}` : "fabric"], N(0, "㎡"), "직접 입력", "㎡"]) ];
-  return { rows: fxApplyObj(rows.map(([n, en, spec, f, rem, unit]) => ({ n, en, spec, f, q: 0, rem: rem || "", unit: unit || "EA" })), "screen", fx),
-    sum: { M, RP, DS, SP, AB, PK: PK / 1000, AREA: A1, AREAL: AREA, NL, m, names } };
+    ...m.map((c, i) => [i, c]).filter(([, c]) => c > 0).map(([i, c]) => ({ k: `motor${i}`, n: "스크린개폐모터", spec: names[i], f: N(c, "대"), rem: "구역수×층수", warn: list.some(x => x.pick.cls === i && x.over) })),
+    { k: "chain", n: "체인 커플링용 체인", spec: "-", f: `${nM}×${N(2, "")}`, rem: "모터×2" },
+    { k: "cc", n: "체인커플링", spec: "KS 32A용", f: `${nM}×${N(2, "")}`, rem: "모터×2" },
+    { k: "mb1", n: "모터브라켓-1", spec: `${K}x${Lt} H${td}용`, f: nZ, rem: "구역수×1" },
+    { k: "mb2", n: "모터브라켓-2", spec: "공용", f: nZ, rem: "구역수×1" },
+    { k: "b880", n: "육각 볼트", spec: "SUS, M8x80", f: `${nZ}×${N(4, "")}+${nZ}×${N(4, "")}`, rem: "(모터브라켓-1×4)+(모터브라켓-2×4)", sp: { s: 10 } },
+    { k: "n880", n: "육각 너트", spec: "SUS, M8", f: `${nZ}×${N(4, "")}+${nZ}×${N(4, "")}`, rem: "육각볼트(M8×80)와 동일", sp: { s: 10 } },
+    { k: "rp", n: "랙피니언", spec: "RSD250-40/RR UNIT", f: nRP, rem: "(온실가로÷4+1)×2(상하)×구역수" },
+    { k: "rack", n: "랙", spec: "40-3/L4446", f: nRP, rem: "랙피니언과 동일" },
+    { k: "sqw", n: "사각와샤", spec: "백색, M8", f: `${nRP}×${N(2, "")}`, rem: "랙×2", sp: { s: 10 } },
+    { k: "b870", n: "육각 볼트", spec: `SUS, M8x${Lt + 25}`, f: `${nRP}×${N(2, "")}`, rem: "사각와샤와 동일", sp: { s: 10 } },
+    { k: "n870", n: "육각 너트", spec: "SUS, M8", f: `${nRP}×${N(2, "")}`, rem: "사각와샤와 동일", sp: { s: 10 } },
+    { k: "rpj", n: "랙파이프연결구", spec: "-", f: `${nRP}×${N(2, "")}`, rem: "랙×2", sp: { s: 10 } },
+    { k: "b625", n: "육각 볼트", spec: "SUS, M6x25", f: `${nRP}×${N(4, "")}`, rem: "랙파이프연결구×2", sp: { s: 10 } },
+    { k: "n625", n: "육각 너트", spec: "SUS, M6", f: `${nRP}×${N(4, "")}`, rem: "육각볼트(M6×25)와 동일", sp: { s: 10 } },
+    { k: "sgc", n: "샤프트 가이드 클립", spec: "TRN용", f: `${nRP}×${N(2, "")}−${nM}×${N(2, "")}`, rem: "(랙피니언×2)−(모터×2)", sp: { s: 10 } },
+    { k: "wj", n: "웰딩조인트", spec: "TRN용", f: `${nRP}×${N(2, "")}−${nM}×${N(2, "")}`, rem: "샤프트 가이드 클립과 동일", sp: { p: 1 } },
+    { k: "roller", n: "파이프로라 주심", spec: "63mm", f: `${N(RB, "개·베이")}−${nRP}×${N(2, "")}`, rem: "랙피니언×(온실세로÷4.5−2)", sp: { p: 2, s: 10 } },
+    { k: "rfix", n: "파이프로라고정구", spec: `${K}x${Lt} 용`, f: `${N(RB, "개·베이")}−${nRP}×${N(2, "")}`, rem: "파이프로라주심과 동일", sp: { p: 2, s: 10 } },
+    { k: "b675", n: "육각 볼트", spec: `SUS, M6x${K}`, f: `${N(RB, "개·베이")}−${nRP}×${N(2, "")}`, rem: "파이프로라고정구와 동일", sp: { p: 3, s: 10 } },
+    { k: "n675", n: "육각 너트", spec: "SUS, M6", f: `${N(RB, "개·베이")}−${nRP}×${N(2, "")}`, rem: "파이프로라고정구와 동일", sp: { p: 3, s: 10 } },
+    { k: "sus", n: "서스와이어", spec: "SUS304, 1000M", f: `⌈(${nRP}÷${N(2, "")}×${N(20, "m")}+${N(r2(L4), "m")}×${N(4, "")})÷${N(1000, "m/롤")}⌉`, rem: "[(랙피니언÷2×20)+((온실세로+4)×4×구역수)]÷1000 올림" },
+    { k: "hook", n: "플라스틱 훅", spec: "-", f: `${nBL}×${N(7, "")}×${N(2, "좌우")}`, rem: "(온실세로÷4.5)×7×2(상하)×2(좌우)×구역수", sp: { p: 3, s: 10 } },
+    { k: "tcl", n: "조리개 클램프", spec: "-", f: N(RB, "개·베이"), rem: "랙피니언×(온실세로÷4.5)", sp: { p: 1, s: 10 } },
+    { k: "hb675", n: "함마 볼트", spec: "백색, M6x75", f: N(RB, "개·베이"), rem: "조리개 클램프와 동일", sp: { p: 1, s: 10 } },
+    { k: "nt675", n: "육각 너트", spec: "SUS, M6", f: N(RB, "개·베이"), rem: "조리개 클램프와 동일", sp: { p: 1, s: 10 } },
+    { k: "wsup", n: "와이어 지지구", spec: "-", f: wsup, rem: "(온실가로÷4)×10×2(상하)×2(앞뒤)×구역수", sp: { p: 1, s: 10 } },
+    { k: "weight", n: "웨이트 추", spec: "추2+똑딱이2 SET", f: `${nBL}×${N(9, "")}×${N(2, "좌우")}`, rem: "(온실세로÷4.5)×9×2(상하)×2(좌우)×구역수", sp: { p: 2, s: 10 } },
+    { k: "tape", n: "양면테이프", spec: "50M", f: `⌈${nBL}×${N(4.7, "m")}×${N(2, "좌우")}÷${N(50, "m/롤")}⌉`, rem: "ROUNDUP[(온실세로÷4.5)×4.7×2×2×구역수÷50]" },
+    { k: "guide", n: "가이드 크립", spec: "PLASTIC", f: `${N(r2(MB), "칸·베이·층")}×${N(15, "")}`, rem: "(온실가로÷4)×15×2(상하)×(온실세로÷4.5)×구역수", sp: { p: 2, s: 100 } },
+    { k: "base", n: "받침선", spec: "1800M", f: `⌈${N(r2(ML), "칸·m·층")}×${N(15, "")}÷${N(1800, "m/롤")}⌉`, rem: "ROUNDUP[(온실가로÷4)×15×(온실세로+4)×2×구역수÷1800]" },
+    { k: "bar", n: "스크린바", spec: "GS-010, 8000L", f: nSB, rem: "(온실가로÷8)×(온실세로÷4.5)×2×구역수", sp: { p: 0.5, s: 5 } },
+    { k: "pcov", n: "프로파일 커버", spec: "-", f: `${nBL}×${N(2, "좌우")}`, rem: "(온실세로÷4.5)×2(상하)×2(좌우)×구역수", sp: { s: 10 } },
+    { k: "imp816", n: "십자와셔붙이 임팩피스", spec: "SUS #8x16", f: `${nBL}×${N(2, "좌우")}×${N(2, "")}`, rem: "프로파일커버×2", sp: { s: 100 } },
+    { k: "gasket", n: "바 가스켓", spec: "GP-001 100M", f: `⌈${nSB}×${N(8, "m")}×${N(1.1, "여유")}÷${N(100, "m/롤")}⌉`, rem: "ROUNDUP[스크린바×8×1.1÷100]" },
+    { k: "pin", n: "스크린바 연결핀", spec: "-", f: `${nSB}−${nBL}`, rem: "(온실가로÷8−1)×(온실세로÷4.5)×2×구역수" },
+    { k: "sclip", n: "스크린 크립", spec: "-", f: sclip, rem: "스크린바×20", sp: { p: 2, s: 100 } },
+    { k: "tcc", n: "트러스 크립(잔넬용)", spec: "100x50용", f: `${wsup}÷${N(2, "")}`, rem: "와이어지지구÷2", sp: { p: 1, s: 5 } },
+    { k: "tclip", n: "트러스 크립", spec: `${K}x${Lt}용`, f: `${sclip}−${wsup}÷${N(2, "")}`, rem: "(스크린바×20)−트러스크립(잔넬용)", sp: { p: 1.5, s: 100 } },
+    { k: "stop", n: "스크린 스톱퍼", spec: "-", f: `${sclip}÷${N(4, "")}`, rem: "(트러스크립합)÷4", sp: { p: 2, s: 50 } },
+    { k: "pal", n: "포켓설치 알미늄", spec: "-", f: pal, rem: "(온실세로÷4.5+1)×2(상하)×2(좌우)×구역수" },
+    { k: "pst", n: "알미늄 스트립", spec: "-", f: `${pal}÷${N(2, "")}`, rem: "포켓설치알미늄÷2" },
+    { k: "imp1016", n: "육각 임팩피스(#10x16)", spec: "델타", f: `${pal}×${N(1.5, "")}×${N(2, "")}`, rem: "(포켓설치알미늄+알미늄스트립)×2", sp: { p: 1, s: 10 } },
+    { k: "pvc", n: "PVC 튜브", spec: "GP-107, 4500L", f: `${nBL}×${N(2, "좌우")}`, rem: "(온실세로÷4.5)×2×2×구역수", sp: { s: 10 } },
+    { k: "coat", n: "코팅와이어", spec: "Ø1.7/2.8MM 1X19", f: `⌈${N(r2(L4N), "m·층")}×${N(6, "")}÷${N(500, "m/롤")}⌉`, rem: "ROUNDUP[(온실세로+4)×6×2×구역수÷500]" },
+    { k: "yoku", n: "요꾸도미", spec: "-", f: `${N(B1, "베이")}×${N(12, "")}×${N(3, "줄")}×${N(2, "좌우")}`, rem: "(온실세로÷4.5)×12×3줄×좌우2×구역수", sp: { p: 2, s: 50 } },
+    { k: "peg", n: "스크린 집게", spec: "-", f: `${N(B1, "베이")}×${N(12, "")}×${N(1, "줄")}×${N(2, "좌우")}`, rem: "(온실세로÷4.5)×12×1줄×좌우2×구역수", sp: { p: 5, s: 10 } },
+    { k: "drive", n: "구동파이프", spec: "KS 32A, 8000L", f: N(r2(W8), "본"), rem: "(온실가로÷8)×2(상하)×구역수" },
+    { k: "pipe", n: "종동파이프", spec: "Φ31.8x1.5T, 9072L", f: `${N(r2(RL), "개·m")}÷${N(9, "m")}`, rem: "(온실세로−9)÷9 × 랙피니언 (소수 유효, 9m원자재 절반사용)", sp: { p: 0.5, s: 5 } },
+    { k: "half", n: "반달볼트", spec: "M6x27/32", f: `${N(r2(RL), "개·m")}÷${N(9, "m")}`, rem: "종동파이프와 동일", sp: { p: 2, s: 10 } },
+    { k: "halfn", n: "반달볼트 너트", spec: "M6", f: `${N(r2(RL), "개·m")}÷${N(9, "m")}`, rem: "반달볼트와 동일", sp: { p: 2, s: 10 } },
+    ...Array.from({ length: NL }, (_, k) => ({ k: `fab${k + 1}`, n: p[k ? `fabric${k + 1}` : "fabric"], spec: `4.7 x ${fmtQty(Math.round(maxW + 2))}`, f: N(sm(x => x.NL > k ? x.bays : 0), "베이"), rem: "온실세로÷4.5×구역수" })),
+    { k: "pocket", n: `포켓스크린 ${p.fabric}`, spec: "1.6 x 60", f: `${nZ}×${N(2, "")}`, rem: "구역수×2" },
+    { k: "tow", n: "예인작업", spec: "-", f: N(TOW, "m"), rem: "TRUNC(온실세로+2)×2×구역수", unit: "m" },
+    { k: "f55", n: "화스너", spec: "50*50", f: `${nZ}×${N(8, "")}`, rem: "구역수×8", sp: { s: 10 } },
+    { k: "f510", n: "화스너", spec: "50*100", f: `${nZ}×${N(4, "")}`, rem: "구역수×4", sp: { s: 5 } },
+    { k: "strn", n: "와이어 스트레이너", spec: "소", f: strn, rem: "(6×2×2×구역수)+(랙피니언÷2×4)" },
+    { k: "imp1025", n: "육각 임팩피스", spec: "델타, #10x25", f: `${strn}+${nZ}×${N(8, "")}×${N(2, "")}+${nZ}×${N(4, "")}×${N(2, "")}`, rem: "와이어스트레이너+화스너(50×50)×2+화스너(50×100)×2", sp: { s: 50 } } ];
+  const out = rows.map(r => { const t = fxParse(r.f, fx[`screen:${r.k}`] || {}), v = fxEval(t), unit = r.unit || "EA", q = Math.max(0, unit === "EA" ? Math.ceil(v - 1e-9) : Math.round(v * 10) / 10), so = (p.spare || {})[r.k], spare = so != null ? Math.max(0, Math.round(num(so))) : SC_SP(q, r.sp);
+    return { ...r, t, ov: t.some(x => x.ov), q, spare, spOv: so != null, tot: q + spare, unit, en: "" }; });
+  return { rows: out, sum: { M, RP, DS, SP, AB, PK: PK / 1000, AREA: A1, AREAL: AREA, NL, m, names, Z, BL } };
 }
 function dzScreenTab(D, G, ed){
   const { S, list } = scAll(D, G), p = S.p, B = scBom(list, p, (D.equip || {}).fx), ro = ed ? "" : "disabled", sel = state.scSel, tool = ed ? (state.scTool || "sel") : "sel";
@@ -3456,9 +3501,13 @@ function dzScreenTab(D, G, ed){
       <span class="note" style="margin:0 0 0 6px">${tool === "draw" ? "평면에서 끌어서 사각형으로 구역을 그립니다 (그 칸은 다른 구역에서 빠짐)." : "빨간 구동축을 위아래로 끌어 옮깁니다 (칸 줄에 붙고 위·아래 면적 표시). 구역을 누르면 왼쪽 목록에서 강조됩니다."}</span></div>` : "";
   const legend = `<div class="dz-legend"><span><i style="background:${SC_COL.area};opacity:.4"></i>스크린 구역 (모터 1대)</span><span><i style="background:${SC_COL.drive}"></i>구동파이프</span><span><b style="display:inline-block;width:12px;height:12px;border:2px solid ${SC_COL.rp};border-radius:50%;vertical-align:-2px;margin-right:4px;background:#fff;font-size:9px;line-height:9px;text-align:center;color:${SC_COL.rp};font-weight:700">✕</b>랙피니언</span><span><i style="background:${SC_COL.shaft}"></i>종동파이프</span><span><i style="background:${SC_COL.bar}"></i>알루미늄 스크린바</span><span><i style="background:${SC_COL.pocket}"></i>포켓</span></div>`;
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
-  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">스크린 수량산출서</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>NO</th><th>품번</th><th>품명</th><th>영문</th><th>규격</th><th class="r">수량</th><th>단위</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
-    ${(pns => B.rows.map((r, i) => `<tr><td class="num">${i + 1}</td><td class="pn">${esc(pns[i])}</td><td>${esc(r.n)}</td><td style="color:var(--ink-3);font-size:11.5px">${esc(r.en)}</td><td>${esc(r.spec)}</td><td class="r num" ${r.ov ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r.q)}</td><td>${r.unit}</td><td class="fx-cell">${fxHtml(r.t, `screen:${i}`, ed)}${r.ov && ed ? ` <button class="fx-rs" data-fxrs="screen:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:${r.rem === "모터사양체크" ? "var(--crit)" : "var(--ink-3)"}">${esc(r.rem)}</td></tr>`).join(""))(scPns(B.rows))}</tbody></table></div>
-    <p class="note">계산식은 ‘스크린_랙피니언 시스템.xlsx’ 템플릿과 같습니다. 낱개 품목은 올림, m·㎡ 품목은 소수 1자리. 구역마다 정한 층수만큼 부재가 한 벌씩 더해지고, 스크린지는 층별로 그 층이 있는 구역 면적만 셉니다. 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (빨간색 = 고친 값, ↺ = 되돌리기, 칸을 비우면 원래 값, ⌈ ⌉ = 올림).${B.rows.some(r => r.ov) && ed ? ` <button class="btn sm" data-fxrs="screen:*">스크린 산출식 모두 되돌리기</button>` : ""}</p>`;
+  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">스크린 수량산출서 <span class="note" style="font-weight:400">패킹리스트 기준</span></h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>NO</th><th>품번</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th class="r">여유</th><th class="r">총계</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
+    ${B.rows.map((r, i) => `<tr><td class="num">${i + 1}</td><td class="pn">${esc(scPn(r))}</td><td>${esc(r.n)}</td><td>${esc(r.spec)}</td><td>${r.unit}</td>
+      <td class="r num" ${r.ov ? 'style="color:#C62828;font-weight:700"' : r.warn ? 'style="color:var(--crit)"' : ""}>${fmtQty(r.q)}</td>
+      <td class="r">${ed ? `<input type="number" min="0" step="1" data-scsp="${r.k}" value="${r.spare || ""}" placeholder="0" style="width:58px;text-align:right${r.spOv ? ";color:#C62828;font-weight:700" : ""}" title="${r.spOv ? "직접 넣은 여유 (비우면 자동)" : "자동 여유 · 고칠 수 있음"}">` : r.spare || ""}</td>
+      <td class="r num" style="font-weight:700">${fmtQty(r.tot)}</td>
+      <td class="fx-cell">${fxHtml(r.t, `screen:${r.k}`, ed)}${r.ov && ed ? ` <button class="fx-rs" data-fxrs="screen:${r.k}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r.rem)}${r.warn ? ' <span style="color:var(--crit)">모터사양체크</span>' : ""}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note">품목·순서·REMARK 식은 실제 패킹리스트(박종국 제2온실, 2026.10.07)와 같습니다. 구역마다 온실가로 = 구동축 방향 길이, 온실세로 = 스크린 이동 방향 길이, 2(상하) = 층수로 계산합니다. 여유는 포장 단위로 올린 값이며 직접 고칠 수 있습니다(빨간색 = 직접 넣은 값, 비우면 자동). 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (⌈ ⌉ = 올림).${B.rows.some(r => r.ov) && ed ? ` <button class="btn sm" data-fxrs="screen:*">스크린 산출식 모두 되돌리기</button>` : ""}</p>`;
   return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${tools}<div class="dz-zwrap">${zb}${scSvg(D, G, list, sel, tool)}</div>${legend}${bom}</div></div>`;
 }
 function scSvg(D, G, list, sel, tool){
@@ -3537,6 +3586,8 @@ function scClick(e){
 function scInput(e){
   if(state.tab !== "design" || state.dzSub !== "screen") return false;
   const t = e.target; if(!t.dataset) return false;
+  if(t.dataset.scsp){ if(e.type !== "change") return true; const k = t.dataset.scsp, raw = t.value.trim();
+    dzSet(D => { const S = scOf(D), sp = { ...(S.p.spare || {}) }; if(raw === "") delete sp[k]; else sp[k] = Math.max(0, Math.round(num(raw))); S.p.spare = sp; D.screen = { sections: S.sections, p: S.p }; }); return true; }
   if(t.dataset.scp){ if(e.type !== "change") return true; const k = t.dataset.scp;
     dzSet(D => { const S = scOf(D); S.p[k] = /^fabric/.test(k) ? t.value.trim() || SC_DEF[k] : k === "layers" ? Math.max(1, Math.min(3, Number(t.value))) : Math.max(0, Math.round(num(t.value))); D.screen = { sections: S.sections, p: S.p }; }); return true; }
   if(t.dataset.scdir != null || t.dataset.scdrv != null || t.dataset.sclay != null){ if(e.type !== "change") return true; const i = Number(t.dataset.scdir ?? t.dataset.scdrv ?? t.dataset.sclay);
@@ -3548,11 +3599,12 @@ async function scExportXlsx(){
   let ExcelJS; try{ ExcelJS = await loadExcelJS(); }catch(err){ toast(err.message, 5000); return; }
   const D = dzDraft().D, G = dzBuild(D), { S, list } = scAll(D, G), B = scBom(list, S.p, (D.equip || {}).fx), pname = (state.M && state.M.p.name) || proj().name || "온실";
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet("스크린"), F = "맑은 고딕", thin = { style: "thin", color: { argb: "FF999999" } }, BOX = { top: thin, left: thin, bottom: thin, right: thin };
-  ws.columns = [{ width: 6 }, { width: 26 }, { width: 24 }, { width: 30 }, { width: 11 }, { width: 7 }, { width: 16 }, { width: 56 }];
-  ws.mergeCells("A1:H1"); ws.getCell("A1").value = `${pname} SCREEN SYSTEM PACKING LIST`; ws.getCell("A1").font = { name: F, size: 15, bold: true }; ws.getCell("A1").alignment = { horizontal: "center" };
+  ws.columns = [{ width: 6 }, { width: 18 }, { width: 24 }, { width: 26 }, { width: 7 }, { width: 9 }, { width: 8 }, { width: 9 }, { width: 46 }, { width: 50 }];
+  ws.mergeCells("A1:J1"); ws.getCell("A1").value = `${pname} SCREEN SYSTEM PACKING LIST`; ws.getCell("A1").font = { name: F, size: 15, bold: true }; ws.getCell("A1").alignment = { horizontal: "center" };
   ws.getCell("G2").value = localToday() + " 설계도"; ws.getCell("G2").font = { name: F, size: 9, color: { argb: "FF777777" } };
-  ["NO", "품명_品名", "영문_英文", "규격_規格", "수량_数量", "단위", "REMARK", "산출식"].forEach((h, c) => { const x = ws.getCell(3, c + 1); x.value = h; x.font = { name: F, bold: true, size: 10 }; x.border = BOX; x.alignment = { horizontal: "center" }; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }; });
-  B.rows.forEach((r, i) => { const R = 4 + i; [i + 1, r.n, r.en, r.spec, r.q, r.unit, r.rem, fxText(r.t)].forEach((v, c) => { const x = ws.getCell(R, c + 1); x.value = c === 4 ? { formula: fxXlQ(r), result: v } : v; if(c === 7) x.alignment = { wrapText: true, vertical: "middle" }; x.font = { name: F, size: 10, color: c === 6 && v === "모터사양체크" ? { argb: "FFC62828" } : undefined }; x.border = BOX; if(c === 4 && typeof v === "number") x.numFmt = r.unit === "EA" ? "#,##0" : "#,##0.0"; }); });
+  ["NO", "품번", "품명", "규격", "단위", "수량", "여유", "총계", "REMARK", "산출식"].forEach((h, c) => { const x = ws.getCell(3, c + 1); x.value = h; x.font = { name: F, bold: true, size: 10 }; x.border = BOX; x.alignment = { horizontal: "center" }; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }; });
+  B.rows.forEach((r, i) => { const R = 4 + i; [i + 1, scPn(r), r.n, r.spec, r.unit, r.q, r.spare || null, r.tot, r.rem, fxText(r.t)].forEach((v, c) => { const x = ws.getCell(R, c + 1);
+    x.value = c === 5 ? { formula: fxXlQ(r), result: v } : c === 7 ? { formula: `F${R}+G${R}`, result: v } : v; if(c === 9) x.alignment = { wrapText: true, vertical: "middle" }; x.font = { name: F, size: 10, bold: c === 7 }; x.border = BOX; if(c >= 5 && c <= 7) x.numFmt = r.unit === "EA" ? "#,##0" : "#,##0.0"; }); });
   const w2 = wb.addWorksheet("구역"); w2.columns = [{ width: 8 }, { width: 10 }, { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }];
   w2.addRow(["구역", "동", "면적(㎡)", "모터", "층수", "랙피니언", "구동(m)", "종동(m)", "스크린바(m)", "포켓(m)", "RSD250 섹션/한도", "종동파이프 한쪽/한도", "선정 근거"]).font = { bold: true };
   list.forEach((x, i) => w2.addRow([`S${i + 1}`, G.blocks[x.sec.bi].B.name, Math.round(x.area * 10) / 10, x.model, x.NL, x.rp, Math.round(x.drive / 100) / 10, Math.round(x.shaft / 100) / 10, Math.round(x.bar / 100) / 10, Math.round(x.pocket / 100) / 10,
@@ -4160,13 +4212,16 @@ const PN_KEYS = {
   alu: ["ridge_glass", "ridge_film", "gutter_glass", "gutter_film", "gutpvc", "raf_glass", "raf_film", "rafpvc", "raftri", "gab_glass", "gab_film", "gab_pc", "gabpvc", "vent_g", "ventpvc", "vent_f", "ventsup", "ventcov", "fcover",
     "top_glass", "top_pc", "top_film", "mul_glass", "mul_pc", "mulpvc_glass", "mulpvc_pc", "bot_glass", "bot_pc", "corner", "box", "dpipe", "elbow", "dfix", "gend", "inst"],
   stx: ["tb", "plate", "galv", "fab", "erect"],
+  screen: ["motor", "chain", "cc", "mb1", "mb2", "b880", "n880", "rp", "rack", "sqw", "b870", "n870", "rpj", "b625", "n625", "sgc", "wj", "roller", "rfix", "b675", "n675", "sus", "hook", "tcl", "hb675", "nt675", "wsup", "weight", "tape", "guide", "base",
+    "bar", "pcov", "imp816", "gasket", "pin", "sclip", "tcc", "tclip", "stop", "pal", "pst", "imp1016", "pvc", "coat", "yoku", "peg", "drive", "pipe", "half", "halfn", "fab1", "fab2", "fab3", "pocket", "tow", "f55", "f510", "strn", "imp1025"],
   steel: ["col", "scol", "ecol", "wcol", "chord", "web", "tv", "mp", "gutter", "rpur", "girt", "scp", "pgirt", "knee", "sch", "hbr", "gb", "vbr", "bb", "ebr"] };
-const PN_VAR = { vent: ["motor", "rrd", "mb1"] };
-const PN_SAME = { vent: { n870: "n8100", nn8: "nn8" } };   // 같은 자재는 같은 품번 (천창 육각 너트 SUS M8)
+const PN_VAR = { vent: ["motor", "rrd", "mb1"], screen: ["motor", "mb1", "fab1", "fab2", "fab3"] };
+const PN_SAME = { vent: { n870: "n8100", nn8: "nn8" }, screen: { n880: "n870", n625: "n675", nt675: "n675", halfn: "halfn" } };   // 같은 자재는 같은 품번 (천창 육각 너트 SUS M8)
 const pnVar = v => String(v || "").trim().split(/[\s,(]/)[0].replace(/[^0-9A-Za-z가-힣._×\-]/g, "").slice(0, 24);
 const pn3 = n => String(n).padStart(3, "0");
+const scPn = r => pnCode("screen", r.k, (/^fab/.test(r.k) ? String(r.n || "") : String(r.spec || "").replace(/용$/, "")).replace(/\s+/g, ""));   // 스크린지는 원단 이름, 모터브라켓은 규격 전체
 function pnCode(sub, key, spec){
-  const P = PN_PFX[sub] || sub.toUpperCase(), k0 = sub === "vent" ? String(key).replace(/^motor\d+$/, "motor") : String(key), k = (PN_SAME[sub] || {})[k0] || k0, L = PN_KEYS[sub];
+  const P = PN_PFX[sub] || sub.toUpperCase(), k0 = sub === "vent" || sub === "screen" ? String(key).replace(/^motor\d+$/, "motor") : String(key), k = (PN_SAME[sub] || {})[k0] || k0, L = PN_KEYS[sub];
   if(sub === "steel"){ const T = DZ_TYPES[k] || {}, i = L.indexOf(k);
     if(i >= 0) return `ST-${pn3(i + 1)}`;
     if(T.truss) return `ST-1${T.trk + 1}${{ top: 1, bot: 2, web: 3, tv: 4 }[T.truss]}`;   // TR1 상현재 ST-111 · 하현재 112 · 사재 113 · 직복재 114
@@ -4175,8 +4230,6 @@ function pnCode(sub, key, spec){
   if(L){ const i = L.indexOf(k); if(i < 0) return `${P}-${pnVar(k).toUpperCase()}`; return `${P}-${pn3(sub === "stx" ? 901 + i : i + 1)}${(PN_VAR[sub] || []).includes(k) ? "-" + pnVar(spec) : ""}`; }
   return `${P}-${pn3(Number(k) + 1)}`;   // 유동휀·훈증기·행잉거터·유인와이어: 행 순서
 }
-/* 스크린: 고정 행은 순서대로 SC-001…, 스크린지 n층 SC-10n-원단, 포켓스크린지 n층 SC-11n */
-const scPns = rows => { let f = 0, k = 0; return rows.map((r, i) => /^포켓스크린지/.test(r.n) ? `SC-11${++k}` : /^스크린지/.test(r.n) ? `SC-10${++f}-${pnVar(r.spec)}` : `SC-${pn3(i + 1)}${i < 3 ? "-" + pnVar(r.spec) : ""}`); };
 /* 행 키 방식 산출 행 { k, n, spec, u, f, rem } → [품명, 규격, 단위, 수량, 비고, 산출식, 고침, 키]. 고친 값 = fx["탭:키"], 고친 규격 = E.specTx["탭:키"] */
 function fxKeyRows(rows, sub, E){
   const fx = E.fx || {}, st = E.specTx || {};
@@ -4468,7 +4521,7 @@ function pnAllRows(D, G){
   aluModel(D, G).rows.forEach(r => push("알루미늄", r[8], r[0], r[1], r[2], fxQty(r[3], r[2]), r[4]));
   cvModel(D, G).rows.forEach(r => push("피복", r[8], r[0], r[1], r[2], fxQty(r[3], r[2]), r[4]));
   const fx = (D.equip || {}).fx || {}, V = vtAll(D, G); vtBom(V.list, V.V.p, fx).rows.forEach(r => push("천창", pnCode("vent", r.k, r.spec), r.n, r.spec, r.unit, r.tot, r.rem));
-  const S = scAll(D, G), SB = scBom(S.list, S.S.p, fx).rows, sp = scPns(SB); SB.forEach((r, i) => push("스크린", sp[i], r.n, r.spec, r.unit, r.q, r.rem));
+  const S = scAll(D, G); scBom(S.list, S.S.p, fx).rows.forEach(r => push("스크린", scPn(r), r.n, r.spec, r.unit, r.tot, r.rem));
   const Mo = eqModel(D, G); [["fan", "유동휀", Mo.fan.rows], ["fog", "훈증기", Mo.fog.rows], ["hgut", "행잉거터", Mo.hg.rows], ["wire", "유인와이어", Mo.wire.rows]].forEach(([k, g, rows]) => rows.forEach((r, i) => push(g, pnCode(k, i), r[0], r[1], r[2], fxQty(r[3], r[2]), r[4])));
   return out;
 }
