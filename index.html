@@ -2724,7 +2724,7 @@ function printDaily(M){
    평면에서 동을 끌어 옮기면 다른 동 가장자리에 자석처럼 붙습니다. 바깥 줄 칸을 모두 빼면 스팬·칸 목록에서도 빠지고, 바깥 점선 칸을 누르면 늘어납니다. */
 const DZ_KINDS = { venlo: "벤로형 온실", gable: "철골 박공" };
 const DZ_PARAMS = {
-  venlo: [["gutterZ", "거터 높이 (mm)"], ["module", "지붕 폭 (mm)"], ["ridgeH", "지붕 높이 (거터~용마루)"], ["trussD", "트러스 춤 (mm, 바깥)"], ["mpH", "미니기둥 높이 (mm)"], ["webPitch", "사재 가로 간격 (mm)"], ["webGap", "사재 절점 간격 (mm)"], ["chordH", "현재 춤 (mm)"], ["kneeL", "보강재 길이 (mm)"]],
+  venlo: [["gutterZ", "거터 높이 (mm)"], ["module", "지붕 폭 (mm)"], ["ridgeH", "지붕 높이 (거터~용마루)"], ["trussD", "트러스 춤 (mm, 바깥)"], ["mpH", "미니기둥 높이 (mm)"], ["webN8", "사재 수 (8m당, 0=자동 8000÷춤)"], ["webGap", "사재 절점 간격 (mm)"], ["chordH", "현재 춤 (mm)"], ["kneeL", "보강재 길이 (mm)"]],
   gable: [["gutterZ", "처마 높이 (mm)"], ["ridgeH", "지붕 높이 (처마~용마루)"], ["module", "전후면 샛기둥 간격 (mm)"], ["rpurSp", "지붕 퍼린 간격 (mm)"], ["panels", "트러스 칸 수 (8m당)"], ["kneeL", "보강재 길이 (mm)"]] };
 const DZ_TYPES = {
   col:    { n: "내부기둥", c: "#1565C0", w: 2.4, layer: "S-COLUMN", aci: 1 },
@@ -2927,7 +2927,7 @@ function dzBlockNew(kind, o = {}){
     girts: kind === "gable" ? "1300, 2600" : "1800, 3550", scrPur: kind === "gable" ? "" : "5300, 5800", gbOn: kind !== "gable", gbReach: "",
     sideMid: true, endMid: true, roof: true, kb: [], rmCol: [], rmTr: [], rmMp: [], noGirt: [], noGb: [] };
   Object.assign(B, kind === "gable" ? { gutterZ: 4000, ridgeH: 1200, module: 3000, rpurSp: 1000, trussD: 0, mpH: 0, panels: 8, kneeL: 800 }
-                                    : { gutterZ: 6000, module: 4000, ridgeH: 1000, trussD: 500, mpH: 150, panels: 8, kneeL: 800, webPitch: 450, webGap: 68, chordH: 45 }, o);
+                                    : { gutterZ: 6000, module: 4000, ridgeH: 1000, trussD: 500, mpH: 150, panels: 8, kneeL: 800, webPitch: 450, webN8: 0, webGap: 68, chordH: 45 }, o);
   return Object.assign(B, dzDefaultBraces(B), o.hb ? { hb: o.hb } : {});
 }
 const dzNew = () => ({ blocks: [dzBlockNew("venlo")], specs: {} });
@@ -3008,6 +3008,14 @@ function dzGrow(B, s, j){
 /* 한 동의 부재 (전체 좌표) */
 /* 스크린 단수(스크린 탭 구역 중 가장 많은 단수): 재배실 박공 스크린 채널 줄 수, 3단이면 트러스도 3단(중현재 추가) */
 function dzScL(D){ const S0 = D.screen || {}, sp0 = { ...SC_DEF, ...(S0.p || {}) }; return Math.max(1, Math.min(3, ...(Array.isArray(S0.sections) && S0.sections.length ? S0.sections.map(x => Number(x.layers) || sp0.layers || 1) : [sp0.layers || 1]))); }
+/* 트러스 사재 (와렌형): 지붕(모듈)마다 나눠 직복재·끝 수직재 자리를 절점으로 → 서로 겹치지 않음.
+   개수 = 8m당 개수(B.webN8, 0이면 8000 ÷ 트러스 춤: H500 → 16개) × 모듈 길이 ÷ 8000 (모듈마다 짝수), 절점에서 이웃 사재와 webGap만큼 띄우고 수직재 쪽은 그 반 폭(22.5)만큼 더 띄움 */
+function dzWebN(B, len){ const n8 = num(B.webN8) > 0 ? num(B.webN8) : Math.round(8000 / Math.max(200, num(B.trussD) || 500)); return Math.max(2, Math.round(n8 * len / 8000 / 2) * 2); }
+function dzWebs(B, x0, S, R, put){
+  const gap = Math.max(0, B.webGap == null ? 68 : num(B.webGap)), half = 22.5, md = S / Math.max(1, R);
+  for(let m = 0; m < Math.max(1, R); m++){ const a0 = x0 + m * md, n = dzWebN(B, md), p = md / n;
+    for(let k = 0; k < n; k++){ const a = a0 + k * p + gap / 2 + (k === 0 ? half : 0), b = a0 + (k + 1) * p - gap / 2 - (k === n - 1 ? half : 0); put(a, b, k % 2 === 0); } }
+}
 function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
   const { sw, bh, xs, ys, ns, nb, inc } = g, L = [], add = (t, a, b, mid) => L.push({ t, bi, a: [a[0] + ox, a[1] + oy, a[2]], b: [b[0] + ox, b[1] + oy, b[2]], ...(mid ? { mid: true } : {}) });
   const gz = B.gutterZ, has = (a, k) => (B[a] || []).includes(k), venlo = B.kind !== "gable";
@@ -3037,9 +3045,8 @@ function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
         if(scL >= 3) add(T_("trm"), [x0, y, (zt + zb) / 2], [x0 + S, y, (zt + zb) / 2]);   // 스크린 3단: 트러스 3단 (중현재)
         add(T_("trw"), [x0, y, zb], [x0, y, zt]); add(T_("trw"), [x0 + S, y, zb], [x0 + S, y, zt]);
         // 사재: 와렌형 V. 가로 간격 pitch마다 하나, 같은 절점에서 이웃 사재와 gap만큼 띄움, 현재 안쪽 면(zb+ch ~ zt−ch) 사이 → 실제 자르는 길이
-        const pitch = Math.max(150, num(B.webPitch) || 450), gap = Math.max(0, Math.min(pitch * 0.8, B.webGap == null ? 68 : num(B.webGap))), ch = Math.max(0, Math.min(B.trussD / 3, B.chordH == null ? 45 : num(B.chordH)));
-        const nW = Math.max(2, Math.floor((S - 2 * ch) / pitch)), offW = (S - nW * pitch) / 2, zl = zb + ch, zh = zt - ch;
-        for(let k = 0; k < nW; k++){ const a = x0 + offW + k * pitch + gap / 2, b = a + pitch - gap; if(k % 2 === 0) add(T_("trw"), [a, y, zl], [b, y, zh]); else add(T_("trw"), [a, y, zh], [b, y, zl]); }
+        const ch = Math.max(0, Math.min(B.trussD / 3, B.chordH == null ? 45 : num(B.chordH))), zl = zb + ch, zh = zt - ch;
+        dzWebs(B, x0, S, Rof(s), (a, b, up) => add(T_("trw"), [a, y, up ? zl : zh], [b, y, up ? zh : zl]));
         for(let m = 1; m < Rof(s); m++){ const x = x0 + m * modOf(s); add(T_("trv"), [x, y, zb], [x, y, zt]); } }   // 직복재: 미니기둥 아래
       else { const xm = x0 + S / 2, zr = gz + B.ridgeH;      // 박공 트러스
         add("chord", [x0, y, gz], [x0 + S, y, gz]); add("chord", [x0, y, gz], [xm, y, zr]); add("chord", [xm, y, zr], [x0 + S, y, gz]);
@@ -3094,8 +3101,8 @@ function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
     else if(tl === "knee" && len > 1){ const k0 = B.kneeL, ux = (E[0] - A[0]) / len, uy = (E[1] - A[1]) / len; add(tt, [A[0], A[1], zb - k0], [A[0] + ux * k0, A[1] + uy * k0, zb]); }
     else if(tl === "truss" && len > 1){ const f = DZ_TYPES["trt" + q.t] ? q.t : Math.round(len), T_ = k => DZ_TYPES[k + f] ? k + f : { trt: "chord", trb: "chord", trm: "chord", trw: "web", trv: "tv" }[k], ux = (E[0] - A[0]) / len, uy = (E[1] - A[1]) / len, P2 = (d, z) => [A[0] + ux * d, A[1] + uy * d, z];
       add(T_("trt"), P2(0, zt), P2(len, zt)); add(T_("trb"), P2(0, zb), P2(len, zb)); if(scL >= 3) add(T_("trm"), P2(0, (zt + zb) / 2), P2(len, (zt + zb) / 2)); add(T_("trw"), P2(0, zb), P2(0, zt)); add(T_("trw"), P2(len, zb), P2(len, zt));
-      const pitch = Math.max(150, num(B.webPitch) || 450), gap = Math.max(0, Math.min(pitch * 0.8, B.webGap == null ? 68 : num(B.webGap))), ch = Math.max(0, Math.min(B.trussD / 3, B.chordH == null ? 45 : num(B.chordH))), nW = Math.max(2, Math.floor((len - 2 * ch) / pitch)), offW = (len - nW * pitch) / 2;
-      for(let k = 0; k < nW; k++){ const d1 = offW + k * pitch + gap / 2, d2 = d1 + pitch - gap; if(k % 2 === 0) add(T_("trw"), P2(d1, zb + ch), P2(d2, zt - ch)); else add(T_("trw"), P2(d1, zt - ch), P2(d2, zb + ch)); }
+      const ch = Math.max(0, Math.min(B.trussD / 3, B.chordH == null ? 45 : num(B.chordH)));
+      dzWebs(B, 0, len, 1, (d1, d2, up) => add(T_("trw"), P2(d1, up ? zb + ch : zt - ch), P2(d2, up ? zt - ch : zb + ch)));
       trussN++; }
     for(let k = n0; k < L.length; k++) L[k].add = true;
     if(L.length > n0) addM.push({ idx, tool: tl, t: tl === "truss" ? q.t : tt, a: [A[0] + ox, A[1] + oy], b: [E[0] + ox, E[1] + oy] }); });
@@ -3122,12 +3129,23 @@ function dzBuild(D){
 const dzLen = m => Math.hypot(m.b[0] - m.a[0], m.b[1] - m.a[1], m.b[2] - m.a[2]);
 /* 철골 길이 산출식: 길이별 개수 → "8m × 19개 + 4.5m × 2개" (종류가 많으면 셋까지 + 나머지 합). 숫자 칸 고치기 = D.equip.fx["steel:타입"] */
 function dzLenFx(D, t, ms){
-  const N = fxN, gp = new Map(); ms.forEach(m => { const k = Math.round(dzLen(m)); gp.set(k, (gp.get(k) || 0) + 1); });
+  const N = fxN, T0 = DZ_TYPES[t] || {};
+  // 트러스 사재: 트러스 수 × 트러스당 사재 수 × 사재 1개 길이 + 끝 수직재 수 × 트러스 춤 (사재 길이 = √(가로² + 세로²))
+  if(T0.truss === "web" && ms.length){ const vert = ms.filter(m => Math.abs(m.a[0] - m.b[0]) < 1 && Math.abs(m.a[1] - m.b[1]) < 1), dg = ms.filter(m => !vert.includes(m));
+    const nTr = (D._G || { L: [] }).L.filter(m => m.t === "trt" + t.slice(3)).length, cnt = new Map(); dg.forEach(m => { const k = Math.round(dzLen(m)); cnt.set(k, (cnt.get(k) || 0) + 1); });
+    const gs = [...cnt].sort((a, b) => b[1] - a[1]), top = gs[0];
+    if(top && nTr && gs.every(([, c]) => Number.isInteger(c / nTr))){ const m0 = dg.find(m => Math.round(dzLen(m)) === top[0]), dx = Math.round(Math.hypot(m0.b[0] - m0.a[0], m0.b[1] - m0.a[1])), dz = Math.round(Math.abs(m0.b[2] - m0.a[2]));
+      const vc = new Map(); vert.forEach(m => { const k = Math.round(dzLen(m)); vc.set(k, (vc.get(k) || 0) + 1); });
+      const f = `${N(nTr, "트러스")}×(${gs.map(([l, c], i) => `${N(c / nTr, i ? "끝 사재" : "사재")}×${N(l / 1000, "m")}`).join("+")})` + [...vc].map(([l, c]) => `+${N(c, "끝 수직재")}×${N(l / 1000, "m 트러스 춤")}`).join("");
+      const tk = fxParse(f, ((D.equip || {}).fx || {})[`steel:${t}`] || {});
+      return { t: tk, len: fxEval(tk), ov: tk.some(x => x.ov), note: `트러스 1개당 사재 ${dg.length / nTr}개 (8m당 ${dzWebN((D.blocks || [])[0] || {}, 8000)}개 기준) · 사재 1개 = √(가로 ${fmtQty(dx)}² + 세로 ${fmtQty(dz)}²) = ${fmtQty(top[0])}mm (가로 = 사재 간격 − 절점 간격, 세로 = 트러스 춤 − 현재 춤 × 2) · 끝 사재 = 직복재·끝 수직재 쪽이라 반 폭만큼 짧음` }; } }
+  const gp = new Map(); ms.forEach(m => { const k = Math.round(dzLen(m)); gp.set(k, (gp.get(k) || 0) + 1); });
   let gs = [...gp].sort((a, b) => b[1] - a[1] || b[0] - a[0]), rest = 0; if(gs.length > 4){ rest = gs.slice(3).reduce((a, [l, c]) => a + l * c, 0); gs = gs.slice(0, 3); }
   const f = gs.map(([l, c]) => `${N(l / 1000, "m")}×${N(c, "개")}`).join("+") + (rest ? `+${N(Math.round(rest) / 1000, "m 기타")}` : "") || N(0, "m");
   const tk = fxParse(f, ((D.equip || {}).fx || {})[`steel:${t}`] || {}); return { t: tk, len: fxEval(tk), ov: tk.some(x => x.ov) };
 }
 function dzBom(D, G){
+  Object.defineProperty(D, "_G", { value: G, configurable: true, enumerable: false, writable: true });
   const sp = t => ({ name: (D.specs[t] && D.specs[t][0]) || DZ_SPEC[t][0], kg: num(D.specs[t] && D.specs[t][1] != null ? D.specs[t][1] : DZ_SPEC[t][1]) });
   const rows = Object.keys(DZ_TYPES).map(t => { const ms = G.L.filter(m => m.t === t), len = ms.length ? dzLenFx(D, t, ms).len : 0, S0 = sp(t);
     return { t, n: DZ_TYPES[t].n + (dzCode(D, t) ? ` (${dzCode(D, t)})` : ""), spec: S0.name, kgm: S0.kg, cnt: ms.length, len, kg: DZ_TYPES[t].ref ? 0 : len * S0.kg, ref: !!DZ_TYPES[t].ref }; }).filter(r => r.cnt);
@@ -3292,8 +3310,8 @@ function dzSteelTab(D, G, ed, Z){
       <label class="chk"><input type="checkbox" data-dzc="sideMid" ${B.sideMid ? "checked" : ""} ${ro}> 측벽 샛기둥 (칸 중앙)</label>
       <label class="chk"><input type="checkbox" data-dzc="endMid" ${B.endMid ? "checked" : ""} ${ro}> 전후면 샛기둥</label>
       ${B.kind !== "gable" ? `<label class="chk"><input type="checkbox" data-dzc="roof" ${B.roof ? "checked" : ""}> 지붕 참고선 보기·출력</label>` : ""}
-      ${B.kind !== "gable" ? (() => { const pt = num(B.webPitch) || 450, gp = B.webGap == null ? 68 : num(B.webGap), ch = B.chordH == null ? 45 : num(B.chordH), hc = num(B.trussD) - 2 * ch, run = pt - gp;
-        return `<div class="note" style="margin:6px 0 0">사재: 가로 ${fmtQty(run)} × 세로 ${fmtQty(hc)} → 각도 약 <b>${run > 0 ? Math.round(Math.atan2(hc, run) * 180 / Math.PI * 10) / 10 : "–"}°</b> · 길이 ${fmtQty(Math.round(Math.hypot(run, hc)))}mm (현재 안쪽 면 사이)</div>`; })() : ""}
+      ${B.kind !== "gable" ? (() => { const md = num(B.module) || 4000, n = dzWebN(B, md), pt = md / n, gp = B.webGap == null ? 68 : num(B.webGap), ch = B.chordH == null ? 45 : num(B.chordH), hc = num(B.trussD) - 2 * ch, run = pt - gp;
+        return `<div class="note" style="margin:6px 0 0">사재: 8m당 <b>${dzWebN(B, 8000)}개</b> (지붕 ${fmtQty(md)}마다 ${n}개, 간격 ${fmtQty(Math.round(pt))}) · 가로 ${fmtQty(Math.round(run))} × 세로 ${fmtQty(hc)} → 각도 약 <b>${run > 0 ? Math.round(Math.atan2(hc, run) * 180 / Math.PI * 10) / 10 : "–"}°</b> · 길이 약 ${fmtQty(Math.round(Math.hypot(run, hc)))}mm · 직복재 자리는 절점으로 비움</div>`; })() : ""}
       <div class="note" style="margin:8px 0">평면: ${esc(B.spans)} / ${esc(B.bays)} (‘평면도’ 탭에서 바꿈)<br>${bom.byBlk.map(x => `${esc(x.name)} ${wonM(x.kg / 100) / 10}톤`).join(" · ")}<br>전체 트러스 ${bom.trussN}개 · 강재 약 <b>${wonM(bom.kg / 100) / 10}톤</b> (${wonM(bom.kg / Math.max(1, G.area) * 10) / 10}kg/㎡)</div>
       ${ed ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="dz-defbrace" title="브레싱을 기본 위치로 다시 놓습니다: 양 끝 둘째 칸부터 5칸 이내마다 · 지붕마다 X(GB가 닿는 바깥 지붕 제외) · 모든 기둥줄 수직 · 전후면은 지붕 칸 하나씩">브레싱 기본 배치</button><button class="btn sm" id="dz-reset" title="이 동에서 뺀 부재·보강재를 모두 되돌립니다">부재 초기화</button></div>` : ""}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><button class="btn" id="dz-dxf3">3D DXF</button><button class="btn" id="dz-dxf2">철골 평면 DXF</button></div>
@@ -3307,6 +3325,7 @@ function dzSteelTab(D, G, ed, Z){
     const trT = Object.keys(DZ_TYPES).filter(t => DZ_TYPES[t].truss).sort((a, b) => DZ_TYPES[a].span - DZ_TYPES[b].span || "tbmwv".indexOf(a[2]) - "tbmwv".indexOf(b[2]));
     const types = isCol ? dzColTypes(D) : tl === "truss" ? [...trT, ...["chord", "web", "tv", "sch"].filter(t => G.L.some(m => m.t === t))] : tl ? [...(DZ_TOOL_TYPES[tl] || [DZ_TOOL_COLOR[tl]]), ...Object.keys(DZ_TYPES).filter(t => DZ_TYPES[t].mt && (DZ_TOOL_TYPES[tl] || []).includes(DZ_TYPES[t].base))] : Object.keys(DZ_TYPES).filter(t => !DZ_TYPES[t].ref && !DZ_TYPES[t].old);
     const delAble = t => isCol ? !!DZ_TYPES[t].custom : !!(DZ_TYPES[t].mt || (DZ_TYPES[t].cfam && DZ_TYPES[t].truss === "top")), pickV = t => tl === "truss" ? (DZ_TYPES[t].truss ? t.slice(3) : null) : DZ_TYPES[t].mt || DZ_MT_BASE[tl] === t ? t : null;
+    Object.defineProperty(D, "_G", { value: G, configurable: true, enumerable: false, writable: true });
     const rows = types.filter(t => DZ_TYPES[t]).map(t => { const ms = G.L.filter(m => m.t === t), lf = dzLenFx(D, t, ms); return { t, n: ms.length, len: lf.len, lf, custom: !!DZ_TYPES[t].custom }; }).filter(r => r.n || r.custom || tl);
     const sp = t => (D.specs[t] && D.specs[t][0]) || DZ_SPEC[t][0], kg = t => num(D.specs[t] && D.specs[t][1] != null ? D.specs[t][1] : DZ_SPEC[t][1]);
     const title = isCol ? "기둥" : tl ? (DZ_TOOLS.find(x => x[0] === tl) || [, "부재"])[1] : "철골 부재 전체";
@@ -3322,7 +3341,7 @@ function dzSteelTab(D, G, ed, Z){
         <td><input data-dzspec="${r.t}" data-dzsf="3" value="${esc(DZ_TYPES[r.t].n)}" ${dis} aria-label="명칭" style="width:8em"></td>
         <td><input data-dzspec="${r.t}" data-dzsf="0" value="${esc(sp(r.t))}" ${dis} aria-label="규격" style="width:9em"></td>
         <td class="r"><input type="number" step="0.01" data-dzspec="${r.t}" data-dzsf="1" value="${kg(r.t)}" ${dis} aria-label="단위중량" style="width:5.2em;text-align:right"></td>
-        <td class="r num">${r.n}개</td><td class="fx-cell" style="white-space:nowrap">${r.n ? `${fxHtml(r.lf.t, `steel:${r.t}`, ed)} = <b style="${r.lf.ov ? "color:#C62828" : ""}">${fmtQty(Math.round(r.len * 10) / 10)}m</b>${r.lf.ov && ed ? ` <button class="fx-rs" data-fxrs="steel:${r.t}" title="길이 산출식 되돌리기">↺</button>` : ""}` : "0m"}</td><td class="r num">${fmtQty(Math.round(r.len * kg(r.t)))}kg</td>${ed && tl ? `<td>${delAble(r.t) ? (isCol ? `<button class="dz-x" data-dzctdel="${r.t}" title="이 타입 지우기 (이 타입 기둥은 내부기둥으로)">×</button>` : `<button class="dz-x" data-dzmtdel="${esc(DZ_TYPES[r.t].cfam ? "fam:" + DZ_TYPES[r.t].cfam : r.t)}" title="이 타입 지우기 (이 타입 자재는 원래 타입으로)">×</button>`) : ""}</td>` : ""}</tr>`).join("")}
+        <td class="r num">${r.n}개</td><td class="fx-cell" style="white-space:nowrap">${r.n ? `${fxHtml(r.lf.t, `steel:${r.t}`, ed)} = <b style="${r.lf.ov ? "color:#C62828" : ""}">${fmtQty(Math.round(r.len * 10) / 10)}m</b>${r.lf.ov && ed ? ` <button class="fx-rs" data-fxrs="steel:${r.t}" title="길이 산출식 되돌리기">↺</button>` : ""}${r.lf.note ? `<div class="note" style="margin:2px 0 0;white-space:normal;max-width:420px">${esc(r.lf.note)}</div>` : ""}` : "0m"}</td><td class="r num">${fmtQty(Math.round(r.len * kg(r.t)))}kg</td>${ed && tl ? `<td>${delAble(r.t) ? (isCol ? `<button class="dz-x" data-dzctdel="${r.t}" title="이 타입 지우기 (이 타입 기둥은 내부기둥으로)">×</button>` : `<button class="dz-x" data-dzmtdel="${esc(DZ_TYPES[r.t].cfam ? "fam:" + DZ_TYPES[r.t].cfam : r.t)}" title="이 타입 지우기 (이 타입 자재는 원래 타입으로)">×</button>`) : ""}</td>` : ""}</tr>`).join("")}
       <tr class="sum"><td colspan="5">합계${ed && isCol ? ` <button class="btn sm" data-dzctadd style="margin-left:6px">＋ 타입 추가</button>` : ed && tl && (tl === "truss" || DZ_MT_BASE[tl]) ? ` <button class="btn sm" data-dzmtadd style="margin-left:6px">＋ 타입 추가</button>` : ""}${isCol ? (state.dzColPick && DZ_TYPES[state.dzColPick] ? ` <span class="note" style="margin:0;font-weight:400">· ${esc(dzCode(D, state.dzColPick))} 선택됨 (빈 자리 누르면 ${esc(dzCode(D, state.dzColPick))}로 넣기)</span>` : ` <span class="note" style="margin:0;font-weight:400">· 줄을 누르면 그 타입으로 넣기</span>`) : ""}</td><td class="r num">${rows.reduce((a, r) => a + r.n, 0)}개</td><td class="r num">${fmtQty(Math.round(rows.reduce((a, r) => a + r.len, 0) * 10) / 10)}m</td><td class="r num">${fmtQty(Math.round(kgSum))}kg</td>${ed && isCol ? "<td></td>" : ""}</tr></tbody></table></div>`; };
   let main;
   if(view === "3d") main = `<div class="dz-tools"><button data-dz3tool="" class="${t3 ? "" : "on"}">🖐 보기만</button>${DZ_TOOLS.map(([k, l]) => `<button data-dz3tool="${k}" class="${t3 === k ? "on" : ""}" ${ed ? "" : "disabled"}><i style="background:${DZ_TYPES[DZ_TOOL_COLOR[k]].c}"></i>${l}</button>`).join("")}</div>
