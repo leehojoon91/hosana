@@ -221,6 +221,9 @@ table.zt td,table.zt th{border-bottom:1px solid var(--line)}
 .dz-coltab td{padding:3px 6px;white-space:nowrap}.dz-coltab td i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 .dz-coltab input{font:inherit;font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink)}.dz-coltab input:disabled{border-color:transparent;background:transparent}
 .dz-coltab tr.sum td{border-top:1px solid var(--line);font-weight:600}
+.dz-coltab.float{position:fixed;right:auto;bottom:auto;z-index:60;resize:both;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);min-width:220px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.dz-coltab.float.mini{resize:none;height:auto!important}.dz-coltab.float .dz-leghd{cursor:move;user-select:none;position:sticky;top:-6px;background:var(--surface);padding:2px 0 4px;z-index:1}
+.dz-leghd{display:flex;align-items:center;gap:8px}
 .dz-coltab tbody tr[data-dzctpick]{cursor:pointer}.dz-coltab tbody tr[data-dzctpick]:hover td{background:var(--surface-2)}
 .dz-coltab tr.pick td{background:var(--accent-soft)!important;box-shadow:inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
 .dz-coltab.all{max-height:70%;overflow:auto}.dz-coltab.mini{padding:4px 8px}
@@ -3256,11 +3259,13 @@ function dzSteelTab(D, G, ed, Z){
     const rows = types.filter(t => DZ_TYPES[t]).map(t => { const ms = G.L.filter(m => m.t === t); return { t, n: ms.length, len: ms.reduce((a, m) => a + dzLen(m), 0) / 1000, custom: !!DZ_TYPES[t].custom }; }).filter(r => r.n || r.custom || tl);
     const sp = t => (D.specs[t] && D.specs[t][0]) || DZ_SPEC[t][0], kg = t => num(D.specs[t] && D.specs[t][1] != null ? D.specs[t][1] : DZ_SPEC[t][1]);
     const title = isCol ? "기둥" : tl ? (DZ_TOOLS.find(x => x[0] === tl) || [, "부재"])[1] : "철골 부재 전체";
-    const head = `<div class="dz-leghd"><b>${esc(title)} 범례</b><button class="linkx" data-dzlegopen>${open ? "접기 ▾" : "펼치기 ▸"}</button></div>`;
-    if(!open) return `<div class="dz-coltab mini">${head}</div>`;
+    // 따로 창(기본): 화면에 떠 있는 창 — 머리줄을 끌어 옮기고, 오른쪽 아래 모서리로 크기 조절. 위치·크기는 이 PC에 기억
+    const fl = state.dzLegFloat !== false, lp = dzLegPos(), fst = fl ? ` style="left:${lp.x}px;top:${lp.y}px;max-height:${Math.max(160, window.innerHeight - lp.y - 8)}px;${lp.w ? `width:${lp.w}px;` : ""}${lp.h && open ? `height:${lp.h}px;` : ""}"` : "";
+    const head = `<div class="dz-leghd" ${fl ? 'data-dzlegdrag title="끌어서 옮기기"' : ""}><b>${fl ? "⠿ " : ""}${esc(title)} 범례</b><span style="margin-left:auto;display:flex;gap:8px"><button class="linkx" data-dzlegfloat title="${fl ? "도면 오른쪽 아래에 붙이기" : "따로 창으로 띄우기 (끌어서 옮길 수 있음)"}">${fl ? "도면에 붙이기 ⇲" : "따로 창 ⇱"}</button><button class="linkx" data-dzlegopen>${open ? "접기 ▾" : "펼치기 ▸"}</button></span></div>`;
+    if(!open) return `<div class="dz-coltab mini ${fl ? "float" : ""}"${fst}>${head}</div>`;
     const kgSum = rows.reduce((a, r) => a + r.len * kg(r.t), 0);
     const trInfo = tl === "truss" ? trT.filter(t => DZ_TYPES[t].truss === "top").map(t => `${esc(dzCode(D, t))} ${fmtQty(DZ_TYPES[t].span / 1000)}m × ${G.L.filter(m => m.t === t).length}개`).join(" · ") : "";
-    return `<div class="dz-coltab ${tl ? "" : "all"}" aria-label="${esc(title)} 범례">${head}${trInfo ? `<div class="note" style="margin:0 0 4px">트러스 ${trInfo} (스팬 폭마다 타입 · 짧은 것부터 TR1)</div>` : ""}<table><thead><tr><th>색</th><th>기호</th><th>명칭</th><th>규격</th><th class="r">kg/m</th><th class="r">수량</th><th class="r">길이</th><th class="r">중량</th>${ed && isCol ? "<th></th>" : ""}</tr></thead><tbody>
+    return `<div class="dz-coltab ${tl ? "" : "all"} ${fl ? "float" : ""}"${fst} aria-label="${esc(title)} 범례">${head}${trInfo ? `<div class="note" style="margin:0 0 4px">트러스 ${trInfo} (스팬 폭마다 타입 · 짧은 것부터 TR1)</div>` : ""}<table><thead><tr><th>색</th><th>기호</th><th>명칭</th><th>규격</th><th class="r">kg/m</th><th class="r">수량</th><th class="r">길이</th><th class="r">중량</th>${ed && isCol ? "<th></th>" : ""}</tr></thead><tbody>
       ${rows.map(r => `<tr ${isCol ? `data-dzctpick="${r.t}" class="${state.dzColPick === r.t ? "pick" : ""}" title="눌러서 이 타입 고르기 → 빈 기둥 자리를 누르면 이 타입으로 넣습니다"` : ""}><td><input type="color" data-dzspec="${r.t}" data-dzsf="4" value="${esc(DZ_TYPES[r.t].c)}" ${dis} aria-label="${esc(DZ_TYPES[r.t].n)} 색" class="cc"></td>
         <td><input data-dzspec="${r.t}" data-dzsf="2" value="${esc(dzCode(D, r.t))}" ${dis} aria-label="기호" style="width:3.8em"></td>
         <td><input data-dzspec="${r.t}" data-dzsf="3" value="${esc(DZ_TYPES[r.t].n)}" ${dis} aria-label="명칭" style="width:8em"></td>
@@ -4779,8 +4784,24 @@ function dzZoomSetup(){
       if(b.dataset.dzzoom === "fit"){ setVB([...full]); if(state.dzVB) delete state.dzVB[k]; } else zoomAt(b.dataset.dzzoom === "in" ? 0.7 : 1 / 0.7, c); };
   });
 }
+/* 철골 범례 따로 창: 위치·크기 (localStorage, 없으면 화면 오른쪽 아래) */
+function dzLegPos(){
+  if(!state.dzLegPos){ let v = null; try{ v = JSON.parse(localStorage.getItem("dzLegPos") || "null"); }catch(e){}
+    state.dzLegPos = v && isFinite(v.x) ? v : { x: Math.max(8, window.innerWidth - 720), y: 120 }; }
+  const p = state.dzLegPos; p.x = Math.max(0, Math.min(p.x, window.innerWidth - 120)); p.y = Math.max(0, Math.min(p.y, window.innerHeight - 40)); return p;
+}
+function dzLegSetup(){
+  const box = document.querySelector(".dz-coltab.float"); if(!box) return;
+  const save = () => { try{ localStorage.setItem("dzLegPos", JSON.stringify(state.dzLegPos)); }catch(e){} };
+  const hd = box.querySelector("[data-dzlegdrag]");
+  if(hd) hd.onpointerdown = e => { if(e.button !== 0 || e.target.closest("button")) return; e.preventDefault(); const r = box.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+    const mv = ev => { const p = state.dzLegPos; p.x = Math.max(0, Math.min(ev.clientX - dx, window.innerWidth - 120)); p.y = Math.max(0, Math.min(ev.clientY - dy, window.innerHeight - 40)); box.style.left = p.x + "px"; box.style.top = p.y + "px"; box.style.maxHeight = Math.max(160, window.innerHeight - p.y - 8) + "px"; };
+    const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); save(); };
+    window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); };
+  if(!box.classList.contains("mini")) box.onpointerup = () => { const p = state.dzLegPos, w = Math.round(box.offsetWidth), h = Math.round(box.offsetHeight); if(p.w !== w || p.h !== h){ p.w = w; p.h = h; save(); } };   // 모서리로 크기 바꾼 뒤
+}
 function dzAfter(){
-  dzZoomSetup(); cvSetup(); eqPlaceSetup();
+  dzZoomSetup(); cvSetup(); eqPlaceSetup(); dzLegSetup();
   scDrawSetup();
   vtSetup();
   dzFloorDrag();
@@ -5060,6 +5081,7 @@ function designClick(e){
   const sn = e.target.closest("[data-dzsnap]"); if(sn){ const ti = Number($("#dz-snapto").value), side = sn.dataset.dzsnap;
     dzSet(D => { const B = D.blocks[state.dzBlk], T = D.blocks[ti], g = dzGrid(B), tg = dzGrid(T), tx0 = num(T.x), ty0 = num(T.y);
       if(side === "R"){ B.x = tx0 + tg.W; B.y = ty0; } else if(side === "L"){ B.x = tx0 - g.W; B.y = ty0; } else if(side === "F"){ B.y = ty0 - g.Lg; B.x = tx0; } else { B.y = ty0 + tg.Lg; B.x = tx0; } }); return true; }
+  if(e.target.closest("[data-dzlegfloat]")){ state.dzLegFloat = state.dzLegFloat === false; render(); return true; }
   if(e.target.closest("[data-dzlegopen]")){ state.dzLegOpen = state.dzLegOpen === false; render(); return true; }
   const pk = e.target.closest("[data-dzctpick]"); if(pk && !e.target.closest("input, button")){ const t = pk.dataset.dzctpick; state.dzColPick = state.dzColPick === t ? null : t; if(state.dzColPick) state.dzColType = t; render();
     if(state.dzColPick) toast(`${dzCode(dzDraft().D, t)} ${DZ_TYPES[t].n} 선택 — 빈 기둥 자리를 누르면 이 타입으로 넣고, ‘＋ 기둥 추가’도 이 타입으로 놓습니다`, 2600); return true; }
