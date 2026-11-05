@@ -2900,9 +2900,13 @@ const dzPartLen = (B, g) => g.parts.reduce((a, k) => { const [t, x, y] = k.split
   if(t === "v" && i > 0 && i < g.ns && j < g.nb && g.inc(i - 1, j) && g.inc(i, j)) return a + g.bh[j]; if(t === "h" && j > 0 && j < g.nb && i < g.ns && g.inc(i, j - 1) && g.inc(i, j)) return a + g.sw[i]; return a; }, 0) / 1000;
 const dzBlkArea = g => { let a = 0; for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++) if(g.inc(s, j)) a += g.sw[s] * g.bh[j]; return a / 1e6; };
 /* 측면 수평 보강재(GB)가 닿는 거리: "왼쪽, 오른쪽" mm (비우면 그 스팬 폭의 2/3) */
-/* 측면 수평 보강재(GB)가 닿는 거리: "왼쪽, 오른쪽" mm (비우면 8m 이하 스팬은 스팬 끝까지, 넓으면 2/3) */
+/* 측면 수평 브레싱(GB)이 닿는 거리: "왼쪽, 오른쪽" mm (비우면 가까운 미니기둥까지) */
 const dzGbReach = (B, g, s, left) => { const v = String(B.gbReach || "").split(/[,\s]+/).map(Number).filter(x => x > 0), r = left ? v[0] : (v[1] || v[0]);
-  return Math.min(g.sw[s], r > 0 ? r : g.sw[s] <= 8000 + 1 ? g.sw[s] : Math.round(g.sw[s] * 2 / 3)); };   // 기본: 8m 이하 스팬은 끝까지, 넓은 스팬(9.6m)은 2/3 (S-005 브레싱 구조평면도)
+  if(r > 0) return Math.min(g.sw[s], r);
+  // 기본: 가까운 미니기둥(지붕 골 줄)까지 — 8m 이하 스팬은 끝, 넓은 스팬은 2/3 지점에서 가장 가까운 미니기둥 (8m·9.6m 2지붕 → 첫 지붕 4.0·4.8m)
+  const R = dzRoofs(B, g, s), want = g.sw[s] <= 8000 + 1 ? g.sw[s] : g.sw[s] * 2 / 3, md = g.sw[s] / Math.max(1, R);
+  if(R < 2 || B.kind === "gable") return Math.min(g.sw[s], Math.round(want));
+  let best = md; for(let m = 1; m < R; m++){ const x = m * md; if(Math.abs(x - want) < Math.abs(best - want) - 1e-6) best = x; } return Math.round(best); };   // 기본: 8m 이하 스팬은 끝까지, 넓은 스팬(9.6m)은 2/3 (S-005 브레싱 구조평면도)
 function dzDefaultBraces(B){
   const g = dzGrid(B), nb = g.nb, venlo = B.kind !== "gable", R = s => dzRoofs(B, g, s);
   // 브레싱 칸: 재배 칸(관리동 아님) 중 양 끝에서 둘째 칸, 그 사이는 B.brGap(기본 5)칸을 넘지 않게 고르게
@@ -3329,7 +3333,7 @@ function dzSteelTab(D, G, ed, Z){
       <label class="chk"><input type="checkbox" data-dzc="gableScreen" ${B.gableScreen !== false ? "checked" : ""} ${ro}> 스크린 박공 줄(재배동 끝)은 트러스 대신 스크린 채널(SC) 2줄</label>
       <label class="chk"><input type="checkbox" data-dzc="edgeNoTruss" ${B.edgeNoTruss !== false ? "checked" : ""} ${ro}> 바깥 테두리 박공 줄은 트러스 없음 (벽 퍼린으로)</label>
       <label class="chk"><input type="checkbox" data-dzc="gbOn" ${B.gbOn !== false ? "checked" : ""} ${ro}> 측면 수평 브레싱 보강재(GB) — 측벽에서 트러스로 지그재그</label>
-      <div class="field"><label for="dzp-gbReach">GB 닿는 거리 (mm, 왼쪽·오른쪽 측벽)</label><input type="text" id="dzp-gbReach" data-dzp="gbReach" value="${esc(B.gbReach || "")}" placeholder="비우면 스팬의 2/3 (예: 6400, 8000)" ${ro}></div>` : ""}
+      <div class="field"><label for="dzp-gbReach">GB 닿는 거리 (mm, 왼쪽·오른쪽 측벽)</label><input type="text" id="dzp-gbReach" data-dzp="gbReach" value="${esc(B.gbReach || "")}" placeholder="비우면 가까운 미니기둥까지 (예: 4800, 4000)" ${ro}></div>` : ""}
       <label class="chk"><input type="checkbox" data-dzc="sideMid" ${B.sideMid ? "checked" : ""} ${ro}> 측벽 샛기둥 (칸 중앙)</label>
       <label class="chk"><input type="checkbox" data-dzc="endMid" ${B.endMid ? "checked" : ""} ${ro}> 전후면 샛기둥</label>
       ${B.kind !== "gable" ? `<label class="chk"><input type="checkbox" data-dzc="roof" ${B.roof ? "checked" : ""}> 지붕 참고선 보기·출력</label>` : ""}
