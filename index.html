@@ -3345,7 +3345,7 @@ function dzSteelTab(D, G, ed, Z){
   const tabs = `<div class="dz-tabs">${[["3d", "3D 보기"], ["plan", "평면 편집"], ["bom", "물량표"]].map(([k, l]) => `<button class="btn sm ${view === k ? "primary" : ""}" data-dzview="${k}">${l}</button>`).join("")}
       ${view === "3d" ? `<span class="note" style="margin:0 0 0 auto">끌기: 회전 · Shift+끌기: 이동 · 휠: 확대</span>${[["iso", "등각"], ["front", "정면"], ["side", "측면"], ["top", "평면"]].map(([k, l]) => `<button class="btn sm" data-dzcam="${k}">${l}</button>`).join("")}` : ""}</div>`;
   const legend = `<div class="dz-legend">${Object.entries(DZ_TYPES).filter(([t]) => G.L.some(m => m.t === t)).map(([t, x]) => `<span><i style="background:${x.c}"></i>${x.n}</span>`).join("")}</div>`;
-  const tip = { col: "기둥 자리를 눌러 빼거나 다시 넣습니다.", truss: "트러스(가로선)를 눌러 빼거나 다시 넣습니다.", mp: "미니기둥 점을 눌러 빼거나 넣습니다 (벤로 동).", knee: "기둥을 눌러 보강재를 붙이거나 뗍니다 (양쪽 트러스 하현으로).", hbr: "지붕 하나 폭의 칸(사각형)을 눌러 수평 브레싱 X를 넣거나 뺍니다.", gb: "측벽 쪽 칸을 눌러 측면 수평 브레싱 보강재(GB, 측벽→트러스 지그재그)를 빼거나 다시 넣습니다.", vbo: "측벽 기둥줄(바깥)의 칸 구간을 누릅니다. 빈 칸을 누르면 그 칸의 모든 기둥줄(외부·내부)에 넣고, 있는 것을 누르면 그 줄만 뺍니다.", vbr: "안쪽 기둥줄의 칸 구간을 누릅니다. 빈 칸을 누르면 그 칸의 모든 기둥줄(외부·내부)에 넣고, 있는 것을 누르면 그 줄만 뺍니다. 수직 브레싱 (안쪽 줄은 위·아래 보강재 BB가 함께 들어감 — BB만 빼려면 보강재 › 브레싱 보강재).", ebr: "전후면 벽의 지붕 칸 하나를 눌러 브레싱 X를 넣거나 뺍니다.", bb: "수직 브레싱이 있는 안쪽 기둥줄 구간을 눌러 위·아래 브레싱 보강재(BB)를 빼거나 다시 넣습니다.", scp: "바깥 벽 구간을 눌러 그 구간의 스크린 마감 퍼린(SC 높이 퍼린)을 빼거나 다시 넣습니다.", sch: "재배실 박공(스크린) 줄을 눌러 스크린 채널을 빼거나 넣습니다. 줄 위의 ‘SC n단’을 누르면 1→2→3단으로 바뀝니다.", girt: "바깥 벽 구간을 눌러 그 구간의 퍼린을 넣거나 뺍니다. 동끼리 맞붙은 벽의 퍼린도 여기서 뺄 수 있습니다." };
+  const tip = { col: "기둥 자리를 눌러 빼거나 다시 넣습니다.", truss: "트러스(가로선)를 눌러 빼거나 다시 넣습니다.", mp: "미니기둥 점을 눌러 빼거나 넣습니다 (벤로 동).", knee: "기둥을 눌러 보강재를 붙이거나 뗍니다 (양쪽 트러스 하현으로).", hbr: "지붕 하나 폭의 칸(사각형)을 눌러 수평 브레싱 X를 넣거나 뺍니다.", gb: "측벽 쪽 칸을 눌러 측면 수평 브레싱 보강재(GB, 측벽→트러스 지그재그)를 빼거나 다시 넣습니다.", vbo: "측벽 기둥줄(바깥)의 칸 구간을 누릅니다. 빈 칸을 누르면 그 칸의 모든 기둥줄(외부·내부)에 넣고, 있는 것을 누르면 그 줄만 뺍니다.", ebr: "박공 벽·칸막이 줄의 지붕 칸 하나를 누르면, 같은 지붕 칸이 박공 벽·칸막이·재배실 경계 줄 전체에 함께 들어가거나 빠집니다.", vbr: "안쪽 기둥줄의 칸 구간을 누릅니다. 빈 칸을 누르면 그 칸의 모든 기둥줄(외부·내부)에 넣고, 있는 것을 누르면 그 줄만 뺍니다. 수직 브레싱 (안쪽 줄은 위·아래 보강재 BB가 함께 들어감 — BB만 빼려면 보강재 › 브레싱 보강재).", bb: "수직 브레싱이 있는 안쪽 기둥줄 구간을 눌러 위·아래 브레싱 보강재(BB)를 빼거나 다시 넣습니다.", scp: "바깥 벽 구간을 눌러 그 구간의 스크린 마감 퍼린(SC 높이 퍼린)을 빼거나 다시 넣습니다.", sch: "재배실 박공(스크린) 줄을 눌러 스크린 채널을 빼거나 넣습니다. 줄 위의 ‘SC n단’을 누르면 1→2→3단으로 바뀝니다.", girt: "바깥 벽 구간을 눌러 그 구간의 퍼린을 넣거나 뺍니다. 동끼리 맞붙은 벽의 퍼린도 여기서 뺄 수 있습니다." };
   const t3 = state.dz3Tool || "";
   const memTab = (tl) => { const isCol = tl === "col", dis = ed ? "" : "disabled", open = state.dzLegOpen !== false;
     const trT = Object.keys(DZ_TYPES).filter(t => DZ_TYPES[t].truss).sort((a, b) => DZ_TYPES[a].span - DZ_TYPES[b].span || "tbmwv".indexOf(a[2]) - "tbmwv".indexOf(b[2]));
@@ -5146,7 +5146,20 @@ function dzToggle(arr, k){ dzSet(D => { let bi = state.dzBlk, key = k; const m =
   const B = D.blocks[bi]; if(!B) return;
   if(arr === "rmCol" && key.startsWith("add:")){ B.addCol = (B.addCol || []).filter(x => x !== key.slice(4)); return; }
   if(arr === "rmCol" && (B.rmCol || []).includes(key) && state.dzColPick && DZ_CODE[state.dzColPick]) B.colType = { ...(B.colType || {}), [key]: state.dzColPick };   // 고른 타입으로 넣기
+  // 수직 브레싱: 빈 칸을 넣으면 그 칸의 모든 기둥줄(외부·내부) · 있는 줄을 누르면 그 줄만 뺌
+  if(arr === "vb"){ const a = [...(B.vb || [])], j = +key.split(":")[1]; if(a.includes(key)) B.vb = a.filter(x => x !== key); else { const g = dzGrid(B); for(let i = 0; i <= g.ns; i++) if(g.lineOn(i, j)) a.push(`${i}:${j}`); B.vb = [...new Set(a)]; } return; }
+  // 전후면 브레싱: 같은 지붕 칸(스팬·지붕)을 박공 벽·칸막이·재배실 경계 줄 전체에 함께 넣고 뺌
+  if(arr === "eb" && /^h:\d+:\d+:\d+$/.test(key)){ const [, s0, m0, j0] = key.split(":"), rows = dzEbRows(B, +s0), on = (B.eb || []).includes(key) || (B.eb || []).includes(`h:${s0}:${j0}`);
+    let a = (B.eb || []).filter(x => { const p = x.split(":"); return !(p[1] === s0 && (p.length === 3 || p[2] === m0) && rows.includes(+p[p.length - 1])); });
+    if(on){ const g = dzGrid(B), R = dzRoofs(B, g, +s0);   // 예전 키(스팬 전체)는 나머지 지붕 칸으로 풀어 둠
+      (B.eb || []).filter(x => { const p = x.split(":"); return p.length === 3 && p[1] === s0 && rows.includes(+p[2]); }).forEach(x => { const jj = x.split(":")[2]; for(let m = 0; m < R; m++) if(String(m) !== m0) a.push(`h:${s0}:${m}:${jj}`); }); }
+    else rows.forEach(jj => a.push(`h:${s0}:${m0}:${jj}`));
+    B.eb = [...new Set(a)]; return; }
   const a = B[arr] || (B[arr] = []); const i = a.indexOf(key); if(i >= 0) a.splice(i, 1); else a.push(key); }); }
+/* 전후면 브레싱 줄(스팬 s): 박공 벽 · 칸막이 · 재배실과 관리동 경계 */
+function dzEbRows(B, s){ const g = dzGrid(B), grow = j => j >= 0 && j < g.nb && g.inc(s, j) && !g.isMg(s, j), out = [];
+  for(let j = 0; j <= g.nb; j++) if(g.hEdge(s, j) || g.parts.includes(`h:${s}:${j}`) || (j > 0 && j < g.nb && g.inc(s, j - 1) && g.inc(s, j) && grow(j - 1) !== grow(j))) out.push(j);
+  return out; }
 function designInput(e){
   if(state.tab !== "design") return false;
   if(fxInput(e)) return true;
@@ -5290,9 +5303,6 @@ function designClick(e){
       if(b.colSlots.some(c => Math.abs(c.x - b.ox - lx) < 150 && Math.abs(c.y - b.oy - ly) < 150)){ toast("그 자리에는 이미 기둥 자리가 있습니다 — 그 기둥을 누르면 넣고 뺄 수 있습니다", 2400); return true; }
       dzSet(D => { const B = D.blocks[b.bi]; B.addCol = [...(B.addCol || []), `${lx}:${ly}:${t}`]; });
       toast(`${dzCode(dzDraft().D, t)} 기둥 추가 (X ${fmtQty(lx)}, Y ${fmtQty(ly)} mm)`, 1800); return true; } }
-  const hv = e.target.closest("[data-dzhit]"); if(hv && ["vbr", "vbo"].includes(state.dzTool) && state.canEdit){ const [bi0, key] = hv.dataset.dzhit.split("|"), j = +key.split(":")[1];
-    dzSet(D => { const B = D.blocks[+bi0]; if(!B) return; const vb = [...(B.vb || [])]; if(vb.includes(key)) B.vb = vb.filter(x => x !== key);
-      else { const g = dzGrid(B); for(let i = 0; i <= g.ns; i++) if(g.lineOn(i, j)) vb.push(`${i}:${j}`); B.vb = [...new Set(vb)]; } }); return true; }
   const h = e.target.closest("[data-dzhit]"); if(h){ dzToggle(DZ_ARR[state.dzTool || "hbr"], h.dataset.dzhit); return true; }
   const ad = e.target.closest("[data-dzadd]"); if(ad){ dzSet(D => { const n = D.blocks.length; let code = String.fromCharCode(65 + n); while(D.blocks.some(x => x.code === code)) code = String.fromCharCode(code.charCodeAt(0) + 1);
       const G0 = dzBuild(D); D.blocks.push(dzBlockNew("venlo", { name: `${code}동`, code, x: G0.maxX + 4000, y: G0.minY })); state.dzBlk = n; }); return true; }
