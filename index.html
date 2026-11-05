@@ -3096,7 +3096,7 @@ function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
     if(t === "v" && i > 0 && i < ns && j < nb && inc(i - 1, j) && inc(i, j)) pLines.set(k, [[xs[i], ys[j]], [xs[i], ys[j + 1]], 0]);
     if(t === "h" && j > 0 && j < nb && i < ns && inc(i, j - 1) && inc(i, j)) pLines.set(k, [[xs[i], ys[j]], [xs[i + 1], ys[j]], scN(i, j)]); });
   scrRows.forEach(k => { const [s0, j0] = k.split(":").map(Number); if(j0 > 0 && j0 < nb && inc(s0, j0 - 1) && inc(s0, j0) && !pLines.has(`h:${s0}:${j0}`)) pLines.set(`h:${s0}:${j0}`, [[xs[s0], ys[j0]], [xs[s0 + 1], ys[j0]], scN(s0, j0)]); });
-  const pgN = {}; pLines.forEach(([a, c, nSc], k) => { const n = girtN; pgN[k] = n; hs.slice(0, n).forEach(h => add("pgirt", [a[0], a[1], h], [c[0], c[1], h])); });
+  const pgN = {}; pLines.forEach(([a, c, nSc], k) => { const n = has("noGirt", k) ? 0 : gN(k); pgN[k] = n; hAt(n).forEach(h => add("pgirt", [a[0], a[1], h], [c[0], c[1], h])); });
   // 기둥 보강재(KB)는 쓰지 않음 (2026-11 · 예전 데이터 B.kb는 무시)
   // 지붕 수평 브레싱: 지붕(모듈) 하나 폭 × 칸 하나에 X — GB 우선: GB가 지나는 지붕 칸에는 넣지 않음
   const gbAt = (i, j) => venlo && B.gbOn !== false && i >= 0 && i <= ns && j >= 0 && j < nb && g.vOut(i, j) && !has("noGb", `${i}:${j}`) && !dzMgS(B, g, inc(i, j) ? i : i - 1, j);
@@ -4923,7 +4923,7 @@ function dzPlanSvg(D, G, tool, ed){
       for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j) && !has("noGirt", `v:${i}:${j}`)){ const out = g.inc(i, j) ? -1 : 1, k = `v:${i}:${j}`; o += ln(X[i] + out * d, Y[j], X[i] + out * d, Y[j + 1], mt("girt", k, "girt").c, 2) + lab(X[i] + out * d * 1.6, (Y[j] + Y[j + 1]) / 2 + cs * 0.5, k, b.gN(k), (B.girtLay || {})[k] != null, out < 0 ? "end" : "start"); }
       for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j) && !has("noGirt", `h:${s}:${j}`)){ const out = g.inc(s, j) ? -1 : 1, k = `h:${s}:${j}`; o += ln(X[s], Y[j] + out * d, X[s + 1], Y[j] + out * d, mt("girt", k, "girt").c, 2) + lab((X[s] + X[s + 1]) / 2, Y[j] + out * d * 2.2 + (out > 0 ? cs : 0), k, b.gN(k), (B.girtLay || {})[k] != null, "middle"); }
       Object.entries(b.pgN || {}).forEach(([k, n]) => { const [t, x, y] = k.split(":"), i = +x, j = +y; const a = t === "v" ? [X[i], Y[j]] : [X[i], Y[j]], c = t === "v" ? [X[i], Y[j + 1]] : [X[i + 1], Y[j]];   // 칸막이 띠장 (기본 단수)
-        o += ln(a[0], a[1], c[0], c[1], T.pgirt.c, n ? 2 : 1, n ? 'stroke-dasharray="8 3"' : 'stroke-dasharray="3 4" opacity=".5"') + `<text x="${(a[0] + c[0]) / 2 + (t === "v" ? cs : 0)}" y="${(a[1] + c[1]) / 2 + (t === "h" ? cs * 2.2 : 0)}" font-size="${cs * 1.3}" text-anchor="middle" fill="${T.pgirt.c}" font-weight="700" pointer-events="none">칸막이 ${n}단</text>`; }); }
+        o += ln(a[0], a[1], c[0], c[1], T.pgirt.c, n ? 2 : 1, n ? 'stroke-dasharray="8 3"' : 'stroke-dasharray="3 4" opacity=".5"') + `<text x="${(a[0] + c[0]) / 2 + (t === "v" ? cs : 0)}" y="${(a[1] + c[1]) / 2 + (t === "h" ? cs * 2.2 : 0)}" font-size="${cs * 1.3}" text-anchor="middle" fill="${(B.girtLay || {})[k] != null ? "#C62828" : T.pgirt.c}" font-weight="700" ${ed && !has("noGirt", k) ? `data-dzgl="${bi}|${k}" style="cursor:pointer"` : 'pointer-events="none"'}>칸막이 ${n}단<title>${ed ? "눌러서 단수 입력 (0~8단)" : ""}${(B.girtLay || {})[k] != null ? " · 이 칸막이만 따로" : ""}</title></text>`; }); }
     if(b.venlo && sh("mp")) for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!b.trussAt(s, j)) continue; for(let m = 1; m < b.Rof(s); m++){ const off = has("rmMp", `${s}:${m}:${j}`), c = mt("mp", `${s}:${m}:${j}`, "mp").c; o += `<circle cx="${X[s] + m * b.modOf(s)}" cy="${Y[j]}" r="${cs * 0.45}" fill="${off ? "none" : c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'opacity=".5"' : ""}/>`; } }
     const colSym = (x, y, t, off, small) => { const k = small ? 0.75 : 1, w = cs * 1.15 * k, h = t === "ecol" ? w : cs * 0.72 * k, c = T[t].c;
       let q = `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" fill="${off ? "none" : c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'stroke-dasharray="3 3"' : ""}><title>${esc(dzCode(D, t))} ${T[t].n}</title></rect>`;
@@ -4953,7 +4953,9 @@ function dzPlanSvg(D, G, tool, ed){
       if(tool === "bb") (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(i <= g.ns && j < g.nb && g.lineOn(i, j) && !g.vEdge(i, j)) o += hit(p + k, `<rect x="${X[i] - hw / 2}" y="${Y[j] + cs}" width="${hw}" height="${g.bh[j] - cs * 2}"/>`); });
       if(tool === "ebr") for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(ebL(s, j)) for(let m = 0; m < b.Rof(s); m++) o += hit(p + `h:${s}:${m}:${j}`, `<rect x="${X[s] + m * b.modOf(s) + cs}" y="${Y[j] - hw}" width="${b.modOf(s) - cs * 2}" height="${hw * 2}"/>`);
       if(tool === "girt"){ for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)) o += hit(p + `v:${i}:${j}`, `<rect x="${X[i] - hw}" y="${Y[j]}" width="${hw * 2}" height="${g.bh[j]}"/>`);
-        for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)) o += hit(p + `h:${s}:${j}`, `<rect x="${X[s]}" y="${Y[j] - hw}" width="${g.sw[s]}" height="${hw * 2}"/>`); } }
+        for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)) o += hit(p + `h:${s}:${j}`, `<rect x="${X[s]}" y="${Y[j] - hw}" width="${g.sw[s]}" height="${hw * 2}"/>`);
+        Object.keys(b.pgN || {}).forEach(k => { const [t, x, y] = k.split(":"), i = +x, j = +y;   // 칸막이 퍼린
+          o += hit(p + k, t === "v" ? `<rect x="${X[i] - hw}" y="${Y[j]}" width="${hw * 2}" height="${g.bh[j]}"/>` : `<rect x="${X[i]}" y="${Y[j] - hw}" width="${g.sw[i]}" height="${hw * 2}"/>`); }); } }
   });
   return o + `</svg>`;
 }
@@ -5013,7 +5015,9 @@ function dzSlots(D, G, tool){
       out.push({ k: p + k, on: !has("noBb", k), segs: [[[X[i], Y[j], 400], [X[i], Y[j + 1], 400]], [[X[i], Y[j], zb], [X[i], Y[j + 1], zb]]], label: `${pre}브레싱 보강재 ${nY(i)} 줄 · ${nX(j)}–${nX(j + 1)}` }); });
     if(tool === "girt"){ const hsOf = k => { const n = b.gN ? b.gN(k) : b.hs.length; return n ? dzGirtH(gz, n) : [gz / 2]; };   // 구간마다 단수
       for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++) if(g.vOut(i, j)){ const k = `v:${i}:${j}`; out.push({ k: p + k, on: !has("noGirt", k), segs: hsOf(k).map(h => [[X[i], Y[j], h], [X[i], Y[j + 1], h]]), label: `${pre}측벽 퍼린 ${nY(i)} 줄 · ${nX(j)}–${nX(j + 1)}` }); }
-      for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++) if(g.hOut(s, j)){ const k = `h:${s}:${j}`; out.push({ k: p + k, on: !has("noGirt", k), segs: hsOf(k).map(h => [[X[s], Y[j], h], [X[s + 1], Y[j], h]]), label: `${pre}전후면 퍼린 ${nX(j)} 벽 · ${nY(s)}–${nY(s + 1)}` }); } }
+      for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++) if(g.hOut(s, j)){ const k = `h:${s}:${j}`; out.push({ k: p + k, on: !has("noGirt", k), segs: hsOf(k).map(h => [[X[s], Y[j], h], [X[s + 1], Y[j], h]]), label: `${pre}전후면 퍼린 ${nX(j)} 벽 · ${nY(s)}–${nY(s + 1)}` }); }
+      Object.keys(b.pgN || {}).forEach(k => { const [t, x, y] = k.split(":"), i = +x, j = +y, a = [X[i], Y[j]], c = t === "v" ? [X[i], Y[j + 1]] : [X[i + 1], Y[j]];   // 칸막이 퍼린 (기본 단수)
+        out.push({ k: p + k, on: !has("noGirt", k), segs: (n => n ? dzGirtH(gz, n) : [gz / 2])(b.gN(k)).map(h => [[a[0], a[1], h], [c[0], c[1], h]]), label: `${pre}칸막이 퍼린 ${t === "v" ? `${nY(i)} 줄 · ${nX(j)}–${nX(j + 1)}` : `${nX(j)} 줄 · ${nY(i)}–${nY(i + 1)}`} (${b.gN(k)}단)` }); }); }
   });
   return out;
 }
@@ -5386,7 +5390,7 @@ function designClick(e){
   const pk = e.target.closest("[data-dzctpick]"); if(pk && !e.target.closest("input, button")){ const t = pk.dataset.dzctpick; state.dzColPick = state.dzColPick === t ? null : t; if(state.dzColPick) state.dzColType = t; render();
     if(state.dzColPick) toast(`${dzCode(dzDraft().D, t)} ${DZ_TYPES[t].n} 선택 — 빈 기둥 자리를 누르면 이 타입으로 넣고, ‘＋ 기둥 추가’도 이 타입으로 놓습니다`, 2600); return true; }
   const gl = e.target.closest("[data-dzgl]"); if(gl && state.canEdit){ const [bi0, key] = gl.dataset.dzgl.split("|"), B0 = dzDraft().D.blocks[+bi0], base = dzGirtN(B0), cur = (B0.girtLay || {})[key] != null ? Number(B0.girtLay[key]) : base;
-    dzInlineNum(gl, cur, 0, 8, `벽체 퍼린 단수 (비우면 기본 ${base}단)`, v => dzSet(D => { const B = D.blocks[+bi0]; if(!B) return; const m = { ...(B.girtLay || {}) }; if(v == null || v === base) delete m[key]; else m[key] = v; B.girtLay = m; })); return true; }
+    dzInlineNum(gl, cur, 0, 8, `${/^[vh]:/.test(key) && dzBuild(dzDraft().D).blocks[+bi0].pgN[key] != null ? "칸막이" : "벽체"} 퍼린 단수 (비우면 기본 ${base}단)`, v => dzSet(D => { const B = D.blocks[+bi0]; if(!B) return; const m = { ...(B.girtLay || {}) }; if(v == null || v === base) delete m[key]; else m[key] = v; B.girtLay = m; })); return true; }
   const scl = e.target.closest("[data-dzscl]"); if(scl && state.canEdit){ const [bi0, key] = scl.dataset.dzscl.split("|"), D0 = dzDraft().D, base = dzScL(D0), cur = Number((D0.blocks[+bi0].scLay || {})[key]) || base;
     dzInlineNum(scl, cur, 1, 3, `스크린 채널 단수 (비우면 스크린 탭 ${base}단)`, v => dzSet(D => { const B = D.blocks[+bi0]; if(!B) return; const m = { ...(B.scLay || {}) }; if(v == null || v === base) delete m[key]; else m[key] = v; B.scLay = m; })); return true; }
   const mmd = e.target.closest("[data-dzmemmode]"); if(mmd){ state.dzMemMode = mmd.dataset.dzmemmode; render(); return true; }
