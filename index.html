@@ -4689,34 +4689,36 @@ function dzBomHtml(D, bom, ed, G){
     <p class="note">개수는 부재 토막 수(트러스는 현재·웹재 낱개)입니다. 규격과 단위중량은 고칠 수 있고, 설계 저장 시 함께 저장됩니다. 지붕 참고선은 중량에 넣지 않습니다.</p>${G ? dzSteelExtra(D, bom, G) : ""}`;
 }
 function dzPlanSvg(D, G, tool, ed){
-  const all = G.blocks.flatMap(b => [...b.g.sw, ...b.g.bh]), base = Math.min(...all), pad = Math.max(...all) * 0.9, T = DZ_TYPES, cur = state.dzBlk;
+  const all = G.blocks.flatMap(b => [...b.g.sw, ...b.g.bh]), base = Math.min(...all), pad = Math.max(...all) * 0.9, T = DZ_TYPES, cur = state.dzBlk, co = tool === "col";   // 기둥 편집: 기둥만 보이게 (다른 부재 숨김)
   const cs = base * 0.09, fs = Math.max(base * 0.28, Math.max(G.W, G.Lg) * 0.014), hw = base * 0.22;
   const full = `${G.minX - pad} ${G.minY - pad} ${G.W + pad * 2} ${G.Lg + pad * 2}`;
   let o = `<svg class="dz-plan" viewBox="${dzVB("steel", full)}" data-full="${full}" data-zk="steel" xmlns="http://www.w3.org/2000/svg">`;
   const ln = (x1, y1, x2, y2, c, w, extra = "") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" ${extra}/>`;
   const hit = (k, shape) => shape.replace(/\/>$/, ` class="hit" data-dzhit="${k}"/>`);
-  G.L.forEach(m => { if(m.t === "gutter" || m.t === "rpur") o += ln(m.a[0], m.a[1], m.b[0], m.b[1], T[m.t].c, 1, 'opacity=".5"'); });
+  if(!co) G.L.forEach(m => { if(m.t === "gutter" || m.t === "rpur") o += ln(m.a[0], m.a[1], m.b[0], m.b[1], T[m.t].c, 1, 'opacity=".5"'); });
   G.blocks.forEach(b => { const { g, X, Y, B, bi } = b, has = (a, k) => (B[a] || []).includes(k), code = D.blocks.length > 1 ? B.code + "-" : "";
     for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++) if(!g.inc(s, j)) o += `<rect x="${X[s]}" y="${Y[j]}" width="${g.sw[s]}" height="${g.bh[j]}" fill="rgba(120,120,120,.08)"/>`;
     if(bi === cur){ X.forEach((x, i) => { o += ln(x, b.oy - pad * 0.5, x, b.oy + g.Lg + pad * 0.2, "#9AA5AB", 0.6, 'stroke-dasharray="6 4"') + `<text x="${x}" y="${b.oy - pad * 0.56}" font-size="${fs}" text-anchor="middle" fill="#56636A">${code}Y${i + 1}</text>`; });
       Y.forEach((y, j) => { o += ln(b.ox - pad * 0.5, y, b.ox + g.W + pad * 0.2, y, "#9AA5AB", 0.6, 'stroke-dasharray="6 4"') + `<text x="${b.ox - pad * 0.56}" y="${y + fs * 0.35}" font-size="${fs}" text-anchor="end" fill="#56636A">${code}X${j + 1}</text>`; }); }
-    G.L.forEach(m => { if(m.bi === bi && (m.t === "hbr" || m.t === "gb")) o += ln(m.a[0], m.a[1], m.b[0], m.b[1], T[m.t].c, m.t === "gb" ? 2.2 : 1.4); });
-    for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!g.rowOn(s, j)) continue; const off = has("rmTr", `${s}:${j}`), tc = (T["trt" + Math.round(g.sw[s])] || T.chord).c;
+    if(co){ for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)) o += ln(X[i], Y[j], X[i], Y[j + 1], "#56636A", 1.2);   // 외곽선만
+      for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)) o += ln(X[s], Y[j], X[s + 1], Y[j], "#56636A", 1.2); }
+    if(!co) G.L.forEach(m => { if(m.bi === bi && (m.t === "hbr" || m.t === "gb")) o += ln(m.a[0], m.a[1], m.b[0], m.b[1], T[m.t].c, m.t === "gb" ? 2.2 : 1.4); });
+    if(!co) for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!g.rowOn(s, j)) continue; const off = has("rmTr", `${s}:${j}`), tc = (T["trt" + Math.round(g.sw[s])] || T.chord).c;
       if(b.scrRows.has(`${s}:${j}`)){ o += ln(X[s], Y[j], X[s + 1], Y[j], T.sch.c, 2.4, 'stroke-dasharray="10 4"'); continue; }
       if(b.edgeRows.has(`${s}:${j}`)) continue;   // 바깥 박공: 트러스 없음 (벽 퍼린)
       o += ln(X[s], Y[j], X[s + 1], Y[j], off ? "#C0392B" : tc, off ? 1 : 2.4, off ? 'stroke-dasharray="4 4" opacity=".5"' : ""); }
-    (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(i <= g.ns && j < g.nb && g.lineOn(i, j)) o += ln(X[i] + cs * 0.9, Y[j] + g.bh[j] * 0.1, X[i] + cs * 0.9, Y[j + 1] - g.bh[j] * 0.1, T.vbr.c, 4); });
-    (B.eb || []).forEach(k => { const p2 = k.split(":"), s = Number(p2[1]), j = Number(p2[p2.length - 1]), m = p2.length === 4 ? Number(p2[2]) : 0; if(s < g.ns && j <= g.nb && g.hOut(s, j) && m < b.Rof(s)){ const out = g.inc(s, j) ? -1 : 1, md = b.modOf(s), a = X[s] + m * md; o += ln(a + md * 0.08, Y[j] + out * cs * 1.2, a + md * 0.92, Y[j] + out * cs * 1.2, T.ebr.c, 4); } });
+    if(!co) (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(i <= g.ns && j < g.nb && g.lineOn(i, j)) o += ln(X[i] + cs * 0.9, Y[j] + g.bh[j] * 0.1, X[i] + cs * 0.9, Y[j + 1] - g.bh[j] * 0.1, T.vbr.c, 4); });
+    if(!co) (B.eb || []).forEach(k => { const p2 = k.split(":"), s = Number(p2[1]), j = Number(p2[p2.length - 1]), m = p2.length === 4 ? Number(p2[2]) : 0; if(s < g.ns && j <= g.nb && g.hOut(s, j) && m < b.Rof(s)){ const out = g.inc(s, j) ? -1 : 1, md = b.modOf(s), a = X[s] + m * md; o += ln(a + md * 0.08, Y[j] + out * cs * 1.2, a + md * 0.92, Y[j] + out * cs * 1.2, T.ebr.c, 4); } });
     const d = cs * 2.4;
-    for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j) && !has("noGirt", `v:${i}:${j}`)){ const out = g.inc(i, j) ? -1 : 1; o += ln(X[i] + out * d, Y[j], X[i] + out * d, Y[j + 1], T.girt.c, 2); }
-    for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j) && !has("noGirt", `h:${s}:${j}`)){ const out = g.inc(s, j) ? -1 : 1; o += ln(X[s], Y[j] + out * d, X[s + 1], Y[j] + out * d, T.girt.c, 2); }
-    if(b.venlo) for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!b.trussAt(s, j)) continue; for(let m = 1; m < b.Rof(s); m++){ const off = has("rmMp", `${s}:${m}:${j}`); o += `<circle cx="${X[s] + m * b.modOf(s)}" cy="${Y[j]}" r="${cs * 0.45}" fill="${off ? "none" : T.mp.c}" stroke="${T.mp.c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'opacity=".5"' : ""}/>`; } }
+    if(!co) for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j) && !has("noGirt", `v:${i}:${j}`)){ const out = g.inc(i, j) ? -1 : 1; o += ln(X[i] + out * d, Y[j], X[i] + out * d, Y[j + 1], T.girt.c, 2); }
+    if(!co) for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j) && !has("noGirt", `h:${s}:${j}`)){ const out = g.inc(s, j) ? -1 : 1; o += ln(X[s], Y[j] + out * d, X[s + 1], Y[j] + out * d, T.girt.c, 2); }
+    if(b.venlo && !co) for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!b.trussAt(s, j)) continue; for(let m = 1; m < b.Rof(s); m++){ const off = has("rmMp", `${s}:${m}:${j}`); o += `<circle cx="${X[s] + m * b.modOf(s)}" cy="${Y[j]}" r="${cs * 0.45}" fill="${off ? "none" : T.mp.c}" stroke="${T.mp.c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'opacity=".5"' : ""}/>`; } }
     const cT = new Map(G.L.filter(m => m.bi === bi && DZ_CODE[m.t]).map(m => [Math.round(m.a[0]) + "," + Math.round(m.a[1]), m.t]));
     const colSym = (x, y, t, off, small) => { const k = small ? 0.75 : 1, w = cs * 1.15 * k, h = t === "ecol" ? w : cs * 0.72 * k, c = T[t].c;
       let q = `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" fill="${off ? "none" : c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'stroke-dasharray="3 3"' : ""}><title>${esc(dzCode(D, t))} ${T[t].n}</title></rect>`;
       if(!off) q += `<text x="${x + w * 0.65}" y="${y - h * 0.7}" font-size="${cs * 1.25}" fill="${c}" font-weight="700" pointer-events="none">${esc(dzCode(D, t))}</text>`; return q; };
     b.colSlots.forEach(c => { o += colSym(c.x, c.y, c.t, !c.on, c.mid && !c.add); if(c.add) o += `<circle cx="${c.x}" cy="${c.y}" r="${cs * 0.95}" fill="none" stroke="${T[c.t].c}" stroke-width="1.4" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; });
-    for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j) && has("kb", `${i}:${j}`)) o += `<circle cx="${X[i]}" cy="${Y[j]}" r="${cs * 1.05}" fill="none" stroke="${T.knee.c}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    if(!co) for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j) && has("kb", `${i}:${j}`)) o += `<circle cx="${X[i]}" cy="${Y[j]}" r="${cs * 1.05}" fill="none" stroke="${T.knee.c}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
     if(ed){ const p = bi + "|";
       if(tool === "col") b.colSlots.forEach(c => { o += hit(p + c.k, `<circle cx="${c.x}" cy="${c.y}" r="${cs * (c.mid ? 1.1 : 1.6)}"/>`); });
       if(tool === "knee") for(let i = 0; i <= g.ns; i++) for(let j = 0; j <= g.nb; j++) if(g.colOn(i, j)) o += hit(p + `${i}:${j}`, `<circle cx="${X[i]}" cy="${Y[j]}" r="${cs * 1.6}"/>`);
