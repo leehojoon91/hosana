@@ -3611,7 +3611,7 @@ function vtPick(x, b, p){
     const ri = racks.findIndex(v => v >= needR), mi = motors.findIndex(v => v >= needM);
     return { ser, S2, t, row, exact, racks, motors, ri, mi, ok: ri >= 0 && mi >= 0 };
   };
-  const order = p.series === "1" ? ["1"] : p.series === "2" ? ["2"] : ["2", "1"];   // 자동: RRD720(5rpm) 먼저, 안 되면 RRD710
+  const order = p.series === "1" ? ["1"] : p.series === "2" ? ["2"] : ["1", "2"];   // 자동: RRD710(3rpm) 먼저, 한도를 넘으면 RRD720
   const cands = order.map(pickSer).filter(Boolean), r = cands.find(c => c.ok) || cands.reduce((a, c) => !a || c.motors[c.motors.length - 1] > a.motors[a.motors.length - 1] ? c : a, null);   // 모두 넘치면 한도가 가장 큰 계열
   if(!r) return { model: p.motor, rack: "RRD", warn: ["표에 없는 칸 폭·트러스 내림입니다"], over: true, need: needM, needR, fac, perLine };
   if(num(p.winW) > r.t[0] + 1) warn.push(`천창 깊이 ${num(p.winW)}mm는 표(최대 ${r.t[0]}mm)를 넘습니다`);
@@ -3628,19 +3628,19 @@ function vtGeom(G, sec, p){
   const b = G.blocks[sec.bi]; if(!b) return null; const g = b.g;
   const set = new Set(scCells(sec).filter(k => { const [s, j] = k.split(":").map(Number); return g.inc(s, j) && !g.isMg(s, j); })); if(!set.size) return null;
   const has = (s, j) => set.has(`${s}:${j}`), X = b.X, Y = b.Y;
-  const gut = []; for(let s = 0; s < g.ns; s++) for(let m = 0; m <= b.Rof(s); m++){ const x = X[s] + m * b.modOf(s); if(!gut.length || Math.abs(gut[gut.length - 1] - x) > 1) gut.push(x); }
+  const gut = []; for(let i = 0; i <= g.ns; i++){ const x = X[i]; if(!gut.length || Math.abs(gut[gut.length - 1] - x) > 1) gut.push(x); }   // 구동축 자리 = 기둥 라인(스팬 경계)만 (트러스 가운데 골 제외)
   let area = 0, xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
   set.forEach(k => { const [s, j] = k.split(":").map(Number); area += g.sw[s] * g.bh[j]; xMin = Math.min(xMin, X[s]); xMax = Math.max(xMax, X[s + 1]); yMin = Math.min(yMin, Y[j]); yMax = Math.max(yMax, Y[j + 1]); });
   area /= 1e6;
   const colAt = x => { const r = []; for(let s = 0; s < g.ns; s++) if(X[s] - 1 <= x && x <= X[s + 1] + 1) r.push(s); return r; };
   const rowsAt = x => { const cs = colAt(x), r = []; for(let j = 0; j < g.nb; j++) if(cs.some(s => has(s, j))) r.push(j); return r; };
   const leftArea = x => { let a = 0; set.forEach(k => { const [s, j] = k.split(":").map(Number); a += Math.max(0, Math.min(x, X[s + 1]) - X[s]) * g.bh[j]; }); return a / 1e6; };   // 칸 가운데를 지나면 비율로
-  // 구동축 자리: 직접 옮긴 골 선(drvX) → 아니면 가장 많은 칸 줄을 지나는 골 선 중 좌우 면적이 가장 비슷한 것
+  // 구동축 자리: 직접 옮긴 기둥 라인(drvX) → 아니면 가장 많은 칸 줄을 지나는 기둥 라인 중 좌우 면적이 가장 비슷한 것
   const cand = gut.map((v, k) => [v, k]).filter(([v]) => v > xMin + 1 && v < xMax - 1);
   const manual = Number.isInteger(sec.drvX) && gut[sec.drvX] > xMin + 1 && gut[sec.drvX] < xMax - 1;
   let xd;
   if(manual) xd = gut[sec.drvX];
-  else if(!cand.length) xd = (xMin + xMax) / 2;
+  else if(!cand.length){ const cl = gut.filter(v => v >= xMin - 1 && v <= xMax + 1); xd = cl.length ? cl.reduce((a, v) => Math.abs(v - (xMin + xMax) / 2) < Math.abs(a - (xMin + xMax) / 2) ? v : a, cl[0]) : (xMin + xMax) / 2; }   // 안쪽 기둥 라인이 없으면 가장 가까운 기둥 라인
   else { const maxR = Math.max(...cand.map(([v]) => rowsAt(v).length)), wide = cand.filter(([v]) => rowsAt(v).length >= maxR);
     xd = wide.reduce((best, [v]) => Math.abs(2 * leftArea(v) - area) < Math.abs(2 * leftArea(best) - area) ? v : best, wide[0][0]); }
   const L = { drive: [], rd: [], pipe: [], win: [] }, xa = xd - p.gap / 2, xb = xd + p.gap / 2;
@@ -3738,7 +3738,7 @@ function dzVentTab(D, G, ed){
       <h3>모터 선정 기준 <span class="note" style="font-weight:400">Ridder 표 2장 (Truss-rail)</span></h3>
       ${(() => { const sl = (k, opts, lab) => `<select data-vtp="${k}" ${ro} aria-label="${lab}" title="${lab}">${opts.map(([v, l]) => `<option value="${v}" ${String(p[k]) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
         return `<div class="dz-dim" style="flex-wrap:wrap;gap:4px">${sl("lower", [[150, "트러스 내림 150"], [180, "트러스 내림 180"]], "트러스 내림 (mm)")}${sl("glass", [[4, "유리 4mm"], [5, "유리 5mm"]], "유리 두께")}${sl("insect", [[0, "방충망 없음"], [1, "방충망 있음"]], "방충망")}
-          ${sl("roofDeg", [[22, "지붕 22°"], [26, "지붕 26°"]], "지붕 각도")}${sl("openDeg", [[44, "열림 44°"], [60, "열림 60°"]], "최대 열림 각도")}${sl("series", [["auto", "랙드라이브 자동"], ["2", "RRD720 (5rpm)"], ["1", "RRD710 (3rpm)"]], "랙드라이브 계열")}
+          ${sl("roofDeg", [[22, "지붕 22°"], [26, "지붕 26°"]], "지붕 각도")}${sl("openDeg", [[44, "열림 44°"], [60, "열림 60°"]], "최대 열림 각도")}${sl("series", [["auto", "자동 (RRD710 우선)"], ["1", "RRD710 (3rpm)"], ["2", "RRD720 (5rpm)"]], "랙드라이브 계열")}
           ${sl("motorMode", [["auto", "모터 자동"], ["manual", "모터 직접"]], "모터 선정")}${p.motorMode === "manual" ? `<input type="text" data-vtp="motor" value="${esc(p.motor)}" ${ro} style="width:90px" aria-label="모터 규격">` : ""}</div>`; })()}
       <p class="note" style="margin:0 0 6px">구역마다 지붕 폭(칸)·천창 깊이(천창 폭 ${fmtQty(num(p.winW))}mm)로 표를 골라, 천창 수 × (천창 길이 ${fmtQty(num(p.winL))} ÷ 1000)가 들어가는 가장 작은 모터와 랙드라이브를 고릅니다.</p>
       <div class="dz-dim" style="flex-wrap:wrap;gap:4px"><span class="lb" style="width:auto">천창 위치</span><select data-vtp="roofSel" ${ro}><option value="all" ${p.roofSel !== "outer" ? "selected" : ""}>모든 지붕</option><option value="outer" ${p.roofSel === "outer" ? "selected" : ""}>양쪽 바깥 지붕만</option></select>
@@ -3756,7 +3756,7 @@ function dzVentTab(D, G, ed){
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><button class="btn" id="vt-xlsx">산출서 엑셀</button><button class="btn" id="vt-dxf">천창 DXF</button></div>
       <p class="note" style="margin-top:6px">DXF 레이어는 참고 도면과 같게 AA-WIND(천창) · Shaft(구동축·종동축) · SIMB(랙드라이브 블록 RRD) · MOTOR(모터 블록)로 나옵니다.</p></div>`;
   const tools = ed ? `<div class="dz-tools"><button data-vttool="sel" class="${tool === "sel" ? "on" : ""}">구역 고르기</button><button data-vttool="draw" class="${tool === "draw" ? "on" : ""}"><i style="background:${VT_COL.area}"></i>구역 그리기</button>
-      <span class="note" style="margin:0 0 0 6px">${tool === "draw" ? "평면에서 끌어서 사각형으로 구역을 그립니다 (그 칸은 다른 구역에서 빠짐)." : "빨간 구동축을 좌우로 끌어 옮깁니다 (지붕 골 선에 붙고 좌·우 면적 표시)."}</span></div>` : "";
+      <span class="note" style="margin:0 0 0 6px">${tool === "draw" ? "평면에서 끌어서 사각형으로 구역을 그립니다 (그 칸은 다른 구역에서 빠짐)." : "빨간 구동축을 좌우로 끌어 옮깁니다 (기둥 라인에만 붙고 좌·우 면적 표시)."}</span></div>` : "";
   const legend = `<div class="dz-legend"><span><i style="background:${VT_COL.area};opacity:.4"></i>천창 구역 (모터 1대)</span><span><i style="background:${VT_COL.win}"></i>천창</span><span><i style="background:${VT_COL.drive}"></i>구동축 (2줄)</span><span><b style="display:inline-block;width:12px;height:12px;border:2px solid ${VT_COL.rd};vertical-align:-2px;margin-right:4px;background:#fff"></b>랙드라이브 (RRD)</span><span><i style="background:${VT_COL.pipe}"></i>종동축</span></div>`;
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
   const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">천창시스템 수량산출서 <span class="note" style="font-weight:400">패킹리스트 기준</span></h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th class="r">여유</th><th class="r">총계</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
@@ -3798,7 +3798,7 @@ function vtSetup(){
   if((state.vtTool || "sel") !== "draw"){   // 구동축 좌우로 끌기 (지붕 골 선에 붙음)
     svg.onpointerdown = e => { const h = e.target.closest("[data-vtdrive]"); if(!h || e.button !== 0) return; e.preventDefault(); e.stopPropagation();
       const i = Number(h.dataset.vtdrive), D = dzDraft().D, G = dzBuild(D), { list } = vtAll(D, G), x = list[i]; if(!x) return; const b = G.blocks[x.sec.bi];
-      const cand = x.gut.map((v, k) => [v, k]).filter(([v]) => v > x.xMin + 1 && v < x.xMax - 1); if(!cand.length){ toast("옮길 골 선이 없습니다", 1600); return; }
+      const cand = x.gut.map((v, k) => [v, k]).filter(([v]) => v > x.xMin + 1 && v < x.xMax - 1); if(!cand.length){ toast("옮길 기둥 라인이 없습니다", 1600); return; }
       const leftA = v => { let a = 0; x.set.forEach(k => { const [s2, j2] = k.split(":").map(Number); a += Math.max(0, Math.min(v, b.X[s2 + 1]) - b.X[s2]) * b.g.bh[j2]; }); return a / 1e6; };
       const NS = "http://www.w3.org/2000/svg", pv = document.createElementNS(NS, "line"), tp = document.createElementNS(NS, "text"), y0 = Number(h.getAttribute("y1")), y1 = Number(h.getAttribute("y2"));
       pv.setAttribute("class", "drvprev"); pv.setAttribute("y1", y0); pv.setAttribute("y2", y1); svg.appendChild(pv);
