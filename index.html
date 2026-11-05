@@ -3587,7 +3587,7 @@ function scExportDxf(){
    구역 1개 = 모터 1대. 구동축은 길이(y) 방향 2줄(간격 1,600), 종동축 줄마다 랙드라이브가 두 구동축에 번갈아.
    종동축은 구역 안쪽 칸 경계선(트러스 줄)마다 폭 방향(테두리 제외), 천창은 그 종동축 위에 걸쳐 지붕마다 1개(용마루 기준 지그재그).
    D.vent = { sections: null(평면에서 자동) | [{ bi, cells, drvX(구동축 골 선 번호) }], p:{…} } */
-const VT_DEF = { winW: 1000, winL: 3375, gap: 1600, pipeL: 8072, driveL: 9000, motor: "RW603", motorMode: "auto", lower: 150, glass: 4, insect: 0, roofDeg: 22, openDeg: 44, series: "auto", roofSel: "all", motorEach: 0 };
+const VT_DEF = { winW: 1000, winL: 3375, gap: 1600, pipeL: 8072, driveL: 9000, motor: "RW603", motorMode: "auto", lower: 150, glass: 4, insect: 0, roofDeg: 22, openDeg: 44, series: "auto", roofSel: "all", motorEach: 0, rpu: 0, driveA: 4341.5, driveB: 4054.5, driveStd: 8820, driveSpec: "Φ42.7x2.9T", spare: {} };
 /* 모터·랙드라이브 선정표: Ridder System Tables 2012 · 2장 Truss-rail ventilation system (벤로).
    [천창 깊이 mm, 칸(지붕) 폭 m, 트러스 내림 mm, "1"=RRD710(3rpm) | "2"=RRD720(5rpm), 행들]
    행 = [유리 mm, 방충망 N/m, 지붕 각도, 열림 각도, 랙드라이브별 최대 천창 수…, 모터별 최대 천창 수…] (천창 1000mm 폭 기준) */
@@ -3669,29 +3669,58 @@ function vtGeom(G, sec, p){
   const lt = Math.min(...[...set].map(k => +k.split(":")[1])), topCells = [...set].filter(k => +k.split(":")[1] === lt).map(k => +k.split(":")[0]);
   return { sec: { ...sec, cells: [...set] }, set, manual, xd, xMin, xMax, area, L, split: [leftArea(xd), area - leftArea(xd)], loops: scLoops(b, set),
     motor: mpos(xd), motors: Number(p.motorEach) ? [mpos(xa), mpos(xb)] : [mpos(xd)], lab: [(X[Math.min(...topCells)] + X[Math.max(...topCells) + 1]) / 2, Y[lt]], gut,
-    rd: L.rd.length, win: L.win.length, pipes, drive: len(L.drive), pipeLen: len(L.pipe) };
+    rd: L.rd.length, win: L.win.length, pipes, drive: len(L.drive), pipeLen: len(L.pipe), trussD: b.B.trussD };
 }
 function vtAll(D, G){ const V = vtOf(D), secs = V.sections || vtAuto(D, G);
   return { V, list: secs.map(s => vtGeom(G, s, V.p)).filter(Boolean).map(x => { const pk = vtPick(x, G.blocks[x.sec.bi], V.p), man = V.p.motorMode === "manual";
     return { ...x, pick: pk, model: man ? (V.p.motor || "RW603") : pk.model, rack: pk.rack }; }) }; }
 /* 산출서 29개 품목 (천창시스템_수량산출서_v3.xlsx 의 수량 비율) */
-function vtBom(list, p, fx){
+/* 천창 수량산출 = 실제 패킹리스트(박종국 제2온실 2026.10.07) 품목·순서·비율.
+   행 { k, n, spec, f(산출식), rem(REMARK), sp: 여유 규칙 [단위로 올림] | {pct} } · 여유는 p.spare[키]로 직접 고칠 수 있음 · 고친 산출식 = fx["vent:키"] */
+const VT_SP = (q, rule) => { if(!rule || q <= 0) return 0; if(rule.pct) return Math.ceil(q * rule.pct / 100 - 1e-9); return Math.ceil(q / rule - 1e-9) * rule - q; };
+function vtBom(list, p, fx = {}){
   const M0 = list.reduce((a, x) => a + (x.motors || [1]).length, 0), RD0 = list.reduce((a, x) => a + x.rd, 0), W0 = list.reduce((a, x) => a + x.win, 0), PP0 = list.reduce((a, x) => a + x.pipes, 0), DM = list.reduce((a, x) => a + x.drive, 0) / 1000;
-  const DS = Math.ceil(DM * 1000 / Math.max(1000, p.driveL) - 1e-9), N = fxN;
-  // 산출식 재료: 모터(구역) · 랙드라이브 · 천창 · 종동축 개수, 구동축 길이
-  const M = N(M0, "대"), RD = N(RD0, "개"), W = N(W0, "개"), PP = N(PP0, "본");
-  const grp = f => { const m = new Map(); list.forEach(x => m.set(f(x), (m.get(f(x)) || 0) + 1)); return [...m]; }, mg = grp(x => x.model), rg = grp(x => x.rack);
+  const N = fxN, A = num(p.driveA) || 4341.5, Bm = num(p.driveB) || 4054.5, STD = Math.max(1000, num(p.driveStd) || 8820), ds = p.driveSpec || "Φ42.7x2.9T";
+  const DS = Math.max(0, Math.round((DM * 1000 - M0 * (A + Bm)) / STD));   // 구동축(표준) 본 수
+  const M = N(M0, "대"), RD = N(RD0, "개"), W = N(W0, "개"), r1 = v => Math.round(v * 1000) / 1000;
+  const grp = f => { const m = new Map(); list.forEach(x => m.set(f(x), (m.get(f(x)) || 0) + (x.motors || [1]).length)); return [...m]; }, mg = grp(x => x.model), rg = grp(x => x.rack);
+  const td = (list[0] && list[0].trussD) || 500, each = Number(p.motorEach);
+  const PPf = `⌈${W}÷${N(2, "")}⌉`;
   const rows = [
-    ...(mg.length ? mg : [[p.motor, 0]]).map(([nm, c]) => ["모터", "MOTER", nm, mg.length > 1 ? N(c, "대") : M, list.some(x => x.model === nm && x.pick.over) ? "모터사양체크" : ""]), ["RPU", "RPU", "POTENTIOm R1K/S10", M], ["체인휠", "CHAIN WHEEL", "6각 RRD용", `${M}×2`], ["체인카플링", "CHAIN COUPLING", "32A용", `${M}×4`],
-    ["모터 브라켓 S타입", "MOTER BRACKET", "85-105/B225/T450-500", M], ["모터설치조임쇠", "MOUNTING SET CLAMP PLATE", "B75", `${M}×2`], ["모터브라켓 볼트/너트", "MOTER BRACKET BOLT NUT", "M8 x 90", `${M}×12`],
-    ["랙드라이브", "RACK DRIVE", rg.map(([nm]) => nm).join(", ") || "RRD", RD], ["클램프세트", "CLAMP SET", "-", RD], ["랙", "RACK", "1250L", RD],
-    ["웰딩조인트", "SLIDE WELDING JOIN", "6각 RRD용", `${RD}×2−${M}×4`], ["샤프트 가이드 클립", "SHAFT GUIDE CLIP", "-", `${RD}×2−${M}×4`], ["랙파이프 연결구", "RACK PIPE JOINT", "볼트 너트 포함", `${RD}×4`],
-    ["파이프 롤러", "PIPE ROLLER", "Φ31.8x1.5T 용", `${PP}×6`], ["파이프롤러 조립볼트", "PIPE ROLLER BOLT", "M8 x 55", `${PP}×6`], ["너트", "PIPE ROLLER NUT", "M8", `${PP}×6`],
-    ["푸시바", "PUSH BAR", "Φ22x1.2T (@750)", `${W}×2`], ["푸시바 링크", "PUSH BAR LINK", "GR3-1016", `${W}×2`], ["푸시바 클램프", "PUSH BAR CLAMP", "GR3-1015", `${W}×2`],
-    ["푸시바 조립볼트", "PUSH BAR BOLT", "M6x45", `${W}×4`], ["나이론 너트", "PUSH BAR NUT", "M6", `${W}×4`], ["푸시바 클램프 볼트", "PUSH BAR CLAMP BOLT", "M8x45(20S)", `${W}×2`], ["나이론 너트", "PUSH BAR CLAMP NUT", "M8", `${W}×2`],
-    ["임팩피스", "IMPACT SCREW", "#10x19", `${W}×6`], ["분할 리벳", "SPLIT RIVET", "-", `${W}×8`], ["반달볼트", "FLANGED BOLT", "M6x27/32", PP], ["반달너트", "FLANGED NUT", "-", PP],
-    ["종동축", "PUSH / PULL PIPE", `Φ31.8x1.5T L:${p.pipeL}`, PP], ["구동축", "SHAFT PIPE", `KS 32A L:${p.driveL}`, `⌈${N(Math.round(DM * 1000) / 1000, "m")}÷${N(Math.max(1000, p.driveL) / 1000, "m/본")}⌉`] ];
-  return { rows: fxApplyObj(rows.map(([n, en, spec, f, rem]) => ({ n, en, spec, f, q: 0, unit: "EA", rem: rem || "" })), "vent", fx), sum: { M: M0, RD: RD0, W: W0, PP: PP0, DS, area: list.reduce((a, x) => a + x.area, 0), driveM: list.reduce((a, x) => a + x.drive, 0) / 1000, pipeM: list.reduce((a, x) => a + x.pipeLen, 0) / 1000 } };
+    ...(mg.length ? mg : [[p.motor, 0]]).map(([nm, c], i) => ({ k: `motor${i}`, n: "천창개폐모터", spec: nm, f: mg.length > 1 ? N(c, "대") : M, rem: `관급 (구역수×${each ? 2 : 1})`, warn: list.some(x => x.model === nm && x.pick.over) })),
+    ...(Number(p.rpu) ? [{ k: "rpu", n: "RPU", spec: "POTENTIOm R1K/S10", f: M, rem: "모터×1 (옵션)" }] : []),
+    { k: "chain", n: "체인 커플링용 체인", spec: "-", f: `${M}×${N(4, "")}`, rem: "모터×4" },
+    { k: "wheel", n: "체인휠", spec: "육각", f: `${M}×${N(2, "")}`, rem: "모터×2" },
+    { k: "mb1", n: "모터브라켓-1", spec: `H-${td}`, f: M, rem: "모터×1 (규격=트러스댑스)" },
+    { k: "mb2", n: "모터브라켓-2", spec: "-", f: `${M}×${N(2, "")}`, rem: "모터브라켓-1×2" },
+    { k: "b8100", n: "육각 볼트", spec: "SUS, M8x100", f: `${M}×${N(12, "")}`, rem: "모터브라켓-1×12", sp: 10 },
+    { k: "n8100", n: "육각 너트", spec: "SUS, M8", f: `${M}×${N(12, "")}`, rem: "육각볼트(M8x100)와 동일", sp: 10 },
+    { k: "rrd", n: "랙드라이브", spec: rg.map(([nm]) => `${nm} K70/80 UNIT`).join(", ") || "RRD710-1003 K70/80 UNIT", f: RD, rem: "(베이수−1)×구역수" },
+    { k: "clamp", n: "클램프세트", spec: "RRD700 SET K80x120-B5/4", f: RD, rem: "랙드라이브와 동일" },
+    { k: "rack", n: "랙", spec: "RACK B20 M4 L1400U", f: RD, rem: "랙드라이브와 동일" },
+    { k: "sgc", n: "샤프트 가이드 클립", spec: "6각", f: `${RD}×${N(2, "")}−${M}×${N(2, "")}`, rem: "랙×2−모터×2", sp: 10 },
+    { k: "rpj", n: "랙파이프 연결구", spec: "-", f: `${RD}×${N(2, "")}`, rem: "랙×2", sp: 10 },
+    { k: "roller", n: "파이프 롤러", spec: "Φ31.8x1.5T용", f: `${W}×${N(3, "")}`, rem: "천창×3", sp: 20 },
+    { k: "b870", n: "육각 볼트", spec: "SUS, M8x70", f: `${W}×${N(3, "")}`, rem: "파이프롤러와 동일", sp: 50 },
+    { k: "n870", n: "육각 너트", spec: "SUS, M8", f: `${W}×${N(3, "")}`, rem: "파이프롤러와 동일", sp: 50 },
+    { k: "pbl", n: "푸시바 링크", spec: "GR3-1016", f: W, rem: "천창 개수", sp: 10 },
+    { k: "pbc", n: "푸시바 클램프", spec: "GR3-1015", f: W, rem: "천창 개수", sp: 10 },
+    { k: "b645", n: "육각 볼트", spec: "SUS, M6x45", f: `${W}×${N(2, "")}`, rem: "푸시바링크×2", sp: 20 },
+    { k: "n6", n: "육각 너트", spec: "SUS, M6", f: `${W}×${N(2, "")}`, rem: "육각볼트(M6x45)와 동일", sp: 20 },
+    { k: "b840", n: "육각 볼트", spec: "SUS, M8x40(20S)", f: W, rem: "푸시바클램프와 동일", sp: 10 },
+    { k: "nn8", n: "육각 나이론 너트", spec: "SUS, M8", f: W, rem: "육각볼트(M8x40)와 동일", sp: 10 },
+    { k: "imp", n: "육각 임팩피스", spec: "델타, #10x25", f: `${W}×${N(3, "")}`, rem: "천창×3", sp: 50 },
+    { k: "rivet", n: "분할 리벳(AL)", spec: "-", f: `${W}×${N(4, "")}`, rem: "천창×4", sp: 40 },
+    { k: "pipe", n: "종동축", spec: `ø31.8X1.5T${p.pipeL ? `, ${p.pipeL}L` : ""}`, f: PPf, rem: "천창÷2", sp: { pct: 1 } },
+    { k: "half", n: "반달볼트/너트", spec: "M6x27/32", f: PPf, rem: "종동축과 동일", sp: 10 },
+    { k: "dA", n: "구동축(모터측A)", spec: `${ds}, ${A}L`, f: M, rem: "모터 개수" },
+    { k: "dB", n: "구동축(모터측B)", spec: `${ds}, ${Bm}L`, f: M, rem: "모터 개수" },
+    { k: "dS", n: "구동축(표준)", spec: `${ds}, ${STD}L`, f: `⌈(${N(r1(DM), "m")}−${M}×(${N(A / 1000, "m")}+${N(Bm / 1000, "m")}))÷${N(STD / 1000, "m")}−${N(0.5, "반올림")}⌉`, rem: "(구동축 길이 − 모터측 A·B) ÷ 표준 길이" },
+    { k: "wj", n: "웰딩조인트", spec: "6각(용접출고)", f: `${N(DS, "본")}×${N(2, "")}`, rem: "구동축(표준)×2", acc: true },
+    { k: "cc", n: "체인커플링", spec: "KS 32A용", f: `(${M}+${M})×${N(2, "")}`, rem: "(구동축A+구동축B)×2", acc: true } ];
+  const out = rows.map(r => { const t = fxParse(r.f, fx[`vent:${r.k}`] || {}), q = Math.max(0, Math.ceil(fxEval(t) - 1e-9)), so = (p.spare || {})[r.k], spare = so != null ? Math.max(0, Math.round(num(so))) : VT_SP(q, r.sp);
+    return { ...r, t, ov: t.some(x => x.ov), q, spare, spOv: so != null, tot: q + spare, unit: "EA", en: "" }; });
+  return { rows: out, sum: { M: M0, RD: RD0, W: W0, PP: PP0, DS, area: list.reduce((a, x) => a + x.area, 0), driveM: DM, pipeM: list.reduce((a, x) => a + x.pipeLen, 0) / 1000 } };
 }
 function dzVentTab(D, G, ed){
   const { V, list } = vtAll(D, G), p = V.p, B = vtBom(list, p, (D.equip || {}).fx), ro = ed ? "" : "disabled", sel = state.vtSel, tool = ed ? (state.vtTool || "sel") : "sel";
@@ -3705,6 +3734,7 @@ function dzVentTab(D, G, ed){
       ${x.pick.warn.map(w => `<span class="note" style="margin:0;width:100%;padding-left:22px;color:var(--crit)">⚠ ${esc(w)}</span>`).join("")}
       ${x.manual ? `<button class="btn sm" data-vtdauto="${i}" ${ro}>구동 자동</button>` : `<span class="note" style="margin:0">구동 자동</span>`}${ed ? `<button class="dz-x" data-vtdel="${i}" title="구역 빼기">×</button>` : ""}</div>`).join("");
   const side = `<div class="panel dz-side">
+      <div class="dz-dim" style="gap:6px"><span class="lb" style="width:auto;font-weight:700">RPU (옵션)</span><select data-vtp="rpu" ${ro}><option value="0" ${Number(p.rpu) ? "" : "selected"}>미포함</option><option value="1" ${Number(p.rpu) ? "selected" : ""}>포함</option></select></div>
       <h3>모터 선정 기준 <span class="note" style="font-weight:400">Ridder 표 2장 (Truss-rail)</span></h3>
       ${(() => { const sl = (k, opts, lab) => `<select data-vtp="${k}" ${ro} aria-label="${lab}" title="${lab}">${opts.map(([v, l]) => `<option value="${v}" ${String(p[k]) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
         return `<div class="dz-dim" style="flex-wrap:wrap;gap:4px">${sl("lower", [[150, "트러스 내림 150"], [180, "트러스 내림 180"]], "트러스 내림 (mm)")}${sl("glass", [[4, "유리 4mm"], [5, "유리 5mm"]], "유리 두께")}${sl("insect", [[0, "방충망 없음"], [1, "방충망 있음"]], "방충망")}
@@ -3718,19 +3748,24 @@ function dzVentTab(D, G, ed){
       <div class="sc-list">${secRows || `<p class="note">구역이 없습니다. 평면에서 끌어서 구역을 그리세요.</p>`}</div>
       ${ed ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"><button class="btn sm" id="vt-auto">자동 구역 다시 만들기</button></div>` : ""}
       <details class="dz-more"><summary>배치 기준</summary><div class="g2">
-        ${pin("winW", "천창 폭 (mm)")}${pin("winL", "천창 길이 (mm)")}${pin("gap", "구동축 2줄 간격 (mm)")}${pin("pipeL", "종동축 1본 길이 (mm)")}${pin("driveL", "구동축 1본 길이 (mm)")}</div>
+        ${pin("winW", "천창 폭 (mm)")}${pin("winL", "천창 길이 (mm)")}${pin("gap", "구동축 2줄 간격 (mm)")}${pin("pipeL", "종동축 1본 길이 (mm)")}${pin("driveStd", "구동축(표준) 길이 (mm)", 0.5)}${pin("driveA", "구동축 모터측A (mm)", 0.5)}${pin("driveB", "구동축 모터측B (mm)", 0.5)}</div>
+        <div class="field"><label>구동축 규격</label><input type="text" data-vtp="driveSpec" value="${esc(p.driveSpec)}" ${ro}></div>
 </details>
       <div class="dz-area" style="margin-top:8px">면적 <b>${wonM(B.sum.area)}㎡</b> · 모터 ${B.sum.M}대 · 천창 <b>${B.sum.W}</b>개<br>
-        랙드라이브 ${B.sum.RD}개 · 구동축 ${fmtQty(Math.round(B.sum.driveM))}m (${B.sum.DS}본)<br>종동축 ${B.sum.PP}본 (${fmtQty(Math.round(B.sum.pipeM))}m)</div>
+        랙드라이브 ${B.sum.RD}개 · 구동축 ${fmtQty(Math.round(B.sum.driveM))}m (모터측 A·B ${B.sum.M}본씩 + 표준 ${B.sum.DS}본)<br>종동축 ${B.sum.PP}본 (${fmtQty(Math.round(B.sum.pipeM))}m)</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><button class="btn" id="vt-xlsx">산출서 엑셀</button><button class="btn" id="vt-dxf">천창 DXF</button></div>
       <p class="note" style="margin-top:6px">DXF 레이어는 참고 도면과 같게 AA-WIND(천창) · Shaft(구동축·종동축) · SIMB(랙드라이브 블록 RRD) · MOTOR(모터 블록)로 나옵니다.</p></div>`;
   const tools = ed ? `<div class="dz-tools"><button data-vttool="sel" class="${tool === "sel" ? "on" : ""}">구역 고르기</button><button data-vttool="draw" class="${tool === "draw" ? "on" : ""}"><i style="background:${VT_COL.area}"></i>구역 그리기</button>
       <span class="note" style="margin:0 0 0 6px">${tool === "draw" ? "평면에서 끌어서 사각형으로 구역을 그립니다 (그 칸은 다른 구역에서 빠짐)." : "빨간 구동축을 좌우로 끌어 옮깁니다 (지붕 골 선에 붙고 좌·우 면적 표시)."}</span></div>` : "";
   const legend = `<div class="dz-legend"><span><i style="background:${VT_COL.area};opacity:.4"></i>천창 구역 (모터 1대)</span><span><i style="background:${VT_COL.win}"></i>천창</span><span><i style="background:${VT_COL.drive}"></i>구동축 (2줄)</span><span><b style="display:inline-block;width:12px;height:12px;border:2px solid ${VT_COL.rd};vertical-align:-2px;margin-right:4px;background:#fff"></b>랙드라이브 (RRD)</span><span><i style="background:${VT_COL.pipe}"></i>종동축</span></div>`;
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
-  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">천창시스템 수량산출서</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품명</th><th>영문품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th></tr></thead><tbody>
-    ${B.rows.map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r.n)}</td><td style="color:var(--ink-3);font-size:11.5px">${esc(r.en)}</td><td>${esc(r.spec)}</td><td>${r.unit}</td><td class="r num" ${r.ov ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r.q)}</td><td class="fx-cell">${fxHtml(r.t, `vent:${i}`, ed)}${r.ov && ed ? ` <button class="fx-rs" data-fxrs="vent:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}${r.rem ? ` <span style="color:var(--crit)">${esc(r.rem)}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>
-    <p class="note">품목과 수량 비율은 ‘천창시스템_수량산출서_v3’와 같습니다 (모터 기준·랙드라이브 기준·천창 기준·종동축 기준). 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (빨간색 = 고친 값, ↺ = 되돌리기, 칸을 비우면 원래 값, ⌈ ⌉ = 올림).${B.rows.some(r => r.ov) && ed ? ` <button class="btn sm" data-fxrs="vent:*">천창 산출식 모두 되돌리기</button>` : ""}</p>`;
+  const bom = `<h3 style="font-size:13.5px;margin:12px 0 6px">천창시스템 수량산출서 <span class="note" style="font-weight:400">패킹리스트 기준</span></h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th class="r">여유</th><th class="r">총계</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
+    ${B.rows.map((r, i) => `<tr ${r.acc ? 'style="background:#F1F3F2"' : ""}><td class="num">${i + 1}</td><td>${r.acc ? '<span class="note" style="margin:0">귀속품</span> ' : ""}${esc(r.n)}</td><td>${esc(r.spec)}</td><td>${r.unit}</td>
+      <td class="r num" ${r.ov ? 'style="color:#C62828;font-weight:700"' : r.warn ? 'style="color:var(--crit)"' : ""}>${fmtQty(r.q)}</td>
+      <td class="r">${ed ? `<input type="number" min="0" step="1" data-vtsp="${r.k}" value="${r.spare || ""}" placeholder="0" style="width:58px;text-align:right${r.spOv ? ";color:#C62828;font-weight:700" : ""}" title="${r.spOv ? "직접 넣은 여유 (비우면 자동)" : "자동 여유 · 고칠 수 있음"}">` : r.spare || ""}</td>
+      <td class="r num" style="font-weight:700">${fmtQty(r.tot)}</td>
+      <td class="fx-cell">${fxHtml(r.t, `vent:${r.k}`, ed)}${r.ov && ed ? ` <button class="fx-rs" data-fxrs="vent:${r.k}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r.rem)}${r.warn ? ' <span style="color:var(--crit)">모터사양체크</span>' : ""}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note">품목·순서·비율은 실제 패킹리스트(박종국 제2온실, 2026.10.07)와 같습니다. 여유는 볼트·너트 등 포장 단위로 올린 값이며 직접 고칠 수 있습니다(빨간색 = 직접 넣은 값, 비우면 자동). 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (⌈ ⌉ = 올림).${B.rows.some(r => r.ov) && ed ? ` <button class="btn sm" data-fxrs="vent:*">천창 산출식 모두 되돌리기</button>` : ""}</p>`;
   return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${tools}<div class="dz-zwrap">${zb}${vtSvg(G, list, sel, tool)}</div>${legend}${bom}</div></div>`;
 }
 function vtSvg(G, list, sel, tool){
@@ -3806,20 +3841,24 @@ function vtClick(e){
 }
 function vtInput(e){
   if(state.tab !== "design" || state.dzSub !== "vent") return false;
-  const t = e.target; if(!t.dataset || !t.dataset.vtp) return false; if(e.type !== "change") return true;
+  const t = e.target;
+  if(t.dataset && t.dataset.vtsp){ if(e.type !== "change") return true; const k = t.dataset.vtsp, raw = t.value.trim();
+    dzSet(D => { const V = vtOf(D), sp = { ...(V.p.spare || {}) }; if(raw === "") delete sp[k]; else sp[k] = Math.max(0, Math.round(num(raw))); V.p.spare = sp; D.vent = { sections: V.sections, p: V.p }; }); return true; }
+  if(!t.dataset || !t.dataset.vtp) return false; if(e.type !== "change") return true;
   const k = t.dataset.vtp; dzSet(D => { const V = vtOf(D);
-    V.p[k] = k === "motor" ? t.value.trim() || VT_DEF.motor : ["motorMode", "series", "roofSel"].includes(k) ? t.value : ["lower", "glass", "insect", "roofDeg", "openDeg", "motorEach"].includes(k) ? Number(t.value) : Math.max(100, Math.round(num(t.value)));
+    V.p[k] = k === "motor" ? t.value.trim() || VT_DEF.motor : k === "driveSpec" ? t.value.trim() || VT_DEF.driveSpec : ["motorMode", "series", "roofSel"].includes(k) ? t.value : ["lower", "glass", "insect", "roofDeg", "openDeg", "motorEach", "rpu"].includes(k) ? Number(t.value) : ["driveA", "driveB", "driveStd"].includes(k) ? Math.max(100, Math.round(num(t.value) * 10) / 10) : Math.max(100, Math.round(num(t.value)));
     D.vent = { sections: V.sections, p: V.p }; }); return true;
 }
 async function vtExportXlsx(){
   let ExcelJS; try{ ExcelJS = await loadExcelJS(); }catch(err){ toast(err.message, 5000); return; }
   const D = dzDraft().D, G = dzBuild(D), { V, list } = vtAll(D, G), B = vtBom(list, V.p, (D.equip || {}).fx), pname = (state.M && state.M.p.name) || proj().name || "온실";
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet("천창시스템 수량산출서"), F = "맑은 고딕", thin = { style: "thin", color: { argb: "FF999999" } }, BOX = { top: thin, left: thin, bottom: thin, right: thin };
-  ws.columns = [{ width: 6 }, { width: 22 }, { width: 28 }, { width: 26 }, { width: 7 }, { width: 10 }, { width: 40 }];
-  ws.mergeCells("A1:G1"); ws.getCell("A1").value = "천창시스템 수량산출서"; ws.getCell("A1").font = { name: F, size: 15, bold: true }; ws.getCell("A1").alignment = { horizontal: "center" };
+  ws.columns = [{ width: 6 }, { width: 10 }, { width: 22 }, { width: 28 }, { width: 7 }, { width: 9 }, { width: 8 }, { width: 9 }, { width: 46 }, { width: 28 }];
+  ws.mergeCells("A1:J1"); ws.getCell("A1").value = "천창시스템 수량산출서 (패킹리스트)"; ws.getCell("A1").font = { name: F, size: 15, bold: true }; ws.getCell("A1").alignment = { horizontal: "center" };
   ws.getCell("A2").value = `사업명: ${pname}`; ws.getCell("A2").font = { name: F, size: 10 };
-  ["No.", "품명", "영문품명", "규격", "단위", "수량", "산출식"].forEach((h, c) => { const x = ws.getCell(4, c + 1); x.value = h; x.font = { name: F, bold: true, size: 10 }; x.border = BOX; x.alignment = { horizontal: "center" }; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }; });
-  B.rows.forEach((r, i) => { [i + 1, r.n, r.en, r.spec, r.unit, r.q, fxText(r.t)].forEach((v, c) => { const x = ws.getCell(5 + i, c + 1); x.value = c === 5 ? { formula: fxXlQ(r), result: v } : v; x.font = { name: F, size: 10 }; x.border = BOX; if(c === 5) x.numFmt = "#,##0"; }); });
+  ["No.", "구분", "품명", "규격", "단위", "수량", "여유", "총계", "산출식", "REMARK"].forEach((h, c) => { const x = ws.getCell(4, c + 1); x.value = h; x.font = { name: F, bold: true, size: 10 }; x.border = BOX; x.alignment = { horizontal: "center" }; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }; });
+  B.rows.forEach((r, i) => { const R0 = 5 + i; [i + 1, r.acc ? "귀속품" : "천창개폐", r.n, r.spec, r.unit, r.q, r.spare || null, r.tot, fxText(r.t), r.rem].forEach((v, c) => { const x = ws.getCell(R0, c + 1);
+    x.value = c === 5 ? { formula: fxXlQ(r), result: v } : c === 7 ? { formula: `F${R0}+G${R0}`, result: v } : v; x.font = { name: F, size: 10, bold: c === 7 }; x.border = BOX; if(c >= 5 && c <= 7) x.numFmt = "#,##0"; }); });
   const w2 = wb.addWorksheet("구역"); w2.columns = [{ width: 8 }, { width: 10 }, { width: 12 }, { width: 8 }, { width: 10 }, { width: 10 }, { width: 12 }];
   w2.addRow(["구역", "동", "면적(㎡)", "천창", "랙드라이브", "종동축(본)", "구동축(m)", "모터", "랙드라이브 규격", "선정 근거"]).font = { bold: true };
   list.forEach((x, i) => w2.addRow([`V${i + 1}`, G.blocks[x.sec.bi].B.name, Math.round(x.area * 10) / 10, x.win, x.rd, x.pipes, Math.round(x.drive / 100) / 10, x.model, x.rack,
