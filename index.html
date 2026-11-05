@@ -2816,10 +2816,10 @@ const DZ_MCODE = { sch: "SC", chord: "TR", web: "TR-W", tv: "TR-V", mp: "MP", gu
 const dzCode = (D, t) => (D.specs[t] && D.specs[t][2] != null && String(D.specs[t][2]).trim()) || DZ_CODE[t] || DZ_MCODE[t] || "";
 const DZ_TOOLS = [["col", "기둥"], ["truss", "트러스"], ["mp", "미니기둥"], ["knee", "보강재"], ["hbr", "수평 브레싱"], ["gb", "측면 수평 브레싱"], ["gbk", "GB (측면 보강재)"], ["vbr", "내부 수직 브레싱"], ["vbo", "외부 수직 브레싱"], ["ebr", "전후면 브레싱"], ["bb", "내부 브레싱 보강재"], ["girt", "퍼린"], ["scp", "스크린 마감 퍼린"], ["sch", "스크린 채널"]];
 const DZ_TOOL_COLOR = { col: "col", truss: "chord", mp: "mp", knee: "knee", hbr: "hbr", gb: "gb", gbk: "gbk", vbr: "vbr", vbo: "vbo", ebr: "ebr", bb: "bb", girt: "girt", scp: "scp", sch: "sch" };
-const DZ_TOOL_TYPES = { col: ["col", "scol", "ecol"], truss: ["chord", "web", "tv"], mp: ["mp"], knee: ["knee"], hbr: ["hbr"], gb: ["gb"], gbk: ["gbk"], vbr: ["vbr"], vbo: ["vbo"], ebr: ["ebr"], bb: ["bb"], girt: ["girt"], scp: ["scp"], sch: ["sch"] };
+const DZ_TOOL_TYPES = { col: ["col", "scol", "ecol"], truss: ["chord", "web", "tv"], mp: ["mp"], knee: ["knee"], hbr: ["hbr"], gb: ["gb"], gbk: ["gbk"], vbr: ["vbr"], vbo: ["vbo"], ebr: ["ebr"], bb: ["bb"], girt: ["girt", "pgirt"], scp: ["scp"], sch: ["sch"] };
 const DZ_ARR = { col: "rmCol", truss: "rmTr", mp: "rmMp", knee: "kb", hbr: "hb", gb: "noGb", gbk: "noGbk", vbr: "vb", vbo: "vb", ebr: "eb", bb: "noBb", girt: "noGirt", scp: "noScp", sch: "rmSc" };
 /* 평면 편집 분류: 브레싱(수평·수직·전후면), 보강재(기둥 보강재·측면 수평 보강재 GB·내부 브레싱 보강재 BB) — 분류 안 자재는 함께 보이고, 고친 것은 고른 세부 도구 */
-const DZ_CATS = [["col", "기둥", ["col"]], ["truss", "트러스", ["truss"]], ["mp", "미니기둥", ["mp"]], ["brace", "브레싱", ["hbr", "gb", "vbr", "vbo", "ebr"], ["수평", "측면 수평", "내부 수직", "외부 수직", "전후면"]], ["stiff", "보강재", ["knee", "gbk", "bb"], ["기둥 보강재", "GB (측면 보강재)", "브레싱 보강재 (BB)"]], ["girt", "퍼린", ["girt", "scp", "sch"], ["벽체 퍼린", "스크린 마감 퍼린", "스크린 채널 (SC)"]]];
+const DZ_CATS = [["col", "기둥", ["col"]], ["truss", "트러스", ["truss"]], ["mp", "미니기둥", ["mp"]], ["brace", "브레싱", ["hbr", "gb", "vbr", "vbo", "ebr"], ["수평", "측면 수평", "내부 수직", "외부 수직", "전후면"]], ["stiff", "보강재", ["knee", "gbk", "bb"], ["기둥 보강재", "GB (측면 보강재)", "브레싱 보강재 (BB)"]], ["girt", "퍼린", ["girt", "sch"], ["벽체 퍼린 (칸막이 포함)", "스크린 채널 (SC)"]]];
 const dzCatOf = tl => DZ_CATS.find(c => c[2].includes(tl)) || [tl, tl, [tl]];
 const DZ_SUBS = [["plan", "평면도"], ["steel", "철골"], ["alu", "알루미늄"], ["cover", "피복"], ["vent", "천창"], ["screen", "스크린"], ["fan", "유동휀"], ["fog", "훈증기"], ["hgut", "행잉거터"], ["wire", "유인와이어"]];
 const DZ_SIDES = { R: "오른쪽", L: "왼쪽", F: "앞쪽 (X1 쪽)", B: "뒤쪽" };
@@ -3026,6 +3026,7 @@ function dzWebs(B, x0, S, R, put){
   for(let m = 0; m < Math.max(1, R); m++){ const a0 = x0 + m * md, n = dzWebN(B, md), p = md / n;
     for(let k = 0; k < n; k++){ const a = a0 + k * p + gap / 2 + (k === 0 ? half : 0), b = a0 + (k + 1) * p - gap / 2 - (k === n - 1 ? half : 0); put(a, b, k % 2 === 0); } }
 }
+const dzGirtN = B => B.girtN == null || B.girtN === "" ? 4 : Math.max(0, Math.min(8, Math.round(num(B.girtN))));   // 벽체 퍼린 기본 단수 (4단)
 function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
   const { sw, bh, xs, ys, ns, nb, inc } = g, L = [], add = (t, a, b, mid) => L.push({ t, bi, a: [a[0] + ox, a[1] + oy, a[2]], b: [b[0] + ox, b[1] + oy, b[2]], ...(mid ? { mid: true } : {}) });
   const gz = B.gutterZ, has = (a, k) => (B[a] || []).includes(k), venlo = B.kind !== "gable";
@@ -3078,12 +3079,18 @@ function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
       const xsP = new Set(); for(let k = 0; k <= n; k++){ xsP.add(xs[s] + S / 2 * k / n); xsP.add(xs[s] + S - S / 2 * k / n); }
       [...xsP].forEach(x => runs("rpur", x, ridgeAt(s, x), j => inc(s, j))); }
   }
-  const hs = String(B.girts || "").split(/[,\s]+/).map(Number).filter(h => h > 0 && h < gz), hsc = String(B.scrPur || "").split(/[,\s]+/).map(Number).filter(h => h > 0 && h <= gz);
-  [["girt", hs], ["scp", hsc]].forEach(([t, list]) => list.forEach(h => { for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++) if(g.vOut(i, j) && !has(t === "girt" ? "noGirt" : "noScp", `v:${i}:${j}`)) add(dzMemT(B, t, `v:${i}:${j}`, t), [xs[i], ys[j], h], [xs[i], ys[j + 1], h]);
-    for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++) if(g.hOut(s, j) && !has(t === "girt" ? "noGirt" : "noScp", `h:${s}:${j}`)) add(dzMemT(B, t, `h:${s}:${j}`, t), [xs[s], ys[j], h], [xs[s + 1], ys[j], h]); }));
-  g.parts.forEach(k => { const [t, x, y] = k.split(":"), i = +x, j = +y;   // 칸막이: 벽 퍼린 높이마다 띠장
-    if(t === "v" && i > 0 && i < ns && j < nb && inc(i - 1, j) && inc(i, j)) hs.forEach(h => add("pgirt", [xs[i], ys[j], h], [xs[i], ys[j + 1], h]));
-    if(t === "h" && j > 0 && j < nb && i < ns && inc(i, j - 1) && inc(i, j)) hs.forEach(h => add("pgirt", [xs[i], ys[j], h], [xs[i + 1], ys[j], h])); });
+  // 벽체 퍼린: 단수(기본 B.girtN = 4, 벽 구간마다 B.girtLay["v:i:j"|"h:s:j"]) → 높이 = 거터 높이를 단수+1로 나눈 자리
+  const girtN = dzGirtN(B), hAt = n => Array.from({ length: n }, (_, k) => Math.round(gz * (k + 1) / (n + 1))), gN = key => { const v = (B.girtLay || {})[key]; return v != null ? Math.max(0, Math.min(8, Math.round(num(v)))) : girtN; };
+  const hs = hAt(girtN), hsc = [];
+  for(let i = 0; i <= ns; i++) for(let j = 0; j < nb; j++){ const k = `v:${i}:${j}`; if(g.vOut(i, j) && !has("noGirt", k)) hAt(gN(k)).forEach(h => add(dzMemT(B, "girt", k, "girt"), [xs[i], ys[j], h], [xs[i], ys[j + 1], h])); }
+  for(let s = 0; s < ns; s++) for(let j = 0; j <= nb; j++){ const k = `h:${s}:${j}`; if(g.hOut(s, j) && !has("noGirt", k)) hAt(gN(k)).forEach(h => add(dzMemT(B, "girt", k, "girt"), [xs[s], ys[j], h], [xs[s + 1], ys[j], h])); }
+  // 칸막이 퍼린(띠장): 칸막이·재배실 경계 줄 = 기본 단수 − 그 줄 스크린 채널 단수 (아래 단부터)
+  const scN = (s, j) => scrRows.has(`${s}:${j}`) && !has("rmSc", `${s}:${j}`) ? Math.max(1, Math.min(3, Number((B.scLay || {})[`${s}:${j}`]) || scL)) : 0;
+  const pLines = new Map(); g.parts.forEach(k => { const [t, x, y] = k.split(":"), i = +x, j = +y;
+    if(t === "v" && i > 0 && i < ns && j < nb && inc(i - 1, j) && inc(i, j)) pLines.set(k, [[xs[i], ys[j]], [xs[i], ys[j + 1]], 0]);
+    if(t === "h" && j > 0 && j < nb && i < ns && inc(i, j - 1) && inc(i, j)) pLines.set(k, [[xs[i], ys[j]], [xs[i + 1], ys[j]], scN(i, j)]); });
+  scrRows.forEach(k => { const [s0, j0] = k.split(":").map(Number); if(j0 > 0 && j0 < nb && inc(s0, j0 - 1) && inc(s0, j0) && !pLines.has(`h:${s0}:${j0}`)) pLines.set(`h:${s0}:${j0}`, [[xs[s0], ys[j0]], [xs[s0 + 1], ys[j0]], scN(s0, j0)]); });
+  const pgN = {}; pLines.forEach(([a, c, nSc], k) => { const n = Math.max(0, girtN - nSc); pgN[k] = n; hs.slice(0, n).forEach(h => add("pgirt", [a[0], a[1], h], [c[0], c[1], h])); });
   (B.kb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(!(i <= ns && j <= nb && g.colOn(i, j))) return; const k0 = B.kneeL;
     [[-1, i - 1], [1, i]].forEach(([dir, s]) => { if(s < 0 || s >= ns || !g.rowOn(s, j) || has("rmTr", `${s}:${j}`)) return; add(dzMemT(B, "knee", `${i}:${j}`, "knee"), [xs[i], ys[j], zb - k0], [xs[i] + dir * k0, ys[j], zb]); }); });
   // 지붕 수평 브레싱: 지붕(모듈) 하나 폭 × 칸 하나에 X — GB 우선: GB가 지나는 지붕 칸에는 넣지 않음
@@ -3119,7 +3126,6 @@ function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
     if(tl === "hbr") add(tt, [A[0], A[1], zt], [E[0], E[1], zt]);
     else if(tl === "gb") add(tt, [A[0], A[1], zb], [E[0], E[1], zb]);
     else if(tl === "girt") (hs.length ? hs : [gz / 2]).forEach(h => add(tt, [A[0], A[1], h], [E[0], E[1], h]));
-    else if(tl === "scp") (hsc.length ? hsc : [gz - 500]).forEach(h => add(tt, [A[0], A[1], h], [E[0], E[1], h]));
     else if(tl === "sch") for(let k = 0; k < scL; k++){ const z = scL === 1 ? zt : zt - (zt - zb) * k / (scL - 1); add(tt, [A[0], A[1], z], [E[0], E[1], z]); }
     else if(tl === "vbr" || tl === "ebr"){ const zl = tl === "vbr" ? zv : z0; add(tt, [A[0], A[1], zl], [E[0], E[1], zb]); add(tt, [E[0], E[1], zl], [A[0], A[1], zb]); }
     else if(tl === "mp") add(tt, [A[0], A[1], zt], [A[0], A[1], gz]);
@@ -3132,7 +3138,7 @@ function dzBuildBlock(B, ox, oy, g, bi, scL = 2){
       trussN++; }
     for(let k = n0; k < L.length; k++) L[k].add = true;
     if(L.length > n0) addM.push({ idx, tool: tl, t: tl === "truss" ? q.t : tt, a: [A[0] + ox, A[1] + oy], b: [E[0] + ox, E[1] + oy] }); });
-  return { B, bi, g, ox, oy, L, addM, gz, zt, zb, Rof, modOf, hs, trussN, venlo, colSlots, scrRows, edgeRows, trussAt: (s, j) => g.rowOn(s, j) && !scrRows.has(`${s}:${j}`) && !edgeRows.has(`${s}:${j}`) && !has("rmTr", `${s}:${j}`), X: xs.map(x => x + ox), Y: ys.map(y => y + oy), ridgeH: B.ridgeH };
+  return { B, bi, g, ox, oy, L, addM, girtN, gN, pgN, gz, zt, zb, Rof, modOf, hs, trussN, venlo, colSlots, scrRows, edgeRows, trussAt: (s, j) => g.rowOn(s, j) && !scrRows.has(`${s}:${j}`) && !edgeRows.has(`${s}:${j}`) && !has("rmTr", `${s}:${j}`), X: xs.map(x => x + ox), Y: ys.map(y => y + oy), ridgeH: B.ridgeH };
 }
 /* 전체: 동마다 만들고 겹치는 부재(맞붙은 벽의 기둥 등)는 하나만 */
 function dzBuild(D){
@@ -3327,8 +3333,9 @@ function dzSteelTab(D, G, ed, Z){
   const side = `<div class="panel dz-side">
       <h3>동 선택</h3>${dzBlkChips(D, bi)}
       <h3>${esc(B.name)} · ${DZ_KINDS[B.kind] || ""}</h3><div class="g2">${params}</div>
-      <div class="field"><label for="dzp-girts">벽체 퍼린(PU) 높이 (mm, 쉼표로)</label><input type="text" id="dzp-girts" data-dzp="girts" value="${esc(B.girts)}" ${ro}></div>
-      ${B.kind !== "gable" ? `<div class="field"><label for="dzp-scrPur">스크린 마감 퍼린(SC) 높이 (mm)</label><input type="text" id="dzp-scrPur" data-dzp="scrPur" value="${esc(B.scrPur || "")}" placeholder="예: 5300, 5800" ${ro}></div>
+      <div class="field"><label for="dzp-girtN">벽체 퍼린 기본 단수</label><input type="number" id="dzp-girtN" data-dzp="girtN" min="0" max="8" step="1" value="${dzGirtN(B)}" ${ro}></div>
+      <p class="note" style="margin:-4px 0 6px">높이 = 거터 높이를 (단수+1)로 나눈 자리 (4단·6m → 1.2·2.4·3.6·4.8m). 벽 구간마다 평면의 ‘n단’을 눌러 바꿉니다. 칸막이 = 기본 단수 − 그 줄 스크린 채널 단수</p>
+      ${B.kind !== "gable" ? `
       <label class="chk"><input type="checkbox" data-dzc="gableScreen" ${B.gableScreen !== false ? "checked" : ""} ${ro}> 스크린 박공 줄(재배동 끝)은 트러스 대신 스크린 채널(SC) 2줄</label>
       <label class="chk"><input type="checkbox" data-dzc="edgeNoTruss" ${B.edgeNoTruss !== false ? "checked" : ""} ${ro}> 바깥 테두리 박공 줄은 트러스 없음 (벽 퍼린으로)</label>
       <label class="chk"><input type="checkbox" data-dzc="gbOn" ${B.gbOn !== false ? "checked" : ""} ${ro}> 측면 수평 브레싱 — 측벽에서 다음 기둥줄까지 지그재그 (+ 칸 가운데 GB 보강재)</label>
@@ -4827,11 +4834,11 @@ function dzPlanSvg(D, G, tool, ed){
     const ebL = (s, j) => g.hOut(s, j) || g.parts.includes(`h:${s}:${j}`) || b.scrRows.has(`${s}:${j}`);   // 전후면 브레싱 줄: 박공 벽 · 칸막이 · 재배실 박공
     if(sh("ebr")) (B.eb || []).forEach(k => { const p2 = k.split(":"), s = Number(p2[1]), j = Number(p2[p2.length - 1]), ms = p2.length === 4 ? [Number(p2[2])] : [...Array(b.Rof(s)).keys()]; if(s < g.ns && j <= g.nb && ebL(s, j)) ms.forEach(m => { if(m >= b.Rof(s)) return; const out = g.inc(s, j) ? -1 : 1, md = b.modOf(s), a = X[s] + m * md; o += ln(a + md * 0.08, Y[j] + out * cs * 1.2, a + md * 0.92, Y[j] + out * cs * 1.2, mt("ebr", `h:${s}:${m}:${j}`, "ebr").c, 4); }); });
     const d = cs * 2.4;
-    if(sh("scp") && String(B.scrPur || "").trim()){ const d2 = d * 1.8;   // 스크린 마감 퍼린: 벽체 퍼린보다 바깥쪽에 그림
-      for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)){ const out = g.inc(i, j) ? -1 : 1, off = has("noScp", `v:${i}:${j}`); o += ln(X[i] + out * d2, Y[j], X[i] + out * d2, Y[j + 1], off ? "#C0392B" : mt("scp", `v:${i}:${j}`, "scp").c, off ? 1 : 2, off ? 'stroke-dasharray="4 4" opacity=".5"' : 'stroke-dasharray="12 3"'); }
-      for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)){ const out = g.inc(s, j) ? -1 : 1, off = has("noScp", `h:${s}:${j}`); o += ln(X[s], Y[j] + out * d2, X[s + 1], Y[j] + out * d2, off ? "#C0392B" : mt("scp", `h:${s}:${j}`, "scp").c, off ? 1 : 2, off ? 'stroke-dasharray="4 4" opacity=".5"' : 'stroke-dasharray="12 3"'); } }
-    if(sh("girt")){ for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j) && !has("noGirt", `v:${i}:${j}`)){ const out = g.inc(i, j) ? -1 : 1; o += ln(X[i] + out * d, Y[j], X[i] + out * d, Y[j + 1], mt("girt", `v:${i}:${j}`, "girt").c, 2); }
-      for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j) && !has("noGirt", `h:${s}:${j}`)){ const out = g.inc(s, j) ? -1 : 1; o += ln(X[s], Y[j] + out * d, X[s + 1], Y[j] + out * d, mt("girt", `h:${s}:${j}`, "girt").c, 2); } }
+    if(sh("girt")){ const lab = (x, y, k, n, own, anc) => `<text x="${x}" y="${y}" font-size="${cs * 1.5}" text-anchor="${anc}" fill="${own ? "#C62828" : T.girt.c}" font-weight="700" ${ed ? `data-dzgl="${bi}|${k}" style="cursor:pointer"` : 'pointer-events="none"'}>${n}단<title>${ed ? "눌러서 단수 바꾸기 (0→…→6단)" : ""}${own ? " · 이 구간만 따로 정함" : " · 기본 단수"}</title></text>`;   // 벽체 퍼린 단수 표기 · 눌러서 바꿈
+      for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j) && !has("noGirt", `v:${i}:${j}`)){ const out = g.inc(i, j) ? -1 : 1, k = `v:${i}:${j}`; o += ln(X[i] + out * d, Y[j], X[i] + out * d, Y[j + 1], mt("girt", k, "girt").c, 2) + lab(X[i] + out * d * 1.6, (Y[j] + Y[j + 1]) / 2 + cs * 0.5, k, b.gN(k), (B.girtLay || {})[k] != null, out < 0 ? "end" : "start"); }
+      for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j) && !has("noGirt", `h:${s}:${j}`)){ const out = g.inc(s, j) ? -1 : 1, k = `h:${s}:${j}`; o += ln(X[s], Y[j] + out * d, X[s + 1], Y[j] + out * d, mt("girt", k, "girt").c, 2) + lab((X[s] + X[s + 1]) / 2, Y[j] + out * d * 2.2 + (out > 0 ? cs : 0), k, b.gN(k), (B.girtLay || {})[k] != null, "middle"); }
+      Object.entries(b.pgN || {}).forEach(([k, n]) => { const [t, x, y] = k.split(":"), i = +x, j = +y; const a = t === "v" ? [X[i], Y[j]] : [X[i], Y[j]], c = t === "v" ? [X[i], Y[j + 1]] : [X[i + 1], Y[j]];   // 칸막이 띠장 (기본 단수 − SC 단수)
+        o += ln(a[0], a[1], c[0], c[1], T.pgirt.c, n ? 2 : 1, n ? 'stroke-dasharray="8 3"' : 'stroke-dasharray="3 4" opacity=".5"') + `<text x="${(a[0] + c[0]) / 2 + (t === "v" ? cs : 0)}" y="${(a[1] + c[1]) / 2 + (t === "h" ? cs * 2.2 : 0)}" font-size="${cs * 1.3}" text-anchor="middle" fill="${T.pgirt.c}" font-weight="700" pointer-events="none">칸막이 ${n}단</text>`; }); }
     if(b.venlo && sh("mp")) for(let j = 0; j <= g.nb; j++) for(let s = 0; s < g.ns; s++){ if(!b.trussAt(s, j)) continue; for(let m = 1; m < b.Rof(s); m++){ const off = has("rmMp", `${s}:${m}:${j}`), c = mt("mp", `${s}:${m}:${j}`, "mp").c; o += `<circle cx="${X[s] + m * b.modOf(s)}" cy="${Y[j]}" r="${cs * 0.45}" fill="${off ? "none" : c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'opacity=".5"' : ""}/>`; } }
     const colSym = (x, y, t, off, small) => { const k = small ? 0.75 : 1, w = cs * 1.15 * k, h = t === "ecol" ? w : cs * 0.72 * k, c = T[t].c;
       let q = `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" fill="${off ? "none" : c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke" ${off ? 'stroke-dasharray="3 3"' : ""}><title>${esc(dzCode(D, t))} ${T[t].n}</title></rect>`;
@@ -4860,7 +4867,7 @@ function dzPlanSvg(D, G, tool, ed){
       if(tool === "vbr" || tool === "vbo") for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.lineOn(i, j) && g.vEdge(i, j) === (tool === "vbo")) o += hit(p + `${i}:${j}`, `<rect x="${X[i] - hw / 2}" y="${Y[j] + cs}" width="${hw}" height="${g.bh[j] - cs * 2}"/>`);
       if(tool === "bb") (B.vb || []).forEach(k => { const [i, j] = k.split(":").map(Number); if(i <= g.ns && j < g.nb && g.lineOn(i, j) && !g.vEdge(i, j)) o += hit(p + k, `<rect x="${X[i] - hw / 2}" y="${Y[j] + cs}" width="${hw}" height="${g.bh[j] - cs * 2}"/>`); });
       if(tool === "ebr") for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(ebL(s, j)) for(let m = 0; m < b.Rof(s); m++) o += hit(p + `h:${s}:${m}:${j}`, `<rect x="${X[s] + m * b.modOf(s) + cs}" y="${Y[j] - hw}" width="${b.modOf(s) - cs * 2}" height="${hw * 2}"/>`);
-      if(tool === "girt" || tool === "scp"){ for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)) o += hit(p + `v:${i}:${j}`, `<rect x="${X[i] - hw}" y="${Y[j]}" width="${hw * 2}" height="${g.bh[j]}"/>`);
+      if(tool === "girt"){ for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)) o += hit(p + `v:${i}:${j}`, `<rect x="${X[i] - hw}" y="${Y[j]}" width="${hw * 2}" height="${g.bh[j]}"/>`);
         for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)) o += hit(p + `h:${s}:${j}`, `<rect x="${X[s]}" y="${Y[j] - hw}" width="${g.sw[s]}" height="${hw * 2}"/>`); } }
   });
   return o + `</svg>`;
@@ -5263,6 +5270,8 @@ function designClick(e){
   if(e.target.closest("[data-dzlegopen]")){ state.dzLegOpen = state.dzLegOpen === false; render(); return true; }
   const pk = e.target.closest("[data-dzctpick]"); if(pk && !e.target.closest("input, button")){ const t = pk.dataset.dzctpick; state.dzColPick = state.dzColPick === t ? null : t; if(state.dzColPick) state.dzColType = t; render();
     if(state.dzColPick) toast(`${dzCode(dzDraft().D, t)} ${DZ_TYPES[t].n} 선택 — 빈 기둥 자리를 누르면 이 타입으로 넣고, ‘＋ 기둥 추가’도 이 타입으로 놓습니다`, 2600); return true; }
+  const gl = e.target.closest("[data-dzgl]"); if(gl && state.canEdit){ const [bi0, key] = gl.dataset.dzgl.split("|");
+    dzSet(D => { const B = D.blocks[+bi0]; if(!B) return; const base = dzGirtN(B), m = { ...(B.girtLay || {}) }, cur = m[key] != null ? Number(m[key]) : base, nx = (cur + 1) % 7; if(nx === base) delete m[key]; else m[key] = nx; B.girtLay = m; }); return true; }
   const scl = e.target.closest("[data-dzscl]"); if(scl && state.canEdit){ const [bi0, key] = scl.dataset.dzscl.split("|"), base = dzScL(dzDraft().D);
     dzSet(D => { const B = D.blocks[+bi0]; if(!B) return; const m = { ...(B.scLay || {}) }, cur = Number(m[key]) || base, nx = cur % 3 + 1; if(nx === base) delete m[key]; else m[key] = nx; B.scLay = m; }); return true; }
   const mmd = e.target.closest("[data-dzmemmode]"); if(mmd){ state.dzMemMode = mmd.dataset.dzmemmode; render(); return true; }
