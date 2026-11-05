@@ -3953,9 +3953,9 @@ function vtExportDxf(){
 const EQ_DEF = {
   fan: { ach: 1.5, cap: 5050, model: "보스트만, 단상 230V-230W-5,050㎥/h", lineW: 12000, add: 0, loop: 1, wallOff: 1500 },
   fog: { crop: "일반", per: 500, perBerry: 250, model: "단상 230V-100W", add: 0 },
-  hg: { perSpan: 5, hose: 0.75, hook: 0.6, stem: 0.9, pipeSets: 0, spanRows: {}, off: 350 },   // spanRows: { "동번호:스팬": 줄 수 }
+  hg: { perSpan: 5, hose: 0.75, hook: 0.6, stem: 0.9, pipeSets: 0, spanRows: {}, off: 350, irr: 1.5, stemP: 1.0, coilM: 40 },   // irr 이리게이션 훅 간격 · stemP 스템서포트 간격 · coilM 코일 길이 (패킹리스트)   // spanRows: { "동번호:스팬": 줄 수 }
   wire: { perGutter: 2, dayM: 400 },
-  cover: { roof: "glass", side: "유리", gable: "유리" },
+  cover: { roof: "glass", side: "유리", gable: "유리", colH: 0 },   // colH 기둥 높이(mm), 0 = 동마다 거터 높이(기둥 윗면)
   alu: { rafG: 1.125, rafF: 3.375, mull: 1.0, angle: 22 } };   // 지붕서가래 간격(유리·필름), 수직서가래 간격, 지붕 경사
 const EQ_COL = { fan: "#0277BD", fog: "#8E24AA", hg: "#2E7D32", wire: "#EF6C00" };
 function eqOf(D){ const E = D.equip || {}, o = Object.fromEntries(Object.keys(EQ_DEF).map(k => [k, { ...EQ_DEF[k], ...(E[k] || {}) }])); o.hg.spanRows = { ...((E.hg || {}).spanRows || {}) }; return o; }
@@ -4075,32 +4075,67 @@ function fxApply(rows, sub, fx){ return rows.map((r, i) => { const ov = fx[`${su
 function eqGroups(regs){ const m = new Map();
   regs.forEach(R => (R.hg || []).forEach(l => { const mm = Math.round(l.y1 - l.y0), k = `${mm}:${l.cells}`; const g = m.get(k) || { n: 0, m: mm / 1000, c: l.cells }; g.n++; m.set(k, g); }));
   return [...m.values()].sort((a, b) => b.m - a.m || b.c - a.c); }
+/* 행잉거터·유인와이어 수량 = 실제 패킹리스트(박종국 제2온실 2026.10.07) 품목·순서·REMARK 식.
+   줄수(토마토줄수) = 거터 줄 수, 트러스칸수 = 줄마다 지나는 칸(베이) 수. 행 { k, n, spec, f, rem, sp(여유 규칙 {p %, s 단위}), acc(귀속품), unit } */
 function eqHgBom(regs, p, P){
-  let rows = 0, len = 0, spans = 0;
+  let rows = 0, len = 0;
+  const edge = new Map();   // 측벽 쪽 줄(구역마다 맨 바깥 두 줄) 길이별 줄 수 → 스템 서포트 특수형
   regs.forEach(R => { const ls = eqGutters(R, P); R.hg = ls; ls.forEach(l => { rows++; len += (l.y1 - l.y0) / 1000; });
-    const sp = new Set(); R.set.forEach(k => sp.add(k.split(":")[0])); spans += sp.size; });
-  const N = fxN, Gs = eqGroups(regs), sum = f => Gs.length ? Gs.map(f).join(" + ") : N(0, "줄"), Rn = N(rows, "줄"), iv = v => Math.max(0.05, v);
-  const pipe = p.pipeSets > 0 ? N(p.pipeSets, "세트") : `${N(spans, "스팬")}×${N(2, "세트")}`;
+    if(ls.length){ const xs = ls.map(l => l.x), lo = Math.min(...xs), hi = Math.max(...xs); ls.filter(l => Math.abs(l.x - lo) < 1 || Math.abs(l.x - hi) < 1).forEach(l => { const mm = Math.round(l.y1 - l.y0); edge.set(mm, (edge.get(mm) || 0) + 1); }); } });
+  const N = fxN, Gs = eqGroups(regs), sum = (f, gs = Gs) => gs.length ? gs.map(f).join("+") : N(0, "줄"), Rn = N(rows, "줄"), iv = v => Math.max(0.05, num(v));
+  const irr = iv(p.irr || 1.5), st = iv(p.stemP || 1), coil = Math.max(1, num(p.coilM) || 40), TC = sum(g => `${N(g.n, "줄")}×${N(g.c, "칸")}`);
+  const eg = [...edge].map(([mm, n]) => ({ n, m: mm / 1000 })), left = new Map(eg.map(g => [Math.round(g.m * 1000), g.n]));
+  const gg = Gs.map(g => { const k = Math.round(g.m * 1000), e = Math.min(g.n, left.get(k) || 0); left.set(k, (left.get(k) || 0) - e); return { ...g, n: g.n - e }; }).filter(g => g.n > 0);
+  const per = g => `${N(g.n, "줄")}×⌈${N(g.m, "m")}÷${N(st, "m")}⌉`;
   return { sum: { rows, len }, rows: [
-    ["거터", "폴리에스터 코팅", "m", 0, "", sum(g => `${N(g.n, "줄")}×${N(g.m, "m")}`)], ["거터 서스펜션", "턴버클, 브라켓, 와이어등", "세트", 0, "", sum(g => `${N(g.n, "줄")}×${N(g.c, "칸")}`)],
-    ["엔드캡", "플라스틱, 볼트포함", "ea", 0, "", Rn], ["배수캡", "Drain cap", "ea", 0, "", Rn],
-    ["주름관", "Ø 38 mm, 30m", "롤", 0, "", `⌈${Rn}÷${N(30, "줄")}⌉`], ["주름관 클램프", "Ø 38 mm, 아연도금", "ea", 0, "", Rn],
-    ["양액호스걸이", `@${p.hose}m`, "ea", 0, "", sum(g => `${N(g.n, "줄")}×(⌈${N(g.m, "m")}÷${N(iv(p.hose), "m")}⌉+1)`)],
-    ["플라스틱 훅걸이", `양액호스걸이 훅 @${p.hook}m`, "ea", 0, "", sum(g => `${N(g.n, "줄")}×(⌈${N(g.m, "m")}÷${N(iv(p.hook), "m")}⌉+1)`)],
-    ["거터지지파이프", "ㅁ-100x50x2.3", "세트", 0, p.pipeSets > 0 ? "직접 입력" : "", pipe],
-    ["턴어라운드브라켓", "박공면", "세트", 0, "", Rn], ["턴어라운드브라켓", "복도면", "세트", 0, "", Rn], ["턴어라운드지지대", "복도면", "ea", 0, "", Rn],
-    ["스템서포트", `@${p.stem}m`, "ea", 0, "", sum(g => `${N(g.n, "줄")}×⌈${N(g.m, "m")}÷${N(iv(p.stem), "m")}⌉`)],
-    ["행잉거터 설치", "하루 거터 성형 2,000m", "인", 0, "(칸 수 + 3명) × 일수 + 액세서리 5명", `(${N(Math.max(0, ...Gs.map(g => g.c)), "칸")}+${N(3, "명")})×⌈${N(Math.round(len * 10) / 10, "m")}÷${N(2000, "m/일")}⌉+${N(5, "명")}`] ] };
+    { k: "coil", n: "행잉거터 코일(토마토용)", spec: `HG-001, 0.7T 552mm, ${coil}M`, f: sum(g => `${N(g.n, "줄")}×⌈${N(g.m, "m")}÷${N(coil, "m/코일")}⌉`), rem: "줄수", sp: { p: 4 } },
+    { k: "tbr", n: "트러스 브라켓(75x45용, 토마토)", spec: "GPH-001-2, Φ8", f: TC, rem: "줄수×트러스칸수", sp: { s: 10 } },
+    { k: "gth", n: "그로우 튜브 훅", spec: "GPH-002-1, Φ8", f: TC, rem: "토마토줄수×트러스칸수", sp: { s: 10 } },
+    { k: "hang", n: "행잉거터 걸이(토마토용)", spec: "GPH-003-1, Φ8", f: TC, rem: "토마토줄수×트러스칸수", sp: { s: 10 } },
+    { k: "hwire", n: "행잉거터 와이어(토마토용)", spec: "GPH-004-1, 턴버클포함", f: TC, rem: "토마토줄수×트러스칸수", sp: { s: 10 } },
+    { k: "irr", n: "이리게이션 훅(토마토용)", spec: `GPH-006-1, Φ4 @${Math.round(irr * 1000)}`, f: sum(g => `${N(g.n, "줄")}×(⌈${N(g.m, "m")}÷${N(irr, "m")}⌉+${N(1, "")})`), rem: "[ROUNDUP(행잉거터길이÷1.5)+1]×토마토줄수", sp: { s: 50 } },
+    { k: "stemS", n: "스템 서포트(특수형, 벽쪽)", spec: `GPH-007-2, Φ5 @${Math.round(st * 1000)}`, f: sum(per, eg), rem: "1줄당개수×(구역 측벽 쪽 줄)", sp: { s: 10 } },
+    { k: "stemG", n: "스템 서포트(일반형)", spec: `GPH-007-1, Φ5 @${Math.round(st * 1000)}`, f: sum(per, gg), rem: "1줄당개수×(줄수−측벽 쪽 줄)", sp: { p: 0.5, s: 10 } },
+    { k: "gturn", n: "박공 턴어라운드 브라켓", spec: "GPH-008, Φ8", f: Rn, rem: "토마토줄수×1", sp: { p: 3, s: 5 } },
+    { k: "tclamp", n: "턴 브라켓 클램프", spec: "GPH-008-1", f: `${Rn}×${N(2, "")}`, rem: "토마토줄수×2", sp: { p: 2, s: 10 } },
+    { k: "ubolt", n: "U 볼트(100x50용)", spec: "GPH-008-2, 백색 M8", f: `${Rn}×${N(2, "")}`, rem: "턴브라켓클램프와 동일", sp: { p: 2, s: 10 } },
+    { k: "nut8", n: "육각 너트", spec: "백색, M8", f: `${Rn}×${N(2, "")}×${N(2, "")}`, rem: "U볼트×2", sp: { p: 2, s: 10 } },
+    { k: "cturn", n: "복도용 턴어라운드 브라켓", spec: "GPH-009, Φ8", f: Rn, rem: "토마토줄수×1", sp: { p: 3, s: 5 } },
+    { k: "cstem", n: "복도용 스템서포트", spec: "GPH-010, Φ8", f: Rn, rem: "토마토줄수×1", sp: { p: 3, s: 5 } },
+    { k: "plate", n: "서포트 플레이트", spec: "GPH-011, 용융 PL-2.3T", f: Rn, rem: "토마토줄수×1", sp: { p: 3, s: 5 } },
+    { k: "b625", n: "육각 볼트", spec: "SUS, M6x25", f: `${Rn}×${N(4, "")}`, rem: "서포트플레이트×4", sp: { p: 2, s: 10 } },
+    { k: "n6", n: "육각 너트", spec: "SUS, M6", f: `${Rn}×${N(4, "")}`, rem: "육각볼트(M6x25)와 동일", sp: { p: 2, s: 10 } },
+    { k: "endcap", n: "엔드캡(토마토용)", spec: "Plastic", f: Rn, rem: "줄수와 동일", sp: { p: 3, s: 5 } },
+    { k: "drain", n: "드레인캡(토마토용)", spec: "Plastic", f: Rn, rem: "줄수와 동일", sp: { p: 3, s: 5 } },
+    { k: "stand", n: "받침대(스탠딩)", spec: "-", f: Rn, rem: "행잉거터 라인수(전체줄수합)과 동일" },
+    { k: "bpipe", n: "흑관(원자재)", spec: "ㅁ40x40x2.3T, 744L", f: `${Rn}×${N(2, "")}`, rem: "받침대(스탠딩)×2 (귀속품), kg단가", acc: true },
+    { k: "wpipe", n: "백관(원자재)", spec: "ㅁ100x50x2.3T, 610L", f: Rn, rem: "받침대(스탠딩)×1 (귀속품), kg단가", acc: true },
+    { k: "anchor", n: "셋앙카", spec: "SUS, 1/2x100", f: `${Rn}×${N(4, "")}`, rem: "받침대(스탠딩)×4", sp: { p: 1.5, s: 5 } },
+    { k: "imp1016", n: "육각 임팩피스", spec: "델타, #10x16", f: `${Rn}×${N(8, "")}`, rem: "받침대(스탠딩)×8", sp: { s: 100 } },
+    { k: "fixbr", n: "행잉거터 고정 브라켓", spec: "GPH-015, AL L-38x38x3T, 40L", f: `${Rn}×${N(2, "")}`, rem: "전체줄수×2", sp: { p: 2, s: 10 } },
+    { k: "hose", n: "흑나선 호스", spec: "Φ38x50M", f: `⌈${Rn}÷${N(50, "줄/롤")}⌉`, rem: "ROUNDUP[전체줄수합÷50]" },
+    { k: "hclamp", n: "호스클램프", spec: "42mm", f: Rn, rem: "전체줄수합×1", sp: { p: 5, s: 10 } },
+    { k: "imp1013", n: "육각 임팩피스", spec: "델타, #10x13", f: N(500, "고정"), rem: "고정값(면적무관)" },
+    { k: "cs816", n: "십자 접시머리 임팩피스", spec: "SUS, #8x16", f: N(500, "고정"), rem: "고정값(면적무관)" },
+    { k: "inst", n: "행잉거터 설치", spec: "하루 거터 성형 2,000m", unit: "인", f: `(${N(Math.max(0, ...Gs.map(g => g.c)), "칸")}+${N(3, "명")})×⌈${N(Math.round(len * 10) / 10, "m")}÷${N(2000, "m/일")}⌉+${N(5, "명")}`, rem: "(칸 수 + 3명) × 일수 + 액세서리 5명 (직영 시트)" } ] };
 }
 function eqWireBom(regs, P, p){
   let wire = 0, rows = 0; const w = p.perGutter, N = fxN;
-  regs.forEach(R => { (R.hg || eqGutters(R, P)).forEach(l => { const m = (l.y1 - l.y0) / 1000; rows++; wire += (m + 1) * w; }); });
-  const Gs = eqGroups(regs), sum = f => Gs.length ? Gs.map(f).join(" + ") : N(0, "줄"), Rn = N(rows, "줄"), W = N(w, "가닥");
+  regs.forEach(R => { (R.hg || eqGutters(R, P)).forEach(l => { const m = (l.y1 - l.y0) / 1000; rows++; wire += (m + 10) * w; }); });
+  const Gs = eqGroups(regs), sum = f => Gs.length ? Gs.map(f).join("+") : N(0, "줄"), Rn = N(rows, "줄"), W = N(w, "가닥");
   return { sum: { rows, wire }, rows: [
-    ["작물지지와이어", "작물와이어 (750m)", "m", 0, "", `(${sum(g => `${N(g.n, "줄")}×(${N(g.m, "m")}+${N(1, "m")})`)})×${W}`],
-    ["턴버클", "턴버클 12mm", "ea", 0, "", `${Rn}×${W}×${N(2, "ea")}`], ["와이어심블", "와이어 심블 1/4", "ea", 0, "", `${Rn}×${W}×${N(2, "ea")}`], ["와이어클립", "와이어 클립 1/8", "ea", 0, "", `${Rn}×${W}×${N(4, "ea")}`],
-    ["와이어클립", "와이어 클립 3/4", "ea", 0, "", `${Rn}×${W}×${N(2, "ea")}`], ["작물지지와이어 거치대(유인훅)", "", "ea", 0, "", `(${sum(g => `${N(g.n, "줄")}×(${N(g.c, "칸")}−1)`)})×${W}`],
-    ["작물지지와이어설치", `1인 1일 ${p.dayM}m`, "인", 0, "", `⌈${N(Math.round(wire * 10) / 10, "m")}÷${N(Math.max(1, p.dayM), "m/인")}⌉`] ] };
+    { k: "hook", n: "유인훅", spec: "GPH-005, Φ4", f: `(${sum(g => `${N(g.n, "줄")}×${N(g.c, "칸")}`)})×${W}`, rem: "토마토줄수×트러스칸수×2", sp: { p: 0.2, s: 10 } },
+    { k: "c34", n: "와이어 클립", spec: "백색, 3/4", f: `${Rn}×${N(4, "")}`, rem: "토마토줄수×4", sp: { p: 5, s: 50 } },
+    { k: "c18", n: "와이어 클립", spec: "백색, 1/8", f: `${Rn}×${N(8, "")}`, rem: "토마토줄수×8", sp: { p: 5, s: 50 } },
+    { k: "thim", n: "와이어 심블(헤비팀블)", spec: "백색, 1/4", f: `${Rn}×${N(4, "")}`, rem: "토마토줄수×4", sp: { p: 5, s: 50 } },
+    { k: "wire", n: "유인철선", spec: "50kg=750M", f: `⌈(${sum(g => `${N(g.n, "줄")}×(${N(g.m, "m")}+${N(10, "m")})`)})×${W}÷${N(750, "m/롤")}⌉`, rem: "ROUNDUP[(온실세로+10)×(토마토줄수×2)÷750]" },
+    { k: "inst", n: "작물지지와이어설치", spec: `1인 1일 ${p.dayM}m`, unit: "인", f: `⌈${N(Math.round(wire * 10) / 10, "m")}÷${N(Math.max(1, p.dayM), "m/인")}⌉`, rem: "와이어 길이 ÷ 1인 1일 설치 길이 (직영 시트)" } ] };
+}
+/* 행 키 산출 행 → [품명, 규격, 단위, 수량, 비고, 산출식, 고침, 키, 여유, 총계, 여유고침, 귀속품] (여유 = SC_SP 규칙, E.spare["탭:키"]로 직접) */
+function eqKeyRows(rows, sub, E){
+  const fx = E.fx || {}, spo = E.spare || {};
+  return rows.map(r => { const t = fxParse(r.f, fx[`${sub}:${r.k}`] || {}), u = r.unit || "EA", q = Math.max(0, Math.ceil(fxEval(t) - 1e-9)), so = spo[`${sub}:${r.k}`], sp = so != null ? Math.max(0, Math.round(num(so))) : SC_SP(q, r.sp);
+    return [r.n, r.spec, u, q, r.rem, t, t.some(x => x.ov), r.k, sp, q + sp, so != null, !!r.acc]; });
 }
 function eqModel(D, G){
   const P = eqOf(D), regs = eqRegions(D, G), fx = (D.equip || {}).fx || {}, N = fxN;
@@ -4117,7 +4152,7 @@ function eqModel(D, G){
   fan.rows = [["유동휀", P.fan.model, "ea", 0, man.fan ? "평면에서 직접 배치한 대수" : regs.some(R => R.fan.extra) ? "줄 맞춤 = 같은 길이 줄을 같은 대수로 맞추려고 더한 대수" : "", man.fan ? rg(R => N(R.fan.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}${ad(R.fan.adj, "조정")}${ad(R.fan.extra, "줄 맞춤")}`)]];
   fog.rows = [["유황훈증기", P.fog.model, "ea", 0, man.fog ? "평면에서 직접 배치한 대수" : regs.some(R => R.fog.extra) ? "격자 = 일정한 간격으로 놓으려고 더한 대수" : "", man.fog ? rg(R => N(R.fog.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}${ad(R.fog.adj, "조정")}${ad(R.fog.extra, "격자")}`)]];
   fan.rows.push(["유동휀, 유황훈증기 설치", "1인 하루 30대 · 2인 1조", "인", 0, "유동휀 + 훈증기 대수", `⌈(${N(fan.n, "대")}+${N(fog.n, "대")})÷${N(30, "대/일")}×${N(2, "인")}⌉`]);
-  fan.rows = fxApply(fan.rows, "fan", fx); fog.rows = fxApply(fog.rows, "fog", fx); hg.rows = fxApply(hg.rows, "hgut", fx); wire.rows = fxApply(wire.rows, "wire", fx);
+  fan.rows = fxApply(fan.rows, "fan", fx); fog.rows = fxApply(fog.rows, "fog", fx); hg.rows = eqKeyRows(hg.rows, "hgut", D.equip || {}); wire.rows = eqKeyRows(wire.rows, "wire", D.equip || {});
   return { P, regs, area, fan, fog, hg, wire, fx, man };
 }
 const EQ_TABS = { fan: "유동휀", fog: "훈증기", hgut: "행잉거터", wire: "유인와이어", cover: "피복", alu: "알루미늄" };
@@ -4136,24 +4171,29 @@ function dzEquipTab(sub, D, G, ed){
     regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ ÷ ${R.fog.per}㎡ = ${R.fog.n0}대 → 격자 ${R.fog.cols}×${R.fog.rows} <b>${R.fog.n}대</b> · 1대당 ${fmtQty(Math.round(R.fog.each * 10) / 10)}㎡ (평균 간격 ${fmtQty(Math.round(R.fog.dx / 100) / 10)}m × ${fmtQty(Math.round(R.fog.dy / 100) / 10)}m)</span>${ed ? `<span class="eq-pm"><button class="btn sm" data-eqcnt="fog|${R.b.bi}:${R.i}|-1" title="1대 빼기 (배치 자동)">−</button><button class="btn sm" data-eqcnt="fog|${R.b.bi}:${R.i}|1" title="1대 더하기 (배치 자동)">+</button>${R.fog.adj ? `<span class="note" style="margin:0 0 0 4px;color:#C62828">${R.fog.adj > 0 ? "+" : ""}${R.fog.adj}</span>` : ""}</span>` : ""}</div>`).join("");
     bom = Mo.fog.rows; summary = `재배면적 ${wonM(Mo.area)}㎡ · 유황훈증기 <b>${Mo.fog.n}대</b><br><span class="note">${P.fog.crop === "딸기" ? "딸기(업다운 재배주수 2배)" : "일반작물(5줄/8m)"} 기준 ${P.fog.crop === "딸기" ? P.fog.perBerry : P.fog.per}㎡당 1대</span>`;
   } else if(sub === "hgut"){
-    params = `<div class="g2">${inp("hg", "perSpan", "기본 스팬당 줄 수")}${inp("hg", "pipeSets", "거터지지파이프 (세트)")}${inp("hg", "off", "첫 줄 위치 (기둥줄에서 mm)", 50)}</div>
-      <p class="note" style="margin-top:-4px">거터지지파이프: 0이면 재배 스팬 수 × 2로 자동 계산, 숫자를 넣으면 그 수량을 그대로 씁니다.</p>
+    params = `<div class="g2">${inp("hg", "perSpan", "기본 스팬당 줄 수")}${inp("hg", "off", "첫 줄 위치 (기둥줄에서 mm)", 50)}</div>
       <p class="note">평면 아래 스팬마다 적힌 「n줄」을 누르면 그 스팬만 고칠 수 있습니다 (빨간 글씨 = 따로 정한 스팬).${Object.keys(P.hg.spanRows).length && ed ? ` <button class="btn sm" id="eq-rowsreset">모두 기본값으로</button>` : ""}</p>
-      <h3 style="margin-top:8px">설치 간격</h3><div class="g2">${inp("hg", "hose", "양액호스걸이 (m)", 0.05)}${inp("hg", "hook", "플라스틱 훅걸이 (m)", 0.05)}${inp("hg", "stem", "스템서포트 (m)", 0.05)}</div>
-      <p class="note" style="margin-top:-4px">개수 = 줄마다 거터 길이 ÷ 간격 (올림, 호스걸이·훅걸이는 +1)</p>`;
+      <h3 style="margin-top:8px">설치 간격</h3><div class="g2">${inp("hg", "irr", "이리게이션 훅 (m)", 0.05)}${inp("hg", "stemP", "스템 서포트 (m)", 0.05)}${inp("hg", "coilM", "코일 길이 (m)", 1)}</div>
+      <p class="note" style="margin-top:-4px">이리게이션 훅 = 줄마다 (⌈거터 길이 ÷ 간격⌉ + 1) · 스템 서포트 = 줄마다 ⌈거터 길이 ÷ 간격⌉ (구역 측벽 쪽 두 줄은 특수형)</p>`;
     regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ · 거터 ${R.hg.length}줄 · ${fmtQty(Math.round(R.hg.reduce((a, l) => a + l.y1 - l.y0, 0) / 100) / 10)}m</span></div>`).join("");
     bom = Mo.hg.rows; summary = `거터 <b>${Mo.hg.sum.rows}줄</b> · 총 ${fmtQty(Math.round(Mo.hg.sum.len))}m<br><span class="note">스팬마다 정한 줄 수, 길이 방향으로 칸이 이어진 만큼 · 복도가 지나는 칸(섹션)은 제외</span>`;
   } else {
     params = `<div class="g2">${inp("wire", "perGutter", "거터당 와이어 줄 수")}${inp("wire", "dayM", "1인 1일 설치 (m)", 10)}</div><p class="note">거터 줄은 ‘행잉거터’ 탭 기준(스팬별 줄 수 · 복도 칸 제외)을 따릅니다.</p>`;
     regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">거터 ${R.hg.length}줄 × ${P.wire.perGutter} = 와이어 ${R.hg.length * P.wire.perGutter}줄</span></div>`).join("");
-    bom = Mo.wire.rows; summary = `작물지지와이어 <b>${fmtQty(Math.round(Mo.wire.sum.wire))}m</b> · ${Mo.wire.sum.rows * P.wire.perGutter}줄<br><span class="note">줄마다 (거터 길이 + 1m) · 턴버클·심블 줄당 2, 클립 1/8 줄당 4 · 유인훅 (칸 수 − 1) × 줄</span>`;
+    bom = Mo.wire.rows; summary = `유인철선 <b>${fmtQty(Math.round(Mo.wire.sum.wire))}m</b> · ${Mo.wire.sum.rows * P.wire.perGutter}줄<br><span class="note">유인철선 = 줄마다 (거터 길이 + 10m) × 와이어 줄 수 · 클립 3/4 줄당 4, 1/8 줄당 8, 심블 줄당 4 · 유인훅 칸 수 × 와이어 줄 수</span>`;
   }
   const side = `<div class="panel dz-side"><h3>${title}</h3>${params}
       <h3 style="margin-top:8px">구역 <span class="note" style="font-weight:400">${Mo.regs.length}개 (관리동 제외 · 칸막이 기준)</span></h3><div class="sc-list">${regRows || `<p class="note">재배 구역이 없습니다.</p>`}</div>
       <div class="dz-area" style="margin-top:8px">${summary}</div>
       <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><button class="btn" data-eqxlsx="${sub}">산출서 엑셀</button></div></div>`;
   const zb = `<div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>`;
-  const table = `<h3 style="font-size:13.5px;margin:12px 0 6px">${title} 수량산출</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품번</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th><th>비고</th></tr></thead><tbody>
+  const table = sub === "hgut" || sub === "wire" ? `<h3 style="font-size:13.5px;margin:12px 0 6px">${title} 수량산출 <span class="note" style="font-weight:400">패킹리스트 기준</span></h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품번</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th class="r">여유</th><th class="r">총계</th><th>산출식</th><th>REMARK</th></tr></thead><tbody>
+    ${bom.map((r, i) => `<tr ${r[11] ? 'style="background:#F1F3F2"' : ""}><td class="num">${i + 1}</td><td class="pn">${pnCode(sub, r[7])}</td><td>${r[11] ? '<span class="note" style="margin:0">귀속품</span> ' : ""}${esc(r[0])}</td><td>${esc(r[1])}</td><td>${r[2]}</td>
+      <td class="r num" ${r[6] ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r[3])}</td>
+      <td class="r">${ed ? `<input type="number" min="0" step="1" data-eqsp="${sub}:${r[7]}" value="${r[8] || ""}" placeholder="0" style="width:58px;text-align:right${r[10] ? ";color:#C62828;font-weight:700" : ""}" title="${r[10] ? "직접 넣은 여유 (비우면 자동)" : "자동 여유 · 고칠 수 있음"}">` : r[8] || ""}</td>
+      <td class="r num" style="font-weight:700">${fmtQty(r[9])}</td>
+      <td class="fx-cell">${fxHtml(r[5], `${sub}:${r[7]}`, ed)}${r[6] && ed ? ` <button class="fx-rs" data-fxrs="${sub}:${r[7]}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r[4] || "")}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note">품목·순서·REMARK 식은 실제 패킹리스트(박종국 제2온실, 2026.10.07)와 같습니다. 줄수 = 평면의 거터 줄 수, 트러스칸수 = 줄마다 지나는 칸 수. 여유는 포장 단위로 올린 값이며 직접 고칠 수 있습니다(빨간색 = 직접 넣은 값, 비우면 자동). 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (⌈ ⌉ = 올림).${bom.some(r => r[6]) && ed ? ` <button class="btn sm" data-fxrs="${sub}:*">이 탭 산출식 모두 되돌리기</button>` : ""}</p>` : `<h3 style="font-size:13.5px;margin:12px 0 6px">${title} 수량산출</h3><div class="tbl-wrap"><table class="dzt sct"><thead><tr><th>No.</th><th>품번</th><th>품명</th><th>규격</th><th>단위</th><th class="r">수량</th><th>산출식</th><th>비고</th></tr></thead><tbody>
     ${bom.map((r, i) => `<tr><td class="num">${i + 1}</td><td class="pn">${pnCode(sub, i)}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td class="r num" ${r[6] ? 'style="color:#C62828;font-weight:700"' : ""}>${fmtQty(r[2] === "m" ? Math.round(r[3] * 10) / 10 : Math.ceil(r[3] - 1e-9))}</td><td class="fx-cell">${fxHtml(r[5], `${sub}:${i}`, ed)}${r[6] && ed ? ` <button class="fx-rs" data-fxrs="${sub}:${i}" title="이 행 산출식 되돌리기">↺</button>` : ""}</td><td style="color:var(--ink-3)">${esc(r[4] || "")}</td></tr>`).join("")}</tbody></table></div>
     <p class="note">계산식은 참고 수량산출 엑셀(0110 · 0111 · 0112)과 같습니다. 산출식의 숫자 칸을 고치면 수량이 다시 계산됩니다 (빨간색 = 고친 값, ↺ = 되돌리기, 칸을 비우면 원래 값). ⌈ ⌉는 올림입니다.${bom.some(r => r[6]) && ed ? ` <button class="btn sm" data-fxrs="${sub}:*">이 탭 산출식 모두 되돌리기</button>` : ""}</p>`;
   const et = state.eqTool || "move", pk = sub === "fan" || sub === "fog";
@@ -4236,6 +4276,8 @@ const PN_KEYS = {
   alu: ["ridge_glass", "ridge_film", "gutter_glass", "gutter_film", "gutpvc", "raf_glass", "raf_film", "rafpvc", "raftri", "gab_glass", "gab_film", "gab_pc", "gabpvc", "vent_g", "ventpvc", "vent_f", "ventsup", "ventcov", "fcover",
     "top_glass", "top_pc", "top_film", "mul_glass", "mul_pc", "mulpvc_glass", "mulpvc_pc", "bot_glass", "bot_pc", "corner", "box", "dpipe", "elbow", "dfix", "gend", "inst"],
   stx: ["tb", "plate", "galv", "fab", "erect"],
+  hgut: ["coil", "tbr", "gth", "hang", "hwire", "irr", "stemS", "stemG", "gturn", "tclamp", "ubolt", "nut8", "cturn", "cstem", "plate", "b625", "n6", "endcap", "drain", "stand", "bpipe", "wpipe", "anchor", "imp1016", "fixbr", "hose", "hclamp", "imp1013", "cs816", "inst"],
+  wire: ["hook", "c34", "c18", "thim", "wire", "inst"],
   screen: ["motor", "chain", "cc", "mb1", "mb2", "b880", "n880", "rp", "rack", "sqw", "b870", "n870", "rpj", "b625", "n625", "sgc", "wj", "roller", "rfix", "b675", "n675", "sus", "hook", "tcl", "hb675", "nt675", "wsup", "weight", "tape", "guide", "base",
     "bar", "pcov", "imp816", "gasket", "pin", "sclip", "tcc", "tclip", "stop", "pal", "pst", "imp1016", "pvc", "coat", "yoku", "peg", "drive", "pipe", "half", "halfn", "fab1", "fab2", "fab3", "pocket", "tow", "f55", "f510", "strn", "imp1025"],
   steel: ["col", "scol", "ecol", "wcol", "chord", "web", "tv", "mp", "gutter", "rpur", "girt", "scp", "pgirt", "knee", "sch", "hbr", "gb", "vbr", "bb", "ebr"] };
@@ -4302,6 +4344,8 @@ function eqInput(e){
   if(t.dataset && t.dataset.fxspec){ if(e.type !== "change") return true; const k = t.dataset.fxspec, v = t.value.trim();
     dzSet(D => { const E = D.equip || (D.equip = {}), st = { ...(E.specTx || {}) }; st[k] = v; E.specTx = st; }); return true; }
   if(!EQ_TABS[state.dzSub]) return false;
+  if(t.dataset && t.dataset.eqsp){ if(e.type !== "change") return true; const k = t.dataset.eqsp, raw = t.value.trim();
+    dzSet(D => { const E = D.equip || (D.equip = {}), sp = { ...(E.spare || {}) }; if(raw === "") delete sp[k]; else sp[k] = Math.max(0, Math.round(num(raw))); E.spare = sp; }); return true; }
   if(t.dataset && t.dataset.cvt){ if(e.type !== "change") return true; const [id, f] = t.dataset.cvt.split(".");
     dzSet(D => { const E = D.equip || (D.equip = {}); E.cvTypes = cvTypes(E).map(x => x.id === id ? { ...x, [f]: t.value.trim() || x[f] } : x); }); return true; }
   if(t.dataset && t.dataset.cvspec){ if(e.type !== "change") return true; const k = t.dataset.cvspec, v = t.value.trim();
@@ -4348,28 +4392,32 @@ const cvName = (T, id) => id === "n" ? "없음" : (T.find(t => t.id === id) || T
 function cvModel(D, G){
   const P = eqOf(D).cover, E = D.equip || {}, T = cvTypes(E), N = fxN, fx = E.fx || {}, sp = E.cvSpec || {}, rows = [], r2 = v => Math.round(v * 100) / 100;
   const area = {}, side = {}, gable = {}, pside = {}, pgable = {};   // 재료 id → 면적 · [{len, h}] · [{wid, tri, h}] (동마다) · 칸막이도 같은 꼴
-  G.blocks.forEach(b => { const g = b.g, bi = b.bi, h = b.gz / 1000;
+  G.blocks.forEach(b => { const g = b.g, bi = b.bi, h = (num(P.colH) > 0 ? num(P.colH) : b.gz) / 1000, rh = b.ridgeH / 1000;   // 벽 높이 = 기둥 높이
+    // 박공 삼각부: 바깥(또는 칸막이) 박공 줄의 지붕마다 지붕폭 × 지붕높이 ÷ 2 → 지붕폭별 지붕 수 tm
+    const tri = (o, s) => { const R = b.venlo ? b.Rof(s) : 1, md = Math.round(b.venlo ? b.modOf(s) : g.sw[s]); o.tm[md] = (o.tm[md] || 0) + R; o.tri += R * md / 1000 * rh / 2; };
     for(let s = 0; s < g.ns; s++) for(let j = 0; j < g.nb; j++) if(g.inc(s, j)){ const m = cvRoofOf(E, P, T, bi, s, j); area[m] = (area[m] || 0) + g.sw[s] * g.bh[j] / 1e6; }
     const sd = {}, gb = {};
     for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.vOut(i, j)){ const m = cvWallOf(E, P, T, `${bi}|v:${i}:${j}`, false); sd[m] = (sd[m] || 0) + g.bh[j] / 1000; }
-    for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)){ const m = cvWallOf(E, P, T, `${bi}|h:${s}:${j}`, true), o = gb[m] || (gb[m] = { wid: 0, tri: 0 });
-      o.wid += g.sw[s] / 1000; o.tri += (b.venlo ? b.Rof(s) * b.modOf(s) : g.sw[s]) * b.ridgeH / 2 / 1e6; }
+    for(let s = 0; s < g.ns; s++) for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)){ const m = cvWallOf(E, P, T, `${bi}|h:${s}:${j}`, true), o = gb[m] || (gb[m] = { wid: 0, tri: 0, tm: {} });
+      o.wid += g.sw[s] / 1000; tri(o, s); }
     // 칸막이: 스팬 방향 격자선(측면과 나란함) = 길이 × 측고 · 폭 방향 격자선(전후면과 나란함) = 폭 × 측고 + 박공 삼각부
     const psd = {}, pgb = {};
     // 격자선을 ‘측벽’으로 칠했으면(E.lineWall) 칸막이 대신 측면·전후면 피복으로 셈
     const LW = E.lineWall || {};
     for(let i = 1; i < g.ns; i++) for(let j = 0; j < g.nb; j++) if(g.inc(i - 1, j) && g.inc(i, j)){ const k = `${bi}|pv:${i}:${j}`, m = cvPartOf(E, T, k), o = LW[k] ? sd : psd; if(m !== "n") o[m] = (o[m] || 0) + g.bh[j] / 1000; }
-    for(let s = 0; s < g.ns; s++) for(let j = 1; j < g.nb; j++) if(g.inc(s, j - 1) && g.inc(s, j)){ const k = `${bi}|ph:${s}:${j}`, m = cvPartOf(E, T, k); if(m === "n") continue; const P2 = LW[k] ? gb : pgb, o = P2[m] || (P2[m] = { wid: 0, tri: 0 });
-      o.wid += g.sw[s] / 1000; o.tri += (b.venlo ? b.Rof(s) * b.modOf(s) : g.sw[s]) * b.ridgeH / 2 / 1e6; }
+    for(let s = 0; s < g.ns; s++) for(let j = 1; j < g.nb; j++) if(g.inc(s, j - 1) && g.inc(s, j)){ const k = `${bi}|ph:${s}:${j}`, m = cvPartOf(E, T, k); if(m === "n") continue; const P2 = LW[k] ? gb : pgb, o = P2[m] || (P2[m] = { wid: 0, tri: 0, tm: {} });
+      o.wid += g.sw[s] / 1000; tri(o, s); }
     [[sd, side], [psd, pside]].forEach(([a, o]) => Object.entries(a).forEach(([m, len]) => (o[m] || (o[m] = [])).push({ len: r2(len), h })));
-    [[gb, gable], [pgb, pgable]].forEach(([a, o2]) => Object.entries(a).forEach(([m, o]) => (o2[m] || (o2[m] = [])).push({ wid: r2(o.wid), tri: r2(o.tri), h }))); });
+    [[gb, gable], [pgb, pgable]].forEach(([a, o2]) => Object.entries(a).forEach(([m, o]) => (o2[m] || (o2[m] = [])).push({ wid: r2(o.wid), tri: r2(o.tri), tm: o.tm, rh, h }))); });
+  // 전후면 = 폭 × 기둥높이 + 박공 삼각부 (지붕 수 × 지붕폭 × 지붕높이 ÷ 2)
+  const gf = x => `${N(x.wid, "m")}×${N(x.h, "기둥높이")}` + Object.entries(x.tm).map(([md, c]) => `+${N(c, "지붕")}×${N(md / 1000, "지붕폭")}×${N(x.rh, "지붕높이")}÷${N(2, "")}`).join("");
   T.forEach(t => { const K = CV_KIND[t.kind] || CV_KIND.glass;
     if(area[t.id] > 0) rows.push({ k: `r_${t.id}`, n: `지붕 ${t.name}`, rem: `평면적 × 1.08(경사 22°) × ${K[1]}(${K[2]})`, f: `${N(r2(area[t.id]), "㎡")}×${N(1.08, "경사")}×${N(K[1], K[2])}` }); });
   const wm = t => t.kind === "pc" ? ["", ""] : [`(`, `)×${N((CV_KIND[t.kind] || CV_KIND.glass)[1], (CV_KIND[t.kind] || CV_KIND.glass)[2])}`], wr = t => t.kind === "pc" ? "" : ` × ${(CV_KIND[t.kind] || CV_KIND.glass)[1]}(${(CV_KIND[t.kind] || CV_KIND.glass)[2]})`;
-  T.forEach(t => { if(side[t.id]){ const [a, b] = wm(t); rows.push({ k: `s_${t.id}`, n: `측면 ${t.name}`, rem: `길이방향 × 측고${wr(t)}`, f: a + side[t.id].map(x => `${N(x.len, "m")}×${N(x.h, "m")}`).join("+") + b }); } });
-  T.forEach(t => { if(gable[t.id]){ const [a, b] = wm(t); rows.push({ k: `g_${t.id}`, n: `전후면 ${t.name}`, rem: `(폭 × 측고 + 박공 삼각부)${wr(t)}`, f: a + gable[t.id].map(x => `${N(x.wid, "m")}×${N(x.h, "m")}+${N(x.tri, "㎡")}`).join("+") + b }); } });
-  T.forEach(t => { if(pside[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_s_${t.id}`, n: `칸막이 (측면) ${t.name}`, rem: `길이 × 측고${wr(t)}`, f: a + pside[t.id].map(x => `${N(x.len, "m")}×${N(x.h, "m")}`).join("+") + b }); } });
-  T.forEach(t => { if(pgable[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_g_${t.id}`, n: `칸막이 (전후면) ${t.name}`, rem: `(폭 × 측고 + 박공 삼각부)${wr(t)}`, f: a + pgable[t.id].map(x => `${N(x.wid, "m")}×${N(x.h, "m")}+${N(x.tri, "㎡")}`).join("+") + b }); } });
+  T.forEach(t => { if(side[t.id]){ const [a, b] = wm(t); rows.push({ k: `s_${t.id}`, n: `측면 ${t.name}`, rem: `길이방향 × 기둥높이${wr(t)}`, f: a + side[t.id].map(x => `${N(x.len, "m")}×${N(x.h, "기둥높이")}`).join("+") + b }); } });
+  T.forEach(t => { if(gable[t.id]){ const [a, b] = wm(t); rows.push({ k: `g_${t.id}`, n: `전후면 ${t.name}`, rem: `(폭 × 기둥높이 + 박공 삼각부: 지붕 수 × 지붕폭 × 지붕높이 ÷ 2)${wr(t)}`, f: a + gable[t.id].map(gf).join("+") + b }); } });
+  T.forEach(t => { if(pside[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_s_${t.id}`, n: `칸막이 (측면) ${t.name}`, rem: `길이 × 기둥높이${wr(t)}`, f: a + pside[t.id].map(x => `${N(x.len, "m")}×${N(x.h, "기둥높이")}`).join("+") + b }); } });
+  T.forEach(t => { if(pgable[t.id]){ const [a, b] = wm(t); rows.push({ k: `p_g_${t.id}`, n: `칸막이 (전후면) ${t.name}`, rem: `(폭 × 기둥높이 + 박공 삼각부: 지붕 수 × 지붕폭 × 지붕높이 ÷ 2)${wr(t)}`, f: a + pgable[t.id].map(gf).join("+") + b }); } });
   // 행: [품명, 규격, 단위, 수량, 비고, 산출식, 고침, 행 키] — 고친 값은 행 키로 저장해 행이 늘거나 줄어도 따라감
   const cvPn = k => { const m = k.match(/^(p_s|p_g|i_r|i_w|i_p|r|s|g)_(.+)$/); if(!m) return `CV-${pnVar(k).toUpperCase()}`; const t = T.find(x => x.id === m[2]);
     return `CV-${{ r: 101, s: 102, g: 103, p_s: 104, p_g: 105, i_r: 201, i_w: 202, i_p: 203 }[m[1]]}-${pnVar(t ? t.name : m[2])}`; };
@@ -4454,6 +4502,7 @@ function dzCoverTab(D, G, ed){
   const side = `<div class="panel dz-side"><h3>피복</h3>
       <p class="note" style="margin:0 0 6px">칠하지 않은 칸·벽의 기본값</p>
       ${sel("roof", "지붕", false)}${sel("side", "측면", true)}${sel("gable", "전후면", true)}
+      <div class="dz-dim"><span class="lb" style="width:auto">기둥 높이 (mm)</span><input type="number" step="10" data-eqp="cover.colH" value="${num(P.colH) > 0 ? num(P.colH) : ""}" placeholder="${G.blocks.map(b => b.gz).filter((v, i, a) => a.indexOf(v) === i).join(" · ")} (자동)" ${ro} style="width:120px" title="측면·전후면 피복 높이. 비우면 동마다 거터 높이(기둥 윗면)"></div>
       <div class="dz-area" style="margin-top:8px">지붕 평면적 <b>${wonM(Mo.area)}㎡</b><br>
         ${[...T.filter(t => Mo.roof[t.id] > 0), ...(Mo.roof.n > 0 ? [{ id: "n", name: "없음", color: CV_NONE }] : [])].map(t => `<span style="color:${t.color}">■</span> ${esc(t.name)} ${wonM(Mo.roof[t.id])}㎡`).join(" · ")}<br>측벽: ${sum(Mo.side)}<br>전후면: ${sum(Mo.gable)}${Object.keys(Mo.pside).length || Object.keys(Mo.pgable).length ? `<br>칸막이: ${sum(Object.fromEntries(T.filter(t => Mo.pside[t.id] || Mo.pgable[t.id]).map(t => [t.id, [...(Mo.pside[t.id] || []), ...(Mo.pgable[t.id] || [])]])))}` : ""}</div>
       ${ed && (Object.keys(E.coverMap || {}).length || Object.keys(E.wallMap || {}).length) ? `<button class="btn sm" id="cv-reset" style="margin-top:6px">칠한 범위 모두 지우기 (기본값으로)</button>` : ""}
@@ -4554,7 +4603,7 @@ function pnAllRows(D, G){
   cvModel(D, G).rows.forEach(r => push("피복", r[8], r[0], r[1], r[2], fxQty(r[3], r[2]), r[4]));
   const fx = (D.equip || {}).fx || {}, V = vtAll(D, G); vtBom(V.list, V.V.p, fx).rows.forEach(r => push("천창", pnCode("vent", r.k, r.spec), r.n, r.spec, r.unit, r.tot, r.rem));
   const S = scAll(D, G); scBom(S.list, S.S.p, fx).rows.forEach(r => push("스크린", scPn(r), r.n, r.spec, r.unit, r.tot, r.rem));
-  const Mo = eqModel(D, G); [["fan", "유동휀", Mo.fan.rows], ["fog", "훈증기", Mo.fog.rows], ["hgut", "행잉거터", Mo.hg.rows], ["wire", "유인와이어", Mo.wire.rows]].forEach(([k, g, rows]) => rows.forEach((r, i) => push(g, pnCode(k, i), r[0], r[1], r[2], fxQty(r[3], r[2]), r[4])));
+  const Mo = eqModel(D, G); [["fan", "유동휀", Mo.fan.rows], ["fog", "훈증기", Mo.fog.rows], ["hgut", "행잉거터", Mo.hg.rows], ["wire", "유인와이어", Mo.wire.rows]].forEach(([k, g, rows]) => rows.forEach((r, i) => push(g, pnCode(k, r[7] != null ? r[7] : i), r[0], r[1], r[2], r[9] != null ? r[9] : fxQty(r[3], r[2]), r[4])));
   return out;
 }
 async function pnExportAll(){
@@ -4589,6 +4638,8 @@ async function eqExportXlsx(sub){
   ws.mergeCells("A1:G1"); ws.getCell("A1").value = `${title} 수량산출서`; ws.getCell("A1").font = { name: F, size: 15, bold: true }; ws.getCell("A1").alignment = { horizontal: "center" };
   ws.getCell("A2").value = `사업명: ${pname} · ${sub === "cover" ? "지붕 평면적" : "재배면적"} ${Math.round(Mo.area)}㎡`; ws.getCell("A2").font = { name: F, size: 10 };
   ["No.", "품명", "규격", "단위", "수량", "산출식", "비고"].forEach((h, c) => { const x = ws.getCell(4, c + 1); x.value = h; x.font = { name: F, bold: true, size: 10 }; x.border = BOX; x.alignment = { horizontal: "center" }; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }; });
+  if(rows[0] && rows[0].length > 9){ ws.getCell(4, 8).value = "여유"; ws.getCell(4, 9).value = "총계"; [8, 9].forEach(c => { const x = ws.getCell(4, c); x.font = { name: F, bold: true, size: 10 }; x.border = BOX; x.alignment = { horizontal: "center" }; x.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7EEE9" } }; }); }
+  rows.forEach((r, i) => { if(r.length > 9){ const R0 = 5 + i, a = ws.getCell(R0, 8), b2 = ws.getCell(R0, 9); a.value = r[8] || null; b2.value = { formula: `E${R0}+H${R0}`, result: r[9] }; [a, b2].forEach(x => { x.font = { name: F, size: 10, bold: x === b2 }; x.border = BOX; x.numFmt = "#,##0"; }); } });
   rows.forEach((r, i) => { [i + 1, r[0], r[1], r[2], fxQty(r[3], r[2]), fxText(r[5]), r[4] || ""].forEach((v, c) => { const x = ws.getCell(5 + i, c + 1); x.value = c === 4 && r[5].length ? { formula: fxXl(r[5]), result: v } : v; x.font = { name: F, size: 10 }; x.border = BOX; if(c === 5) x.alignment = { wrapText: true, vertical: "middle" }; if(c === 4) x.numFmt = ["m", "㎡", "평"].includes(r[2]) ? "#,##0.0" : "#,##0"; }); });
   const buf = await wb.xlsx.writeBuffer(), a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
   a.download = `${pname} ${title} 수량산출서.xlsx`.replace(/[\\/:*?"<>|]/g, "_"); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
