@@ -3972,6 +3972,15 @@ function eqSnapIn(R, x, y){
   return best || [x, y];
 }
 /* n개를 구역 안에 고르게: nb개 띠(vert=true면 세로 띠)로 나누고, 띠마다 구역이 차지하는 길이에 비례해 개수를 나눈 뒤 띠 안에서 같은 간격으로 */
+/* 줄(띠)마다 대수: 길이에 비례하되 같은 길이(100mm 단위)의 줄은 같은 대수. 모자라면 남은 몫이 큰 길이부터 그 길이의 줄마다 1대씩 → 합계는 n 이상 */
+function eqEvenCounts(bands, n){
+  const tot = bands.reduce((t, x) => t + x.len, 0) || 1, grp = new Map();
+  bands.forEach(x => { if(x.len <= 0){ x.cnt = 0; return; } const k = Math.round(x.len / 100); (grp.get(k) || grp.set(k, []).get(k)).push(x); });
+  const gs = [...grp.values()].map(xs => ({ xs, q: n * xs[0].len / tot, c: Math.floor(n * xs[0].len / tot) }));
+  let sum = gs.reduce((t, g) => t + g.c * g.xs.length, 0);
+  while(sum < n){ const g = gs.reduce((a, b) => (b.q - b.c) > (a.q - a.c) ? b : a, gs[0]); if(!g) break; g.c++; sum += g.xs.length; }
+  gs.forEach(g => g.xs.forEach(x => { x.cnt = g.c; }));
+}
 function eqSpread(R, n, nb, vert, alt = false){
   const { b, g } = R, a0 = vert ? R.x0 : R.y0, a1 = vert ? R.x1 : R.y1, step = (a1 - a0) / nb, bands = [];
   for(let i = 0; i < nb; i++){ const c = a0 + (i + 0.5) * step, iv = [];
@@ -3980,7 +3989,7 @@ function eqSpread(R, n, nb, vert, alt = false){
     bands.push({ c, iv: m, len: m.reduce((t, q) => t + q[1] - q[0], 0) }); }
   const tot = bands.reduce((t, x) => t + x.len, 0) || 1;
   bands.forEach(x => { x.q = n * x.len / tot; x.cnt = Math.floor(x.q); });
-  if(alt){ let cum = 0, prev = 0; bands.forEach(x => { cum += x.q; const r = Math.round(cum + 1e-9); x.cnt = r - prev; prev = r; }); }   // 누적 반올림 → 4·3·4·3 처럼 번갈아
+  if(alt) eqEvenCounts(bands, n);   // 같은 길이 줄은 같은 대수 (이웃 줄과는 엇갈려 배치)
   else { let left = n - bands.reduce((t, x) => t + x.cnt, 0); [...bands].sort((x, y) => (y.q - y.cnt) - (x.q - x.cnt)).forEach(x => { if(left > 0 && x.len > 0){ x.cnt++; left--; } }); }
   const pts = [];
   bands.forEach((x, i) => { const nb2 = Math.max(bands[i - 1] ? bands[i - 1].cnt : 0, bands[i + 1] ? bands[i + 1].cnt : 0);
@@ -3997,7 +4006,8 @@ function eqFan(R, p){
   const W = R.x1 - R.x0; let lines = Math.max(1, Math.round(W / Math.max(4000, p.lineW)));
   if(Number(p.loop) && lines === 2 && W > 9000) lines = 3;   // 순환: 양쪽 측벽 줄 + 가운데 줄
   const pts = Number(p.loop) ? eqFanLoop(R, n, lines, Math.min(W / 4, num(p.wallOff) || 1500)) : eqSpread(R, n, lines, true, true).map(q => [q[0], q[1], -1]);
-  return { n, lo, hi, pts, lines };
+  const extra = Math.max(0, pts.length - n);   // 같은 길이 줄을 같은 대수로 맞추느라 더한 대수
+  return { n: n + extra, n0: n, extra, lo, hi, pts, lines };
 }
 /* 순환 배치 (보령 양요한 온실 유동휀 평면도): 바깥 두 줄은 측벽 가까이 앞쪽(X1)으로, 안쪽 줄은 뒤쪽으로 불어 한 바퀴 돌게.
    줄마다 대수는 길이에 비례해 고르게, 바람이 시작되는 끝에서 1/10 들어간 곳부터 같은 간격 */
@@ -4008,8 +4018,7 @@ function eqFanLoop(R, n, lines, wallOff){
     R.set.forEach(k => { const [s, j] = k.split(":").map(Number); if(c >= b.X[s] && c < b.X[s + 1] + (s === R.g.ns - 1 ? 1 : 0)) iv.push([b.Y[j], b.Y[j + 1]]); });
     iv.sort((p, q) => p[0] - q[0]); const m = []; iv.forEach(q => { const l = m[m.length - 1]; if(l && q[0] <= l[1] + 1) l[1] = Math.max(l[1], q[1]); else m.push([...q]); });
     return { c, iv: m, len: m.reduce((t, q) => t + q[1] - q[0], 0), dir: lines >= 3 && i > 0 && i < lines - 1 ? 1 : -1 }; });
-  const tot = bands.reduce((t, x) => t + x.len, 0) || 1; let cum = 0, prev = 0;
-  bands.forEach(x => { cum += n * x.len / tot; const r = Math.round(cum + 1e-9); x.cnt = r - prev; prev = r; });
+  eqEvenCounts(bands, n);   // 같은 길이 줄은 같은 대수
   const pts = [];
   bands.forEach(x => { for(let k = 0; k < x.cnt; k++){ const d = (k + 0.1) * x.len / x.cnt, list = x.dir < 0 ? x.iv.slice().reverse() : x.iv; let rem = d, pos = list.length ? list[0][0] : 0;
     for(const q of list){ const L = q[1] - q[0]; if(rem <= L){ pos = x.dir < 0 ? q[1] - rem : q[0] + rem; break; } rem -= L; }
@@ -4024,8 +4033,18 @@ function eqFog(R, p){
   let best = null;
   for(let c = 1; c <= n0; c++){ const r = Math.ceil(n0 / c), cost = (c * r - n0) * 1.2 + Math.abs(Math.log((W / c) / (L / r))) * 2; if(!best || cost < best.cost) best = { c, r, cost }; }
   const { c, r } = best, n = c * r, pts = [];
-  for(let k = 0; k < r; k++) for(let i = 0; i < c; i++) pts.push(eqSnapIn(R, R.x0 + (i + 0.5) * W / c, R.y0 + (k + 0.5) * L / r));
-  return { n, n0, extra: n - n0, per, pts, cols: c, rows: r, dx: W / c, dy: L / r };
+  // 같은 면적 나누기: 길이 방향으로 면적이 같은 r개 띠 → 띠마다 폭 방향으로 면적이 같은 c칸 → 칸마다 면적 가운데(가로·세로 중앙값)에 1대
+  // (직사각형 구역이면 일정한 격자와 같고, 빠진 칸·복도가 있으면 그만큼 칸이 넓어져 1대가 맡는 면적이 같게)
+  const rs = [...R.set].map(k => { const [s0, j] = k.split(":").map(Number); return [R.b.X[s0], R.b.X[s0 + 1], R.b.Y[j], R.b.Y[j + 1]]; });
+  const ar = (xa, xb, ya, yb) => rs.reduce((t, q) => t + Math.max(0, Math.min(xb, q[1]) - Math.max(xa, q[0])) * Math.max(0, Math.min(yb, q[3]) - Math.max(ya, q[2])), 0);
+  const inv = (f, lo, hi, tg) => { for(let it = 0; it < 40; it++){ const m = (lo + hi) / 2; if(f(m) < tg) lo = m; else hi = m; } return (lo + hi) / 2; };
+  const tot = ar(R.x0, R.x1, R.y0, R.y1), ys = [R.y0];
+  for(let k = 1; k < r; k++) ys.push(inv(y => ar(R.x0, R.x1, R.y0, y), R.y0, R.y1, tot * k / r)); ys.push(R.y1);
+  for(let k = 0; k < r; k++){ const ya = ys[k], yb = ys[k + 1], SA = ar(R.x0, R.x1, ya, yb), fx = x => ar(R.x0, x, ya, yb), xs = [R.x0];
+    for(let i = 1; i < c; i++) xs.push(inv(fx, R.x0, R.x1, SA * i / c)); xs.push(R.x1);
+    for(let i = 0; i < c; i++){ const x = inv(fx, R.x0, R.x1, SA * (i + 0.5) / c), PA = ar(xs[i], xs[i + 1], ya, yb), y = inv(y2 => ar(xs[i], xs[i + 1], ya, y2), ya, yb, PA / 2);
+      pts.push(eqSnapIn(R, Math.round(x / 10) * 10, Math.round(y / 10) * 10)); } }
+  return { n, n0, extra: n - n0, per, pts, cols: c, rows: r, dx: W / c, dy: L / r, each: tot / 1e6 / n };
 }
 /* 행잉거터 줄: 스팬마다 정한 줄 수(없으면 기본), 길이 방향으로 칸이 이어진 만큼. 복도가 지나는 칸은 제외 */
 const eqSpanRows = (P, b, s) => { const v = P.hg.spanRows[`${b.bi}:${s}`]; return v != null && v >= 0 ? v : P.hg.perSpan; };
@@ -4090,7 +4109,7 @@ function eqModel(D, G){
   const area = regs.reduce((a, R) => a + R.area, 0);
   const fan = { n: regs.reduce((a, R) => a + R.fan.n, 0), rows: [] }, fog = { n: regs.reduce((a, R) => a + R.fog.n, 0), rows: [] };
   const ad = (a, u) => a ? `+${N(a, u)}` : "", rg = f => regs.length ? regs.map(f).join(" + ") : N(0, "대");
-  fan.rows = [["유동휀", P.fan.model, "ea", 0, man.fan ? "평면에서 직접 배치한 대수" : "", man.fan ? rg(R => N(R.fan.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}`)]];
+  fan.rows = [["유동휀", P.fan.model, "ea", 0, man.fan ? "평면에서 직접 배치한 대수" : regs.some(R => R.fan.extra) ? "줄 맞춤 = 같은 길이 줄을 같은 대수로 맞추려고 더한 대수" : "", man.fan ? rg(R => N(R.fan.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}${ad(R.fan.extra, "줄 맞춤")}`)]];
   fog.rows = [["유황훈증기", P.fog.model, "ea", 0, man.fog ? "평면에서 직접 배치한 대수" : regs.some(R => R.fog.extra) ? "격자 = 일정한 간격으로 놓으려고 더한 대수" : "", man.fog ? rg(R => N(R.fog.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}${ad(R.fog.extra, "격자")}`)]];
   fan.rows.push(["유동휀, 유황훈증기 설치", "1인 하루 30대 · 2인 1조", "인", 0, "유동휀 + 훈증기 대수", `⌈(${N(fan.n, "대")}+${N(fog.n, "대")})÷${N(30, "대/일")}×${N(2, "인")}⌉`]);
   fan.rows = fxApply(fan.rows, "fan", fx); fog.rows = fxApply(fog.rows, "fog", fx); hg.rows = fxApply(hg.rows, "hgut", fx); wire.rows = fxApply(wire.rows, "wire", fx);
@@ -4109,7 +4128,7 @@ function dzEquipTab(sub, D, G, ed){
   } else if(sub === "fog"){
     params = `<div class="dz-dim"><span class="lb" style="width:auto">작물</span><select data-eqp="fog.crop" ${ro}>${["일반", "딸기"].map(v => `<option ${P.fog.crop === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
       <details class="dz-more"><summary>훈증기 기준</summary><div class="g2">${inp("fog", "per", "일반작물 (㎡/대)", 10)}${inp("fog", "perBerry", "딸기 (㎡/대)", 10)}${inp("fog", "add", "구역마다 더하기 (대)")}</div>${inp("fog", "model", "모델·규격", 1, "text")}</details>`;
-    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ ÷ ${R.fog.per}㎡ = ${R.fog.n0}대 → 격자 ${R.fog.cols}×${R.fog.rows} <b>${R.fog.n}대</b> (간격 ${fmtQty(Math.round(R.fog.dx / 100) / 10)}m × ${fmtQty(Math.round(R.fog.dy / 100) / 10)}m)</span></div>`).join("");
+    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ ÷ ${R.fog.per}㎡ = ${R.fog.n0}대 → 격자 ${R.fog.cols}×${R.fog.rows} <b>${R.fog.n}대</b> · 1대당 ${fmtQty(Math.round(R.fog.each * 10) / 10)}㎡ (평균 간격 ${fmtQty(Math.round(R.fog.dx / 100) / 10)}m × ${fmtQty(Math.round(R.fog.dy / 100) / 10)}m)</span></div>`).join("");
     bom = Mo.fog.rows; summary = `재배면적 ${wonM(Mo.area)}㎡ · 유황훈증기 <b>${Mo.fog.n}대</b><br><span class="note">${P.fog.crop === "딸기" ? "딸기(업다운 재배주수 2배)" : "일반작물(5줄/8m)"} 기준 ${P.fog.crop === "딸기" ? P.fog.perBerry : P.fog.per}㎡당 1대</span>`;
   } else if(sub === "hgut"){
     params = `<div class="g2">${inp("hg", "perSpan", "기본 스팬당 줄 수")}${inp("hg", "pipeSets", "거터지지파이프 (세트)")}${inp("hg", "off", "첫 줄 위치 (기둥줄에서 mm)", 50)}</div>
