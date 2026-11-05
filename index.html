@@ -4957,7 +4957,8 @@ function dzPlanSvg(D, G, tool, ed){
         Object.keys(b.pgN || {}).forEach(k => { const [t, x, y] = k.split(":"), i = +x, j = +y;   // 칸막이 퍼린
           o += hit(p + k, t === "v" ? `<rect x="${X[i] - hw}" y="${Y[j]}" width="${hw * 2}" height="${g.bh[j]}"/>` : `<rect x="${X[i]}" y="${Y[j] - hw}" width="${g.sw[i]}" height="${hw * 2}"/>`); }); } }
   });
-  return o + `</svg>`;
+  const labRe = /<text [^>]*data-dz(?:gl|scl)=[\s\S]*?<\/text>/g, labs = o.match(labRe) || [];   /* 단수 글자(퍼린·SC)는 누를 자리 위로 */
+  return o.replace(labRe, "") + labs.join("") + `</svg>`;
 }
 /* 철골 평면 ‘＋ 추가’(기둥 외): 끌어서 그리기 — 시작점·끝점은 기둥줄·지붕 골 400mm 안이면 붙고 아니면 100mm 단위. 미니기둥은 누른 자리 */
 function dzMemAddSetup(){
