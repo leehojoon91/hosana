@@ -495,6 +495,7 @@ svg text{font-family:var(--sans)}
 .tbl-wrap{overflow-x:auto}
 .od{color:var(--bad);font-weight:700}
 .dz-plan.cvr rect[data-cvc]{cursor:crosshair}.dz-plan.cvr rect.cvw{fill:transparent;cursor:pointer;pointer-events:all}.dz-plan.cvr rect.cvw:hover{fill:rgba(30,136,229,.18)}.dz-plan.cvr rect.cvp:hover{fill:rgba(30,136,229,.28)}
+.eq-pm{display:inline-flex;gap:2px;margin-left:auto;align-items:center}.eq-pm .btn{padding:0 8px;min-width:26px;font-weight:700}
 .dz-plan .eqpt{cursor:grab}.dz-plan .eqpt:hover circle,.dz-plan .eqpt:hover rect{stroke-width:3.5}
 td.pn{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#37474F;white-space:nowrap}
 .cvt-row{display:flex;align-items:center;gap:4px;margin-bottom:4px}.cvt-row input[type=color]{width:28px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none}.cvt-row select{font-size:11.5px;max-width:110px}
@@ -3285,7 +3286,7 @@ function dzSteelTab(D, G, ed, Z){
    '스크린 수량산출서 프로그램'(screen_qty.py)과 같은 규칙:
    구역(screenarea) 1개 = 모터 1대 (면적으로 RW245/405/605), 랙피니언 개수, 구동파이프·종동파이프·스크린바·포켓 길이 → 52개 품목.
    D.screen = { sections: null(평면에서 자동) | [{ bi, s0, s1, j0, j1, dir:"y"|"x"(스크린 이동 방향), drv:"c"|"s"|"e"(구동축 위치) }], p:{…} } */
-const SC_DEF = { edge: 1000, barOff: 500, pocketOff: 500, trussW: 75, trussH: 45, fabric: "보온스크린", fabric2: "차광스크린", fabric3: "암막스크린", layers: 1, pocketMode: "side", fabricW: 75, rpm: 5, freq: 0, rackMax: 4000 };
+const SC_DEF = { edge: 1000, barOff: 500, pocketOff: 500, trussW: 75, trussH: 45, fabric: "보온스크린", fabric2: "차광스크린", fabric3: "암막스크린", layers: 2, pocketMode: "side", fabricW: 75, fabricW2: 75, fabricW3: 150, rpm: 5, freq: 0, rackMax: 4000 };
 const SC_FAB = 4.8 / 4.5;
 /* 모터 선정표: Ridder System Tables 2012 · 6장 Push-pull screen system (TUS25-40).
    "섹션(m)/랙 간격(m)" → 원단 무게(g/㎡)별 [원단, 섹션 힘 N/m, RSD250 섹션 수, RW24x·RW40x·RW60x ㎡, RW24xF·RW40xF·RW60xF ㎡, 푸시풀 튜브 ø27·ø32 한쪽 섹션 수] */
@@ -3380,7 +3381,8 @@ function scGeom(G, sec, p){
       for(let c = 0; c <= nB; c++){ const o = c < nB && (side > 0 ? has(i, c) && !has(i - 1, c) : has(i - 1, c) && !has(i, c)); if(o && st < 0) st = c;
         if(!o && st >= 0){ const ap = A[i] + side * p.pocketOff; L.pocket.push([P(ap, Bv[st]), P(ap, Bv[c])]); st = -1; } } }); }
   const len = segs => segs.reduce((x, [[ax, ay], [bx, by]]) => x + Math.hypot(bx - ax, by - ay), 0);
-  const pick = scPick(b, set, area, bd, p), model = pick.model, over = pick.over;
+  // 층마다 원단 무게가 달라 모터가 다를 수 있음 → 1~3층 각각 선정 (몇 층까지 쓸지는 scAll에서)
+  const picks = [1, 2, 3].map(k => scPick(b, set, area, bd, { ...p, fabricW: k === 1 ? p.fabricW : (p[`fabricW${k}`] ?? p.fabricW) })), pick = picks[0], model = pick.model, over = pick.over;
   const [x0, y0] = P(aMin, bMin), [x1, y1] = P(aMax, bMax);
   const lt = (Math.min(...[...set].map(k => +k.split(":")[1])));   // 이름 자리: 맨 앞 칸 줄의 가운데
   const topCells = [...set].filter(k => +k.split(":")[1] === lt).map(k => +k.split(":")[0]);
@@ -3388,15 +3390,16 @@ function scGeom(G, sec, p){
   const split = [aBefore / 1e6, area - aBefore / 1e6];
   return { split, manual, bd, bMin, bMax, sec: { ...sec, cells: [...set] }, set, x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: Math.min(y0, y1), y1: Math.max(y0, y1), loops: scLoops(b, set),
     lab: [(b.X[Math.min(...topCells)] + b.X[Math.max(...topCells) + 1]) / 2, b.Y[lt]], area, L, model, over, pick, rp: L.rp.length, drive: len(L.drive), shaft: len(L.shaft), bar: len(L.bar), pocket: len(L.pocket),
-    trussD: b.B.trussD, W: (aMax - aMin) / 1000, Ly: (bMax - bMin) / 1000, bays: new Set([...set].map(k => +k.split(":")[1])).size };
+    picks, trussD: b.B.trussD, W: (aMax - aMin) / 1000, Ly: (bMax - bMin) / 1000, bays: new Set([...set].map(k => +k.split(":")[1])).size };
 }
-function scAll(D, G){ const S = scOf(D), secs = S.sections || scAuto(D, G); return { S, list: secs.map(s => scGeom(G, s, S.p)).filter(Boolean).map(x => ({ ...x, NL: Math.max(1, Math.min(3, Number(x.sec.layers) || S.p.layers || 1)) })) }; }
+function scAll(D, G){ const S = scOf(D), secs = S.sections || scAuto(D, G); return { S, list: secs.map(s => scGeom(G, s, S.p)).filter(Boolean).map(x => { const NL = Math.max(1, Math.min(3, Number(x.sec.layers) || S.p.layers || 1)), lp = x.picks.slice(0, NL);
+    return { ...x, NL, lp, models: lp.map(q => q.model), over: lp.some(q => q.over), warn: [...new Set(lp.flatMap(q => q.warn))] }; }) }; }
 /* 스크린 수량산출 = 실제 패킹리스트(박종국 제2온실 2026.10.07) 품목·순서·REMARK 식.
    구역마다: 가로 W(구동축 방향 m) · 세로 L(스크린 이동 방향 m) · 베이 수 n(=세로÷4.5) · 층수 NL(=REMARK의 2(상하)) · 랙피니언 rp(층마다, =가로÷4+1)
    여유 = ⌈수량 × (1+p%) ÷ 단위⌉ × 단위 − 수량 (패킹리스트 값에 맞춘 규칙) · p.spare[키]로 직접 고침 */
 const SC_SP = (q, r) => { if(!r || q <= 0) return 0; const t = Math.ceil(q * (1 + (r.p || 0) / 100) / (r.s || 1) - 1e-9) * (r.s || 1); return Math.max(0, t - q); };
 function scBom(list, p, fx = {}){
-  const NL = Math.max(1, ...list.map(x => x.NL)), m = [0, 0, 0], names = (list[0] && list[0].pick.names) || ["RW245", "RW405", "RW605"]; list.forEach(x => { m[x.pick.cls] += x.NL; });
+  const NL = Math.max(1, ...list.map(x => x.NL)), m = [0, 0, 0], names = (list[0] && list[0].pick.names) || ["RW245", "RW405", "RW605"]; list.forEach(x => x.lp.forEach(q => { m[q.cls]++; }));   // 층마다 모터 1대 (그 층 원단 무게로 고른 모델)
   const sm = f => list.reduce((a, x) => a + f(x), 0), r2 = v => Math.round(v * 100) / 100, N = fxN;
   const Z = list.length, M = sm(x => x.NL), RP = sm(x => x.rp * x.NL), BL = sm(x => x.bays * x.NL), B1 = sm(x => x.bays), RB = sm(x => x.rp * x.NL * x.bays);
   const MW = sm(x => x.W / 4 * x.NL), MB = sm(x => x.W / 4 * x.bays * x.NL), ML = sm(x => x.W / 4 * (x.Ly + 4) * x.NL), SB = sm(x => x.W / 8 * x.bays * x.NL), W8 = sm(x => x.W / 8 * x.NL);
@@ -3406,7 +3409,7 @@ function scBom(list, p, fx = {}){
   const nZ = N(Z, "구역"), nM = N(M, "대"), nRP = N(RP, "개"), nBL = N(r2(BL), "베이·층"), nSB = N(r2(SB), "본"), nMW = N(r2(MW), "칸·층");
   const wsup = `${nMW}×${N(10, "")}×${N(2, "앞뒤")}`, sclip = `${nSB}×${N(20, "")}`, pal = `(${nBL}+${nM})×${N(2, "좌우")}`, strn = `${nZ}×${N(24, "")}+${nRP}×${N(2, "")}`;
   const rows = [
-    ...m.map((c, i) => [i, c]).filter(([, c]) => c > 0).map(([i, c]) => ({ k: `motor${i}`, n: "스크린개폐모터", spec: names[i], f: N(c, "대"), rem: "구역수×층수", warn: list.some(x => x.pick.cls === i && x.over) })),
+    ...m.map((c, i) => [i, c]).filter(([, c]) => c > 0).map(([i, c]) => ({ k: `motor${i}`, n: "스크린개폐모터", spec: names[i], f: N(c, "대"), rem: "구역수×층수 (층마다 원단 무게로 선정)", warn: list.some(x => x.lp.some(q => q.cls === i && q.over)) })),
     { k: "chain", n: "체인 커플링용 체인", spec: "-", f: `${nM}×${N(2, "")}`, rem: "모터×2" },
     { k: "cc", n: "체인커플링", spec: "KS 32A용", f: `${nM}×${N(2, "")}`, rem: "모터×2" },
     { k: "mb1", n: "모터브라켓-1", spec: `${K}x${Lt} H${td}용`, f: nZ, rem: "구역수×1" },
@@ -3472,20 +3475,21 @@ function dzScreenTab(D, G, ed){
   const { S, list } = scAll(D, G), p = S.p, B = scBom(list, p, (D.equip || {}).fx), ro = ed ? "" : "disabled", sel = state.scSel, tool = ed ? (state.scTool || "sel") : "sel";
   const pin = (k, label, step = 100) => `<div class="field"><label>${label}</label><input type="number" step="${step}" data-scp="${k}" value="${p[k]}" ${ro}></div>`;
   const secRows = list.map((x, i) => `<div class="dz-dim sc-row ${sel === i ? "on" : ""}" data-scpick="${i}"><span class="lb" style="width:auto;font-weight:600">S${i + 1}</span>
-      <span class="note" style="margin:0;white-space:nowrap">${esc(G.blocks[x.sec.bi].B.code)} ${wonM(x.area)}㎡ · <b style="color:${x.over ? "var(--crit)" : "inherit"}">${x.model}${x.NL > 1 ? ` ×${x.NL}` : ""}</b></span><span class="note" style="margin:0;width:100%;padding-left:22px" title="구동축 앞(위) / 뒤(아래) 면적">구동축 기준 ${wonM(x.split[0])} / ${wonM(x.split[1])}㎡</span>
+      <span class="note" style="margin:0;white-space:nowrap">${esc(G.blocks[x.sec.bi].B.code)} ${wonM(x.area)}㎡ · <b style="color:${x.over ? "var(--crit)" : "inherit"}">${x.models.join(" / ")}</b> <span style="font-weight:400">(${x.NL}층)</span></span><span class="note" style="margin:0;width:100%;padding-left:22px" title="구동축 앞(위) / 뒤(아래) 면적">구동축 기준 ${wonM(x.split[0])} / ${wonM(x.split[1])}㎡</span>
       <span class="note" style="margin:0;width:100%;padding-left:22px" title="RSD250: 랙피니언 1개가 밀고 당기는 섹션(칸) 수 한도 · 종동파이프 ø32: 구동축 한쪽으로 미는 섹션 수 한도">랙피니언 RSD250 1개당 섹션 <b style="color:${x.pick.tot > x.pick.rsd ? "var(--crit)" : "inherit"}">${x.pick.tot} / 한도 ${x.pick.rsd} ${x.pick.tot > x.pick.rsd ? "⚠" : "✓"}</b> · 종동파이프 ø32 한쪽 <b style="color:${x.pick.side > x.pick.tube ? "var(--crit)" : "inherit"}">${x.pick.side} / 한도 ${x.pick.tube} ${x.pick.side > x.pick.tube ? "⚠" : "✓"}</b></span>
       <span class="note" style="margin:0;width:100%;padding-left:22px" title="Ridder 6장 표: ${x.pick.key} · ${x.pick.fk}g/㎡ · 스크린 면적 = 바닥 × 4.8/4.5">표 ${x.pick.sk}m 섹션 · 랙 ${x.pick.ck}m · ${x.pick.fk}g → 필요 ${wonM(x.pick.need)}㎡ / 한도 ${x.pick.caps.map((c, k) => `${x.pick.names[k]} ${fmtQty(c)}`).join(" · ")}</span>
-      ${x.pick.warn.map(w => `<span class="note" style="margin:0;width:100%;padding-left:22px;color:var(--crit)">⚠ ${esc(w)}</span>`).join("")}
+      ${x.warn.map(w => `<span class="note" style="margin:0;width:100%;padding-left:22px;color:var(--crit)">⚠ ${esc(w)}</span>`).join("")}
       <select data-sclay="${i}" ${ro} title="이 구역의 스크린 층수">${[1, 2, 3].map(n => `<option value="${n}" ${x.NL === n ? "selected" : ""}>${n}층</option>`).join("")}</select>
       ${x.manual ? `<button class="btn sm" data-scdauto="${i}" ${ro} title="구동축을 자동 위치(가장 넓은 줄 중 면적 균형)로">구동 자동</button>` : `<span class="note" style="margin:0">구동 자동</span>`}
       ${ed ? `<button class="dz-x" data-scdel="${i}" title="구역 빼기">×</button>` : ""}</div>`).join("");
   const side = `<div class="panel dz-side">
-      ${Array.from({ length: Math.max(1, ...list.map(x => x.NL)) }, (_, k) => { const key = k ? `fabric${k + 1}` : "fabric"; return `<div class="dz-dim"><span class="lb" style="width:auto">${k + 1}층 스크린지</span><input type="text" data-scp="${key}" value="${esc(p[key])}" ${ro} style="flex:1"></div>`; }).join("")}
+      ${Array.from({ length: Math.max(1, ...list.map(x => x.NL)) }, (_, k) => { const key = k ? `fabric${k + 1}` : "fabric", wk = k ? `fabricW${k + 1}` : "fabricW", wv = num(p[wk] ?? p.fabricW);
+        return `<div class="dz-dim"><span class="lb" style="width:auto">${k + 1}층</span><input type="text" data-scp="${key}" value="${esc(p[key])}" ${ro} style="flex:1;min-width:0" aria-label="${k + 1}층 스크린지">
+          <select data-scp="${wk}" ${ro} aria-label="${k + 1}층 원단 무게" title="${k + 1}층 원단 무게 (모터 선정)">${SC_FABW.map(v => `<option value="${v}" ${wv === v ? "selected" : ""}>${v} g/㎡</option>`).join("")}</select></div>`; }).join("")}
       <h3 style="margin-top:8px">모터 선정 기준 <span class="note" style="font-weight:400">Ridder 표 6장 (Push-pull)</span></h3>
-      <div class="dz-dim"><span class="lb" style="width:auto">원단 무게</span><select data-scp="fabricW" ${ro}>${SC_FABW.map(v => `<option value="${v}" ${num(p.fabricW) === v ? "selected" : ""}>${v} g/㎡</option>`).join("")}</select>
-        <select data-scp="rpm" ${ro} aria-label="모터 속도"><option value="5" ${Number(p.rpm) !== 3 ? "selected" : ""}>5 rpm</option><option value="3" ${Number(p.rpm) === 3 ? "selected" : ""}>3 rpm</option></select>
+      <div class="dz-dim"><span class="lb" style="width:auto">모터</span><select data-scp="rpm" ${ro} aria-label="모터 속도"><option value="5" ${Number(p.rpm) !== 3 ? "selected" : ""}>5 rpm</option><option value="3" ${Number(p.rpm) === 3 ? "selected" : ""}>3 rpm</option></select>
         <select data-scp="freq" ${ro} aria-label="주파수 제어"><option value="0" ${Number(p.freq) ? "" : "selected"}>일반</option><option value="1" ${Number(p.freq) ? "selected" : ""}>주파수 제어(F)</option></select></div>
-      <p class="note" style="margin:0 0 6px">구역마다 칸 길이(섹션)·랙피니언 간격·원단 무게로 표를 골라, 스크린 면적이 들어가는 가장 작은 모터를 고릅니다.</p>
+      <p class="note" style="margin:0 0 6px">구역·층마다 칸 길이(섹션)·랙피니언 간격·그 층 원단 무게로 표를 골라, 스크린 면적이 들어가는 가장 작은 모터를 고릅니다 (층마다 모터 1대).</p>
       <h3 style="margin-top:8px">스크린 구역 <span class="note" style="font-weight:400">${list.length}개 · 모터 ${B.sum.M}대</span></h3>
       <p class="note" style="margin:0 0 6px">${S.sections ? "직접 고친 구역입니다." : "평면도(관리동 제외·칸막이 기준)에서 자동으로 나눈 구역입니다."}</p>
       <div class="sc-list">${secRows || `<p class="note">구역이 없습니다. 평면에서 끌어서 구역을 그리세요.</p>`}</div>
@@ -3529,8 +3533,8 @@ function scSvg(D, G, list, sel, tool){
     x.L.drive.forEach(([a, c]) => { o += ln(a, c, SC_COL.drive, 3, 'pointer-events="none"') + (state.canEdit && tool !== "draw" ? `<line class="drvhit" x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" data-scdrive="${i}"><title>끌어서 구동축 위치 옮기기</title></line>` : ""); });
     x.L.rp.forEach(([px, py]) => { const R = r * 1.6;   // 랙피니언 기호: 흰 원 + ✕
       o += `<g pointer-events="none"><circle cx="${px}" cy="${py}" r="${R}" fill="#fff" stroke="${SC_COL.rp}" stroke-width="1.8" vector-effect="non-scaling-stroke"/><line x1="${px - R * 0.7}" y1="${py - R * 0.7}" x2="${px + R * 0.7}" y2="${py + R * 0.7}" stroke="${SC_COL.rp}" stroke-width="2" vector-effect="non-scaling-stroke"/><line x1="${px - R * 0.7}" y1="${py + R * 0.7}" x2="${px + R * 0.7}" y2="${py - R * 0.7}" stroke="${SC_COL.rp}" stroke-width="2" vector-effect="non-scaling-stroke"/><title>랙피니언</title></g>`; });
-    const mo = x.L.motor; if(mo) o += `<rect x="${mo[0] - r * 2.5}" y="${mo[1] - r * 2.5}" width="${r * 5}" height="${r * 5}" rx="${r * 0.5}" fill="#263238" pointer-events="none"><title>모터 ${x.model}</title></rect>`;
-    o += `<text x="${x.lab[0]}" y="${x.lab[1] + fs * 1.3}" font-size="${fs}" text-anchor="middle" fill="${SC_COL.area}" font-weight="700" pointer-events="none">S${i + 1} · ${x.model} · ${wonM(x.area)}㎡</text>`; });
+    const mo = x.L.motor; if(mo) o += `<rect x="${mo[0] - r * 2.5}" y="${mo[1] - r * 2.5}" width="${r * 5}" height="${r * 5}" rx="${r * 0.5}" fill="#263238" pointer-events="none"><title>모터 ${x.models.join(" / ")}</title></rect>`;
+    o += `<text x="${x.lab[0]}" y="${x.lab[1] + fs * 1.3}" font-size="${fs}" text-anchor="middle" fill="${SC_COL.area}" font-weight="700" pointer-events="none">S${i + 1} · ${x.models.join(" / ")} · ${wonM(x.area)}㎡</text>`; });
   return o + `</svg>`;
 }
 /* 구역 그리기: 동 하나 안에서 끌어서 사각형 */
@@ -3589,7 +3593,7 @@ function scInput(e){
   if(t.dataset.scsp){ if(e.type !== "change") return true; const k = t.dataset.scsp, raw = t.value.trim();
     dzSet(D => { const S = scOf(D), sp = { ...(S.p.spare || {}) }; if(raw === "") delete sp[k]; else sp[k] = Math.max(0, Math.round(num(raw))); S.p.spare = sp; D.screen = { sections: S.sections, p: S.p }; }); return true; }
   if(t.dataset.scp){ if(e.type !== "change") return true; const k = t.dataset.scp;
-    dzSet(D => { const S = scOf(D); S.p[k] = /^fabric/.test(k) ? t.value.trim() || SC_DEF[k] : k === "layers" ? Math.max(1, Math.min(3, Number(t.value))) : Math.max(0, Math.round(num(t.value))); D.screen = { sections: S.sections, p: S.p }; }); return true; }
+    dzSet(D => { const S = scOf(D); S.p[k] = /^fabric\d?$/.test(k) ? t.value.trim() || SC_DEF[k] : k === "layers" ? Math.max(1, Math.min(3, Number(t.value))) : Math.max(0, Math.round(num(t.value))); D.screen = { sections: S.sections, p: S.p }; }); return true; }
   if(t.dataset.scdir != null || t.dataset.scdrv != null || t.dataset.sclay != null){ if(e.type !== "change") return true; const i = Number(t.dataset.scdir ?? t.dataset.scdrv ?? t.dataset.sclay);
     dzSet(D => { const G = dzBuild(D), S = scOf(D), cur = (S.sections || scAuto(D, G)).map(q => ({ ...q })); if(!cur[i]) return;
       if(t.dataset.scdir != null) cur[i].dir = t.value; else if(t.dataset.sclay != null) cur[i].layers = Math.max(1, Math.min(3, Number(t.value))); else cur[i].drv = t.value; D.screen = { sections: cur, p: S.p }; }); return true; }
@@ -3607,7 +3611,7 @@ async function scExportXlsx(){
     x.value = c === 5 ? { formula: fxXlQ(r), result: v } : c === 7 ? { formula: `F${R}+G${R}`, result: v } : v; if(c === 9) x.alignment = { wrapText: true, vertical: "middle" }; x.font = { name: F, size: 10, bold: c === 7 }; x.border = BOX; if(c >= 5 && c <= 7) x.numFmt = r.unit === "EA" ? "#,##0" : "#,##0.0"; }); });
   const w2 = wb.addWorksheet("구역"); w2.columns = [{ width: 8 }, { width: 10 }, { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }];
   w2.addRow(["구역", "동", "면적(㎡)", "모터", "층수", "랙피니언", "구동(m)", "종동(m)", "스크린바(m)", "포켓(m)", "RSD250 섹션/한도", "종동파이프 한쪽/한도", "선정 근거"]).font = { bold: true };
-  list.forEach((x, i) => w2.addRow([`S${i + 1}`, G.blocks[x.sec.bi].B.name, Math.round(x.area * 10) / 10, x.model, x.NL, x.rp, Math.round(x.drive / 100) / 10, Math.round(x.shaft / 100) / 10, Math.round(x.bar / 100) / 10, Math.round(x.pocket / 100) / 10,
+  list.forEach((x, i) => w2.addRow([`S${i + 1}`, G.blocks[x.sec.bi].B.name, Math.round(x.area * 10) / 10, x.models.join(" / "), x.NL, x.rp, Math.round(x.drive / 100) / 10, Math.round(x.shaft / 100) / 10, Math.round(x.bar / 100) / 10, Math.round(x.pocket / 100) / 10,
     `${x.pick.tot}/${x.pick.rsd}${x.pick.tot > x.pick.rsd ? " ⚠" : ""}`, `${x.pick.side}/${x.pick.tube}${x.pick.side > x.pick.tube ? " ⚠" : ""}`,
     `Ridder 6장 ${x.pick.key} ${x.pick.fk}g: 필요 ${Math.round(x.pick.need)}㎡ / ${x.pick.names.map((n, k) => `${n} ${x.pick.caps[k]}`).join(", ")}${x.pick.warn.length ? " ⚠ " + x.pick.warn.join(" / ") : ""}`]));
   const buf = await wb.xlsx.writeBuffer(), a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
@@ -3628,7 +3632,7 @@ function scExportDxf(){
     x.L.bar.forEach(([a, c]) => ents.push(P(a, c, "aluminiumbar"))); x.L.pocket.forEach(([a, c]) => ents.push(P(a, c, "pocket")));
     x.L.rp.forEach(([px, py]) => ents.push(ins("rackpinion", "rackpinion", px, py)));
     if(x.L.motor) ents.push(ins("screen motor", "screen motor", x.L.motor[0], x.L.motor[1]));
-    if(ly === 0) ents.push(dxText("TEXT", x.lab[0], fy(x.lab[1] + 1500), 600, `S${i + 1} ${x.model} ${Math.round(x.area)} m2${x.NL > 1 ? ` x${x.NL}` : ""}`, true)); });
+    if(ly === 0) ents.push(dxText("TEXT", x.lab[0], fy(x.lab[1] + 1500), 600, `S${i + 1} ${x.models.join("/")} ${Math.round(x.area)} m2${x.NL > 1 ? ` x${x.NL}` : ""}`, true)); });
   const blocks = [["rackpinion", [["0", "CIRCLE", "8", "0", "10", "0", "20", "0", "30", "0", "40", "150"].join("\r\n"), dxLine("0", [-106, -106, 0], [106, 106, 0]), dxLine("0", [-106, 106, 0], [106, -106, 0])].join("\r\n")],
     ["screen motor", [dxLine("0", [-300, -300, 0], [300, -300, 0]), dxLine("0", [300, -300, 0], [300, 300, 0]), dxLine("0", [300, 300, 0], [-300, 300, 0]), dxLine("0", [-300, 300, 0], [-300, -300, 0])].join("\r\n")]];
   const layers = [["A-WALL", 8], ["screenarea", 5], ["drive shaft", 1], ["shaft", 6], ["aluminiumbar", 30], ["pocket", 4], ["rackpinion", 1], ["screen motor", 7], ["TEXT", 7]];
@@ -3947,7 +3951,7 @@ function vtExportDxf(){
    구역 = 평면도 재배 칸(관리동 제외)을 칸막이로 나눈 덩어리 (스크린·천창과 같은 규칙)
    D.equip = { fan:{…}, fog:{…}, hg:{…}, wire:{…} } */
 const EQ_DEF = {
-  fan: { ach: 2, cap: 5050, model: "보스트만, 단상 230V-230W-5,050㎥/h", lineW: 12000, add: 0, loop: 1, wallOff: 1500 },
+  fan: { ach: 1.5, cap: 5050, model: "보스트만, 단상 230V-230W-5,050㎥/h", lineW: 12000, add: 0, loop: 1, wallOff: 1500 },
   fog: { crop: "일반", per: 500, perBerry: 250, model: "단상 230V-100W", add: 0 },
   hg: { perSpan: 5, hose: 0.75, hook: 0.6, stem: 0.9, pipeSets: 0, spanRows: {}, off: 350 },   // spanRows: { "동번호:스팬": 줄 수 }
   wire: { perGutter: 2, dayM: 400 },
@@ -4001,13 +4005,13 @@ function eqSpread(R, n, nb, vert, alt = false){
   return pts;
 }
 /* 유동휀: 대수 = 재배면적 × (측고+0.5) × 회전수 ÷ 풍량, 폭 16m마다 한 줄 */
-function eqFan(R, p){
-  const vol = R.area * (R.h + 0.5), lo = Math.ceil(vol * 1.5 / p.cap), hi = Math.ceil(vol * 2 / p.cap), n = Math.max(1, Math.ceil(vol * p.ach / p.cap) + (p.add || 0));
+function eqFan(R, p, d = 0){
+  const vol = R.area * (R.h + 0.5), lo = Math.ceil(vol * 1.5 / p.cap), hi = Math.ceil(vol * 2 / p.cap), n = Math.max(1, Math.ceil(vol * p.ach / p.cap) + (p.add || 0) + d);
   const W = R.x1 - R.x0; let lines = Math.max(1, Math.round(W / Math.max(4000, p.lineW)));
   if(Number(p.loop) && lines === 2 && W > 9000) lines = 3;   // 순환: 양쪽 측벽 줄 + 가운데 줄
   const pts = Number(p.loop) ? eqFanLoop(R, n, lines, Math.min(W / 4, num(p.wallOff) || 1500)) : eqSpread(R, n, lines, true, true).map(q => [q[0], q[1], -1]);
   const extra = Math.max(0, pts.length - n);   // 같은 길이 줄을 같은 대수로 맞추느라 더한 대수
-  return { n: n + extra, n0: n, extra, lo, hi, pts, lines };
+  return { n: n + extra, n0: n, extra, adj: d, lo, hi, pts, lines };
 }
 /* 순환 배치 (보령 양요한 온실 유동휀 평면도): 바깥 두 줄은 측벽 가까이 앞쪽(X1)으로, 안쪽 줄은 뒤쪽으로 불어 한 바퀴 돌게.
    줄마다 대수는 길이에 비례해 고르게, 바람이 시작되는 끝에서 1/10 들어간 곳부터 같은 간격 */
@@ -4028,8 +4032,8 @@ function eqFanLoop(R, n, lines, wallOff){
 /* 훈증기: 대수 = 재배면적 ÷ (일반 500㎡ · 딸기 250㎡), 고르게 */
 /* 훈증기: 대수 = ⌈재배면적 ÷ 1대당 면적⌉, 구역을 가로 c × 세로 r 일정한 격자로 (칸 가운데 간격 = 폭÷c, 길이÷r).
    c×r이 대수보다 크면 격자를 맞추려고 남는 대수(extra)를 더함 — 격자 칸이 정사각형에 가깝고 남는 대수가 적은 쪽 */
-function eqFog(R, p){
-  const per = p.crop === "딸기" ? p.perBerry : p.per, n0 = Math.max(1, Math.ceil(R.area / per) + (p.add || 0)), W = R.x1 - R.x0, L = R.y1 - R.y0;
+function eqFog(R, p, d = 0){
+  const per = p.crop === "딸기" ? p.perBerry : p.per, n0 = Math.max(1, Math.ceil(R.area / per) + (p.add || 0) + d), W = R.x1 - R.x0, L = R.y1 - R.y0;
   let best = null;
   for(let c = 1; c <= n0; c++){ const r = Math.ceil(n0 / c), cost = (c * r - n0) * 1.2 + Math.abs(Math.log((W / c) / (L / r))) * 2; if(!best || cost < best.cost) best = { c, r, cost }; }
   const { c, r } = best, n = c * r, pts = [];
@@ -4044,7 +4048,7 @@ function eqFog(R, p){
     for(let i = 1; i < c; i++) xs.push(inv(fx, R.x0, R.x1, SA * i / c)); xs.push(R.x1);
     for(let i = 0; i < c; i++){ const x = inv(fx, R.x0, R.x1, SA * (i + 0.5) / c), PA = ar(xs[i], xs[i + 1], ya, yb), y = inv(y2 => ar(xs[i], xs[i + 1], ya, y2), ya, yb, PA / 2);
       pts.push(eqSnapIn(R, Math.round(x / 10) * 10, Math.round(y / 10) * 10)); } }
-  return { n, n0, extra: n - n0, per, pts, cols: c, rows: r, dx: W / c, dy: L / r, each: tot / 1e6 / n };
+  return { n, n0, extra: n - n0, adj: d, per, pts, cols: c, rows: r, dx: W / c, dy: L / r, each: tot / 1e6 / n };
 }
 /* 행잉거터 줄: 스팬마다 정한 줄 수(없으면 기본), 길이 방향으로 칸이 이어진 만큼. 복도가 지나는 칸은 제외 */
 const eqSpanRows = (P, b, s) => { const v = P.hg.spanRows[`${b.bi}:${s}`]; return v != null && v >= 0 ? v : P.hg.perSpan; };
@@ -4100,7 +4104,8 @@ function eqWireBom(regs, P, p){
 }
 function eqModel(D, G){
   const P = eqOf(D), regs = eqRegions(D, G), fx = (D.equip || {}).fx || {}, N = fxN;
-  regs.forEach(R => { R.fan = eqFan(R, P.fan); R.fog = eqFog(R, P.fog); });
+  const CN = (D.equip || {}).cnt || {}, adj = (k, R) => num((CN[k] || {})[`${R.b.bi}:${R.i}`]) || 0;   // +/− 버튼으로 더하거나 뺀 대수
+  regs.forEach(R => { R.fan = eqFan(R, P.fan, adj("fan", R)); R.fog = eqFog(R, P.fog, adj("fog", R)); });
   const PL = (D.equip || {}).place || {}, man = { fan: Array.isArray(PL.fan), fog: Array.isArray(PL.fog) };
   const inR = (R, x, y) => [...R.set].some(k => { const [s, j] = k.split(":").map(Number); return x >= R.b.X[s] - 1 && x <= R.b.X[s + 1] + 1 && y >= R.b.Y[j] - 1 && y <= R.b.Y[j + 1] + 1; });
   ["fan", "fog"].forEach(k => { if(man[k]){ regs.forEach(R => { R[k].pts = []; R[k].man = true; }); PL[k].forEach((q, idx) => { const R = regs.find(R => inR(R, q[0], q[1])); if(R) R[k].pts.push([q[0], q[1], q[2] == null ? -1 : q[2], idx]); }); regs.forEach(R => { R[k].n = R[k].pts.length; }); }
@@ -4108,9 +4113,9 @@ function eqModel(D, G){
   const hg = eqHgBom(regs, P.hg, P), wire = eqWireBom(regs, P, P.wire);
   const area = regs.reduce((a, R) => a + R.area, 0);
   const fan = { n: regs.reduce((a, R) => a + R.fan.n, 0), rows: [] }, fog = { n: regs.reduce((a, R) => a + R.fog.n, 0), rows: [] };
-  const ad = (a, u) => a ? `+${N(a, u)}` : "", rg = f => regs.length ? regs.map(f).join(" + ") : N(0, "대");
-  fan.rows = [["유동휀", P.fan.model, "ea", 0, man.fan ? "평면에서 직접 배치한 대수" : regs.some(R => R.fan.extra) ? "줄 맞춤 = 같은 길이 줄을 같은 대수로 맞추려고 더한 대수" : "", man.fan ? rg(R => N(R.fan.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}${ad(R.fan.extra, "줄 맞춤")}`)]];
-  fog.rows = [["유황훈증기", P.fog.model, "ea", 0, man.fog ? "평면에서 직접 배치한 대수" : regs.some(R => R.fog.extra) ? "격자 = 일정한 간격으로 놓으려고 더한 대수" : "", man.fog ? rg(R => N(R.fog.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}${ad(R.fog.extra, "격자")}`)]];
+  const ad = (a, u) => a > 0 ? `+${N(a, u)}` : a < 0 ? `−${N(-a, u)}` : "", rg = f => regs.length ? regs.map(f).join(" + ") : N(0, "대");
+  fan.rows = [["유동휀", P.fan.model, "ea", 0, man.fan ? "평면에서 직접 배치한 대수" : regs.some(R => R.fan.extra) ? "줄 맞춤 = 같은 길이 줄을 같은 대수로 맞추려고 더한 대수" : "", man.fan ? rg(R => N(R.fan.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}×(${N(R.h, "m")}+${N(0.5, "m")})×${N(P.fan.ach, "회")}÷${N(P.fan.cap, "㎥/h")}⌉${ad(P.fan.add, "대")}${ad(R.fan.adj, "조정")}${ad(R.fan.extra, "줄 맞춤")}`)]];
+  fog.rows = [["유황훈증기", P.fog.model, "ea", 0, man.fog ? "평면에서 직접 배치한 대수" : regs.some(R => R.fog.extra) ? "격자 = 일정한 간격으로 놓으려고 더한 대수" : "", man.fog ? rg(R => N(R.fog.n, "대")) : rg(R => `⌈${N(Math.round(R.area), "㎡")}÷${N(R.fog.per, "㎡")}⌉${ad(P.fog.add, "대")}${ad(R.fog.adj, "조정")}${ad(R.fog.extra, "격자")}`)]];
   fan.rows.push(["유동휀, 유황훈증기 설치", "1인 하루 30대 · 2인 1조", "인", 0, "유동휀 + 훈증기 대수", `⌈(${N(fan.n, "대")}+${N(fog.n, "대")})÷${N(30, "대/일")}×${N(2, "인")}⌉`]);
   fan.rows = fxApply(fan.rows, "fan", fx); fog.rows = fxApply(fog.rows, "fog", fx); hg.rows = fxApply(hg.rows, "hgut", fx); wire.rows = fxApply(wire.rows, "wire", fx);
   return { P, regs, area, fan, fog, hg, wire, fx, man };
@@ -4123,12 +4128,12 @@ function dzEquipTab(sub, D, G, ed){
   if(sub === "fan"){
     params = `<div class="dz-dim"><span class="lb" style="width:auto">시간당 공기 회전수</span><select data-eqp="fan.ach" ${ro}>${[1.5, 2].map(v => `<option value="${v}" ${P.fan.ach === v ? "selected" : ""}>${v}회</option>`).join("")}</select></div>
       <details class="dz-more"><summary>유동휀 기준</summary><div class="g2">${inp("fan", "cap", "풍량 (㎥/h)", 50)}${inp("fan", "lineW", "줄 간격 (폭, mm)", 1000)}${inp("fan", "loop", "순환 배치 (1=켬, 0=끔)")}${inp("fan", "wallOff", "측벽에서 줄까지 (mm)", 100)}${inp("fan", "add", "구역마다 더하기 (대)")}</div>${inp("fan", "model", "모델·규격", 1, "text")}</details>`;
-    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ · 측고 ${fmtQty(R.h)}m → <b>${R.fan.n}대</b> <span title="회전수 1.5~2회 기준">(추천 ${R.fan.lo}~${R.fan.hi})</span> · ${R.fan.lines}줄</span></div>`).join("");
+    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ · 측고 ${fmtQty(R.h)}m → <b>${R.fan.n}대</b> <span title="회전수 1.5~2회 기준">(추천 ${R.fan.lo}~${R.fan.hi})</span> · ${R.fan.lines}줄</span>${ed ? `<span class="eq-pm"><button class="btn sm" data-eqcnt="fan|${R.b.bi}:${R.i}|-1" title="1대 빼기 (배치 자동)">−</button><button class="btn sm" data-eqcnt="fan|${R.b.bi}:${R.i}|1" title="1대 더하기 (배치 자동)">+</button>${R.fan.adj ? `<span class="note" style="margin:0 0 0 4px;color:#C62828">${R.fan.adj > 0 ? "+" : ""}${R.fan.adj}</span>` : ""}</span>` : ""}</div>`).join("");
     bom = Mo.fan.rows; summary = `재배면적 ${wonM(Mo.area)}㎡ · 유동휀 <b>${Mo.fan.n}대</b><br><span class="note">대수 = 면적 × (측고 + 0.5m) × 회전수 ÷ 풍량 ${fmtQty(P.fan.cap)}㎥/h · 폭 ${fmtQty(P.fan.lineW / 1000)}m마다 한 줄</span>`;
   } else if(sub === "fog"){
     params = `<div class="dz-dim"><span class="lb" style="width:auto">작물</span><select data-eqp="fog.crop" ${ro}>${["일반", "딸기"].map(v => `<option ${P.fog.crop === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
       <details class="dz-more"><summary>훈증기 기준</summary><div class="g2">${inp("fog", "per", "일반작물 (㎡/대)", 10)}${inp("fog", "perBerry", "딸기 (㎡/대)", 10)}${inp("fog", "add", "구역마다 더하기 (대)")}</div>${inp("fog", "model", "모델·규격", 1, "text")}</details>`;
-    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ ÷ ${R.fog.per}㎡ = ${R.fog.n0}대 → 격자 ${R.fog.cols}×${R.fog.rows} <b>${R.fog.n}대</b> · 1대당 ${fmtQty(Math.round(R.fog.each * 10) / 10)}㎡ (평균 간격 ${fmtQty(Math.round(R.fog.dx / 100) / 10)}m × ${fmtQty(Math.round(R.fog.dy / 100) / 10)}m)</span></div>`).join("");
+    regRows = Mo.regs.map(R => `<div class="dz-dim sc-row"><span class="lb" style="width:auto;font-weight:600">${esc(R.b.B.code)}${R.i + 1}</span><span class="note" style="margin:0">${wonM(R.area)}㎡ ÷ ${R.fog.per}㎡ = ${R.fog.n0}대 → 격자 ${R.fog.cols}×${R.fog.rows} <b>${R.fog.n}대</b> · 1대당 ${fmtQty(Math.round(R.fog.each * 10) / 10)}㎡ (평균 간격 ${fmtQty(Math.round(R.fog.dx / 100) / 10)}m × ${fmtQty(Math.round(R.fog.dy / 100) / 10)}m)</span>${ed ? `<span class="eq-pm"><button class="btn sm" data-eqcnt="fog|${R.b.bi}:${R.i}|-1" title="1대 빼기 (배치 자동)">−</button><button class="btn sm" data-eqcnt="fog|${R.b.bi}:${R.i}|1" title="1대 더하기 (배치 자동)">+</button>${R.fog.adj ? `<span class="note" style="margin:0 0 0 4px;color:#C62828">${R.fog.adj > 0 ? "+" : ""}${R.fog.adj}</span>` : ""}</span>` : ""}</div>`).join("");
     bom = Mo.fog.rows; summary = `재배면적 ${wonM(Mo.area)}㎡ · 유황훈증기 <b>${Mo.fog.n}대</b><br><span class="note">${P.fog.crop === "딸기" ? "딸기(업다운 재배주수 2배)" : "일반작물(5줄/8m)"} 기준 ${P.fog.crop === "딸기" ? P.fog.perBerry : P.fog.per}㎡당 1대</span>`;
   } else if(sub === "hgut"){
     params = `<div class="g2">${inp("hg", "perSpan", "기본 스팬당 줄 수")}${inp("hg", "pipeSets", "거터지지파이프 (세트)")}${inp("hg", "off", "첫 줄 위치 (기둥줄에서 mm)", 50)}</div>
@@ -4268,6 +4273,14 @@ const fxXlQ = r => r.unit === "EA" ? `ROUNDUP(${fxXl(r.t)},0)` : `ROUND(${fxXl(r
 function eqClick(e){
   if(state.tab !== "design" || !EQ_TABS[state.dzSub]) return false;
   const x = e.target.closest("[data-eqxlsx]"); if(x){ eqExportXlsx(x.dataset.eqxlsx); return true; }
+  const pmb = e.target.closest("[data-eqcnt]"); if(pmb && state.canEdit){ const [k, rk, dir] = pmb.dataset.eqcnt.split("|"), sg = Number(dir), D0 = dzDraft().D, G0 = dzBuild(D0);
+    const cntOf = d => { const D1 = clone(D0), E1 = D1.equip || (D1.equip = {}); E1.cnt = { ...(E1.cnt || {}), [k]: { ...((E1.cnt || {})[k] || {}), [rk]: d } }; delete (E1.place || {})[k]; const R = eqModel(D1, G0).regs.find(R => `${R.b.bi}:${R.i}` === rk); return R ? R[k].n : 0; };
+    const d0 = num(((D0.equip || {}).cnt || {})[k]?.[rk]) || 0, R0 = eqModel(D0, G0).regs.find(R => `${R.b.bi}:${R.i}` === rk); if(!R0) return true;
+    const n0 = R0[k].n, base = R0[k].n0 - d0; let d = d0, n = n0;
+    for(let it = 0; it < 80; it++){ d += sg; if(base + d < 1){ d -= sg; break; } n = cntOf(d); if(sg > 0 ? n > n0 : n < n0) break; }
+    if(n === n0 && !((D0.equip || {}).place || {})[k]){ toast("더 줄일 수 없습니다", 1400); return true; }
+    dzSet(D => { const E = D.equip || (D.equip = {}), cn = { ...(E.cnt || {}) }; cn[k] = { ...(cn[k] || {}), [rk]: d }; if(!d) delete cn[k][rk]; E.cnt = cn; if(E.place && E.place[k]){ const pl = { ...E.place }; delete pl[k]; E.place = pl; } });
+    toast(`${EQ_TABS[k]} ${n0}대 → ${n}대 (자동 배치)`, 1500); return true; }
   const et = e.target.closest("[data-eqtool]"); if(et){ state.eqTool = et.dataset.eqtool; render(); return true; }
   const ea = e.target.closest("[data-eqauto]"); if(ea && state.canEdit){ const k = ea.dataset.eqauto; dzSet(D => { const E = D.equip || (D.equip = {}), pl = { ...(E.place || {}) }; delete pl[k]; E.place = pl; }); return true; }
   const cl = e.target.closest("[data-cvline]"); if(cl){ state.cvLine = cl.dataset.cvline; render(); return true; }
