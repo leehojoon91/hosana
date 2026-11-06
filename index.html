@@ -4484,11 +4484,15 @@ function eqClick(e){
   const avv = e.target.closest("[data-aluwallv]"); if(avv && state.canEdit){ const wk = avv.dataset.aluwallv, D0 = dzDraft().D, w = aluGeom(D0, dzBuild(D0)).walls.find(x => x.k === wk); if(!w) return true;
     dzSet(D => { const E = D.equip || (D.equip = {}), o = { ...(E.aluOff || {}) }; if(o[wk]){ delete o[wk]; o[wk + "|h"] = 1; } const anyOn = w.mk.some(k => !o[k]); w.mk.forEach(k => { if(anyOn) o[k] = 1; else delete o[k]; }); E.aluOff = o; }); return true; }
   const apk = e.target.closest("[data-alupipe]"); if(apk && state.canEdit){ const k = apk.dataset.alupipe, nv = apk.dataset.on === "1" ? 0 : 1, def = apk.dataset.def === "1" ? 1 : 0; dzSet(D => { const E = D.equip || (D.equip = {}), o = { ...(E.aluPipe || {}) }; if(nv === def) delete o[k]; else o[k] = nv; E.aluPipe = o; }); return true; }
-  const arn = e.target.closest("[data-alurafn]"); if(arn && state.canEdit){ const key = arn.dataset.alurafn, D0 = dzDraft().D, r = aluGeom(D0, dzBuild(D0)).rafBays.find(x => `${x.bi}|${x.j}` === key); if(!r) return true;
-    const def = Math.max(1, Math.ceil((r.y1 - r.y0) / 1000 / r.sp - 1e-9));
-    dzInlineNum(arn, r.n, 1, 60, `서까래 등분 수 (비우면 기본 ${def}등분 = ⌈칸 길이÷${r.sp}m⌉)`, v => dzSet(D => { const E = D.equip || (D.equip = {}), o = { ...(E.aluRafN || {}) }; if(v == null || v === def) delete o[key]; else o[key] = v; E.aluRafN = o; })); return true; }
+  const zsEdit = (bi, fn) => dzSet(D => { const E = D.equip || (D.equip = {}), m = { ...(E.aluRaf || {}) }, zs = aluRafZ(E, bi, "glass", eqOf(D).alu).map(z => ({ ...z })); fn(zs); m[bi] = zs; E.aluRaf = m; });
+  const rza = e.target.closest("[data-alurzadd]"); if(rza && state.canEdit){ const [bi, w] = rza.dataset.alurzadd.split("|"); zsEdit(+bi, zs => { const mi = zs.findIndex(z => z.L == null), sp = Math.round(num(eqOf(dzDraft().D).alu.rafG) * 1000) || 1125, nz = { L: sp * 2, sp, mode: "c" };
+      if(w === "f") zs.splice(mi < 0 ? 0 : mi, 0, nz); else zs.splice(mi < 0 ? zs.length : mi + 1, 0, nz); if(mi < 0 && !zs.some(z => z.L == null)) zs.push({ L: null, sp, mode: "c", rem: "one" }); }); return true; }
+  const rzd = e.target.closest("[data-alurzdel]"); if(rzd && state.canEdit){ const [bi, i] = rzd.dataset.alurzdel.split("|").map(Number); zsEdit(bi, zs => { if(zs[i] && zs[i].L != null) zs.splice(i, 1); }); return true; }
+  const rzf = e.target.closest("[data-alurzdef]"); if(rzf && state.canEdit){ const bi = rzf.dataset.alurzdef; dzSet(D => { const E = D.equip || (D.equip = {}), m = { ...(E.aluRaf || {}) }; delete m[bi]; E.aluRaf = m; }); return true; }
+  const rzs = e.target.closest("[data-alurzsp]"); if(rzs && state.canEdit){ const [bi, i] = rzs.dataset.alurzsp.split("|").map(Number), D0 = dzDraft().D, z = aluRafZ(D0.equip || {}, bi, "glass", eqOf(D0).alu)[i]; if(!z) return true;
+    dzInlineNum(rzs, num(z.sp), 100, 5000, "서까래 간격 (mm)", v => { if(v == null) return; zsEdit(bi, zs => { if(zs[i]) zs[i].sp = v; }); }); return true; }
   if(e.target.closest("#alu-offreset") && state.canEdit){ dzSet(D => { const E = D.equip || (D.equip = {}); E.aluOff = {}; E.aluPipe = {}; E.aluAdd = {}; }); return true; }
-  if(e.target.closest("#alu-rafreset") && state.canEdit){ dzSet(D => { const E = D.equip || (D.equip = {}); E.aluRafN = {}; E.aluMulN = {}; }); return true; }
+  if(e.target.closest("#alu-rafreset") && state.canEdit){ dzSet(D => { const E = D.equip || (D.equip = {}); E.aluRafN = {}; E.aluMulN = {}; E.aluRaf = {}; }); return true; }
   const ct = e.target.closest("[data-cvtool]"); if(ct){ state.cvTool = ct.dataset.cvtool; render(); return true; }
   if(e.target.closest("[data-cvadd]") && state.canEdit){ const id = "m" + Date.now().toString(36), pal = ["#7CB342", "#8E24AA", "#00897B", "#F4511E", "#3949AB", "#C0CA33"];
     dzSet(D => { const E = D.equip || (D.equip = {}), T = cvTypes(E); E.cvTypes = [...T, { id, name: `재료${T.length + 1}`, kind: "film", color: pal[T.length % pal.length] }]; }); state.cvTool = id; return true; }
@@ -4504,6 +4508,10 @@ function eqClick(e){
 function eqInput(e){
   if(state.tab !== "design") return false;
   const t = e.target;
+  if(t.dataset && t.dataset.alurzblk != null){ if(e.type !== "change") return true; state.aluRafBlk = +t.value; render(); return true; }
+  if(t.dataset && t.dataset.alurz){ if(e.type !== "change") return true; const [bi, i, f] = t.dataset.alurz.split("|"), v = f === "mode" || f === "rem" ? t.value : num(t.value);
+    if(f !== "mode" && f !== "rem" && !(v >= (f === "sp" ? 100 : 0))){ toast(f === "sp" ? "간격은 100mm 이상" : "길이는 0 이상", 1800); render(); return true; }
+    dzSet(D => { const E = D.equip || (D.equip = {}), m = { ...(E.aluRaf || {}) }, zs = aluRafZ(E, +bi, "glass", eqOf(D).alu).map(z => ({ ...z })); if(zs[+i]) zs[+i][f] = v; m[+bi] = zs; E.aluRaf = m; }); return true; }
   if(t.dataset && t.dataset.alukg){ if(e.type !== "change") return true; const k = t.dataset.alukg, v = num(t.value);
     dzSet(D => { const E = D.equip || (D.equip = {}), o = { ...(E.aluKg || {}) }; if(!isFinite(v) || t.value.trim() === "") delete o[k]; else o[k] = Math.max(0, v); E.aluKg = o; }); return true; }
   if(t.dataset && t.dataset.fxspec){ if(e.type !== "change") return true; const k = t.dataset.fxspec, v = t.value.trim();
@@ -4707,6 +4715,30 @@ const ALU_KG = { ridge_glass: 0.447, ridge_film: 1.085, gutter_glass: 3.551, gut
 const ALU_CAT = [["all", "전체"], ["ridge", "용마루·거터", ["ridge", "gutter"]], ["raf", "서가래·박공바", ["raf", "gab"]], ["wallh", "벽 바 · 수평", ["top", "bot"]], ["wallv", "벽 바 · 수직", ["mul", "corner"]], ["pipe", "홈통", ["dpipe"]], ["vent", "천창", ["vent"]]];
 const aluCatNow = () => ({ wall: "wallh" })[state.aluCat] || state.aluCat || "all";
 const aluShown = t => { const ct = aluCatNow(); return ct === "all" || (ALU_CAT.find(c => c[0] === ct) || [, , []])[2].includes(t); };
+/* 서까래 구간: E.aluRaf[동] = [{ L: 길이 mm (null = 가운데 나머지), sp: 간격 mm, mode: "c" 연속 간격 | "t" 트러스 줄 맞춤, rem: "one" 남는 길이 한 칸에 | "even" 고르게 }]
+   나머지 구간 앞쪽 = 지붕 앞 끝(박공)부터, 뒤쪽 = 지붕 뒤 끝부터 잼. 지붕(스팬마다 이어진 칸)이 끝나는 자리마다 끝 구간이 붙음. 박공 자리는 박공바라 서까래를 넣지 않음.
+   없으면 기본: 유리 = 끝 3×간격 @간격÷2 / 가운데 @간격 연속 / 끝 3×간격 @간격÷2 (양요한 Drawing4: 3,375 @562.5 · @1,125) · 필름 = 한 구간 @필름 간격 */
+const aluRafZ = (E, bi, k, P) => { const c = (E.aluRaf || {})[bi]; if(c && c.length) return c; const sp = Math.round((k === "film" ? num(P.rafF) : num(P.rafG)) * 1000) || 1125;
+  return k === "film" ? [{ L: null, sp, mode: "c", rem: "one" }] : [{ L: sp * 3, sp: sp / 2, mode: "c" }, { L: null, sp, mode: "c", rem: "one" }, { L: sp * 3, sp: sp / 2, mode: "c" }]; };
+function aluRafYs(Y, ja, jb, zs, nBay){
+  const y0 = Y[ja], y1 = Y[jb + 1], T = y1 - y0, mi = zs.findIndex(z => z.L == null), hasMid = mi >= 0;
+  const fr = hasMid ? zs.slice(0, mi) : zs, bk = hasMid ? zs.slice(mi + 1) : [];
+  const fixed = [...fr, ...bk].reduce((a, z) => a + Math.max(0, num(z.L)), 0), sc = fixed > T ? T / fixed : 1, segs = [];
+  let a = y0; fr.forEach((z, i) => { const b = a + Math.max(0, num(z.L)) * sc; segs.push([a, b, i]); a = b; });
+  let b2 = y1; const back = []; for(let i = bk.length - 1; i >= 0; i--){ const aa = b2 - Math.max(0, num(bk[i].L)) * sc; back.unshift([aa, b2, mi + 1 + i]); b2 = aa; }
+  if(hasMid) segs.push([a, b2, mi]); segs.push(...back);
+  if(!hasMid && segs.length) segs[segs.length - 1][1] = y1;
+  const out = [];
+  segs.forEach(([a, b, zi]) => { const z = zs[zi], L = b - a; if(L < 1) return; const sp = Math.max(100, num(z.sp) || 1000);
+    if(z.mode === "t"){ const br = [a, ...Y.filter(y => y > a + 1 && y < b - 1), b];   // 트러스 줄마다 1개 + 칸 안 등분
+      for(let q = 0; q < br.length - 1; q++){ const l = br[q + 1] - br[q], jj = Y.findIndex(y => Math.abs(y - br[q]) < 1), ov = jj >= 0 && jj + 1 < Y.length && Math.abs(Y[jj + 1] - br[q + 1]) < 1 ? nBay(jj) : null, n = ov || Math.max(1, Math.ceil(l / sp - 1e-6));
+        for(let t = 1; t <= n; t++) out.push(br[q] + l * t / n); } }
+    else { const n = Math.max(1, Math.round(L / sp));   // 연속 간격: 남는 길이는 가운데 한 칸에(또는 고르게)
+      if(z.rem === "even") for(let t = 1; t <= n; t++) out.push(a + L * t / n);
+      else { const adj = L - n * sp, big = Math.floor(n / 2); let y = a; for(let t = 0; t < n; t++){ y += sp + (t === big ? adj : 0); out.push(y); } } } });
+  const ys = [...new Set(out.map(v => Math.round(v * 10) / 10))].filter(v => v > y0 + 1 && v < y1 - 1).sort((p, q) => p - q);
+  return { ys, segs, y0, y1 };
+}
 function aluGeom(D, G){
   const P = eqOf(D).alu, cp = eqOf(D).cover, E = D.equip || {}, T = cvTypes(E), off = E.aluOff || {}, pipeOv = E.aluPipe || {}, rafN = E.aluRafN || {}, aAdd = E.aluAdd || {}, mulN = E.aluMulN || {};
   const kd = id => id === "n" ? null : ((T.find(t => t.id === id) || T[0]).kind === "film" ? "film" : (T.find(t => t.id === id) || T[0]).kind === "pc" ? "pc" : "glass");
@@ -4714,25 +4746,27 @@ function aluGeom(D, G){
   const cosA = Math.cos(Math.max(0, Math.min(60, num(P.angle))) * Math.PI / 180);
   const L = [], Loff = [], sum = {};
   const add = (t, k, a, b, len, key, isOff, x) => { if(k === null) return; const m = { t, k, a, b, len, key, ...(x || {}) }; if(isOff === undefined ? key && off[key] : isOff){ Loff.push(m); return; } L.push(m); const kk = k ? `${t}_${k}` : t; sum[kk] = (sum[kk] || 0) + len; };
-  let ends = 0, corners = 0, hMax = 0, W = 0; const roofArea = { glass: 0, film: 0 }, rafL = new Set(), walls = [], rafBays = [], slots = [];
+  let ends = 0, corners = 0, hMax = 0, W = 0; const roofArea = { glass: 0, film: 0 }, rafL = new Set(), walls = [], rafRuns = [], slots = [];
   const mulDiv = (wk, len) => { const v = mulN[wk]; return v != null && +v >= 1 ? Math.round(+v) : Math.max(1, Math.ceil(len / 1000 / Math.max(0.3, P.mull) - 1e-9)); };   // 수직서가래 등분 수 (벽 구간마다)
   G.blocks.forEach(b => { const g = b.g, bi = b.bi, X = b.X, Y = b.Y, gz = b.gz, rh = b.ridgeH, h = gz / 1000, R = s => b.venlo ? b.Rof(s) : 1, md = s => g.sw[s] / R(s);
     const cell = (s, j) => cvRoofOf(E, cp, T, bi, s, j), sl = s => Math.round((md(s) / 2 / cosA / 1000 + 0.1) * 10) / 10;   // 경사 길이 + 자름 여유 0.1m
     hMax = Math.max(hMax, h);
     const gabZ = (s, x) => gz + rh * (1 - Math.abs(((x - X[s]) % md(s)) / md(s) * 2 - 1));   // 박공면 높이 (지붕마다 삼각)
     const spOf = k => Math.max(0.3, k === "film" ? P.rafF : P.rafG);
-    const nOf = (j, k) => { const v = rafN[`${bi}|${j}`]; return v != null && +v >= 1 ? Math.round(+v) : Math.max(1, Math.ceil(g.bh[j] / 1000 / spOf(k) - 1e-9)); };
+    const nBay = j => { const v = rafN[`${bi}|${j}`]; return v != null && +v >= 1 ? Math.round(+v) : null; };
     const rafter = (s, y, k, key) => { const Lr = sl(s); rafL.add(Lr);   // 지붕마다 따로 넣고 빼기 (키 끝 :m)
       for(let m = 0; m < R(s); m++){ const xa = X[s] + m * md(s), xr = xa + md(s) / 2, xb = xa + md(s), km = `${key}:${m}`; add("raf", k, [xa, y, gz], [xr, y, gz + rh], Lr, km); add("raf", k, [xb, y, gz], [xr, y, gz + rh], Lr, km); } };
-    const bayK = {};
     for(let s = 0; s < g.ns; s++){
       const kAt = j => j >= 0 && j < g.nb && g.inc(s, j) ? rk(cell(s, j)) : null;
-      for(let j = 0; j < g.nb; j++){ const k = kAt(j); if(!k) continue; roofArea[k] += g.sw[s] * g.bh[j] / 1e6; if(!bayK[j]) bayK[j] = k;
+      for(let j = 0; j < g.nb; j++){ const k = kAt(j); if(!k) continue; roofArea[k] += g.sw[s] * g.bh[j] / 1e6;
         for(let m = 0; m < R(s); m++){ const xr = X[s] + (m + 0.5) * md(s); add("ridge", k, [xr, Y[j], gz + rh], [xr, Y[j + 1], gz + rh], g.bh[j] / 1000, `${bi}|r:${s}:${m}:${j}`); }
         for(let m = 1; m < R(s); m++){ const xg = X[s] + m * md(s); add("gutter", k, [xg, Y[j], gz], [xg, Y[j + 1], gz], g.bh[j] / 1000, `${bi}|g:${s}:${m}:${j}`); }
-        // 지붕서가래: 칸마다 n등분 (칸 경계선 포함), 이어진 칸의 마지막 경계선까지
-        const n = nOf(j, k); for(let t = 0; t < n; t++) rafter(s, Y[j] + g.bh[j] * t / n, k, `${bi}|f:${s}:${j}:${t}`);
-        if(!kAt(j + 1)) rafter(s, Y[j + 1], k, `${bi}|f:${s}:${j + 1}:0`); }
+      }
+      // 지붕서가래: 스팬마다 이어진 지붕(칸) 단위로 구간 배치 (aluRafYs)
+      for(let j = 0; j < g.nb;){ if(!kAt(j)){ j++; continue; } let jb = j; while(jb + 1 < g.nb && kAt(jb + 1)) jb++;
+        const r = aluRafYs(Y, j, jb, aluRafZ(E, bi, kAt(j), P), nBay); rafRuns.push({ bi, s, ...r });
+        r.ys.forEach(y => { let jj = j; while(jj < jb && y >= Y[jj + 1] - 0.5) jj++; rafter(s, y, kAt(jj), `${bi}|f:${s}:${Math.round(y)}`); });
+        j = jb + 1; }
       for(let j = 0; j <= g.nb; j++) if(g.hOut(s, j)){ const c = g.inc(s, j) ? cell(s, j) : cell(s, j - 1), k = rk(c), w = kd(cvWallOf(E, cp, T, `${bi}|h:${s}:${j}`, true)), wk = `${bi}|h:${s}:${j}`;
         for(let m = 0; m < R(s); m++){ const xa = X[s] + m * md(s), xr = xa + md(s) / 2, xb = xa + md(s), gk = k === "glass" && w === "pc" ? "pc" : k, bk = `${bi}|b:${s}:${j}:${m}`; add("gab", gk, [xa, Y[j], gz], [xr, Y[j], gz + rh], sl(s), bk); add("gab", gk, [xb, Y[j], gz], [xr, Y[j], gz + rh], sl(s), bk); }
         const prof = []; for(let m = 0; m < R(s); m++){ const xa = X[s] + m * md(s); prof.push([xa, gz], [xa + md(s) / 2, gz + rh]); } prof.push([X[s + 1], gz]);
@@ -4740,7 +4774,6 @@ function aluGeom(D, G){
         walls.push({ k: wk, w, dir: "h", bi, line: j, a: [X[s], Y[j]], b: [X[s + 1], Y[j]], off: wOff, prof, mk, dv, own: mulN[wk] != null, len: g.sw[s] });
         if(w && w !== "film"){ add("bot", w, [X[s], Y[j], 0], [X[s + 1], Y[j], 0], g.sw[s] / 1000, wk + "|b", wOff || !!off[wk + "|b"]); const n = dv + 1, avg = (h + (h + rh / 1000)) / 2;
           for(let t = 0; t < n; t++){ const x = X[s] + g.sw[s] * t / Math.max(1, n - 1), key = `${bi}|m:h:${s}:${j}:${t}`; mk.push(key); add("mul", w, [x, Y[j], 0], [x, Y[j], b.venlo ? gabZ(s, Math.min(x, X[s + 1] - 1)) : gz], avg, key, !!(off[wk] || off[key]), { w: wk }); } } } }
-    Object.keys(bayK).forEach(j => { const own = rafN[`${bi}|${j}`] != null; rafBays.push({ bi, j: +j, n: nOf(+j, bayK[j]), own, sp: spOf(bayK[j]), y0: Y[+j], y1: Y[+j + 1], x: X[0] }); });
     for(let i = 0; i <= g.ns; i++) for(let j = 0; j < g.nb; j++){
       if(g.lineOn(i, j)){ const k = rk(i < g.ns && g.inc(i, j) ? cell(i, j) : cell(i - 1, j)); add("gutter", k, [X[i], Y[j], gz], [X[i], Y[j + 1], gz], g.bh[j] / 1000, `${bi}|gl:${i}:${j}`); }
       if(g.vOut(i, j)){ const w = kd(cvWallOf(E, cp, T, `${bi}|v:${i}:${j}`, false)), wk = `${bi}|v:${i}:${j}`, wOff = !!(off[wk] || off[wk + "|h"]), mk = [], dv = mulDiv(wk, g.bh[j]);
@@ -4775,7 +4808,7 @@ function aluGeom(D, G){
     x.L.win.forEach(([x0, y0, x1, y1]) => { const z0 = zAt(x0 + 1), z1 = zAt(x1 - 1), cz = (z0 > z1 ? [b.gz + b.ridgeH, z1] : [z0, b.gz + b.ridgeH]);
       const key = `${x.sec.bi}|w:${Math.round(x0)}:${Math.round(y0)}`; if(!off[key]) W++;
       add("vent", "", [x0, y0, cz[0]], [x1, y1, cz[1]], 0, key, undefined, { poly: [[x0, y0, cz[0]], [x1, y0, cz[1]], [x1, y1, cz[1]], [x0, y1, cz[0]]] }); }); });
-  return { L, Loff, sum, ends, corners, hMax, rafL, roofArea, walls, rafBays, slots, W };
+  return { L, Loff, sum, ends, corners, hMax, rafL, roofArea, walls, rafRuns, slots, W };
 }
 function aluModel(D, G){
   const P = eqOf(D).alu, E = D.equip || {}, N = fxN, r2 = v => Math.round(v * 100) / 100, Gm = aluGeom(D, G);
@@ -4788,7 +4821,7 @@ function aluModel(D, G){
   bar("ridge", ridge, "지붕마다 용마루 길이");
   bar("gutter", gut, "거터 줄 길이 (관리동 포함)");
   if(gut.glass > 0) rows.push({ k: "gutpvc", n: "거터 덮개 PVC", spec: "", u: "m", f: `${N(L1(gut.glass), "m")}×${N(2, "면")}`, rem: "유리 거터 길이 × 2" });
-  bar("raf", raf, `개수 × 개당 길이(경사 길이 ${[...rafL].map(v => v + "m").join("·")}) · 칸마다 ⌈칸 길이÷간격⌉등분 (유리 @${P.rafG}m · 필름 @${P.rafF}m, 평면에서 칸별로 바꿈)`, true);
+  bar("raf", raf, `개수 × 개당 길이(경사 길이 ${[...rafL].map(v => v + "m").join("·")}) · 서까래 구간(끝 구간·가운데)대로 배치, 박공 자리는 박공바`, true);
   if(raf.glass > 0){ rows.push({ k: "rafpvc", n: "지붕서가래 PVC", spec: "", u: "m", f: `${N(L1(raf.glass), "m")}×${N(2, "면")}`, rem: "서가래 홈(날개) 양쪽" });
     rows.push({ k: "raftri", n: "서가래 삼각대", spec: "", u: "ea", f: `${N(L1(raf.glass), "m")}÷${N([...rafL][0] || 2.3, "m")}÷${N(2, "")}`, rem: "서가래 2개당 1" }); }
   bar("gab", gab, "개수(바깥 박공의 경사면 수) × 개당 길이(경사 길이)", true);
@@ -4816,7 +4849,7 @@ function dzAluTab(D, G, ed){
       <p class="note" style="margin:0 0 6px">지붕·벽 재료는 ‘피복’ 탭에서 칠한 범위를 따릅니다 (유리 / 불소필름 / PC 전용바).</p>
       <div class="g2">${inp("rafG", "지붕서가래 간격 · 유리 (m)", 0.005)}${inp("rafF", "지붕서가래 간격 · 필름 (m)", 0.005)}${inp("mull", "수직서가래 간격 (m)", 0.05)}${inp("angle", "지붕 경사 (°)", 1)}</div>
       <div class="dz-area" style="margin-top:8px">천창 ${Mo.W}개 · 모서리 ${Mo.corners}곳 · 거터 끝 ${Mo.ends}곳<br>알루미늄 바 약 <b>${wonM(Math.round(kgSum))}kg</b></div>
-      ${(Object.keys(E.aluOff || {}).length || Object.keys(E.aluPipe || {}).length || Object.keys(E.aluAdd || {}).length) && ed ? `<button class="btn sm" id="alu-offreset" style="margin-top:6px">넣고 뺀 것 모두 되돌리기</button>` : ""}${(Object.keys(E.aluRafN || {}).length || Object.keys(E.aluMulN || {}).length) && ed ? `<button class="btn sm" id="alu-rafreset" style="margin-top:6px">칸별 등분(서까래·수직서가래) 되돌리기</button>` : ""}
+      ${(Object.keys(E.aluOff || {}).length || Object.keys(E.aluPipe || {}).length || Object.keys(E.aluAdd || {}).length) && ed ? `<button class="btn sm" id="alu-offreset" style="margin-top:6px">넣고 뺀 것 모두 되돌리기</button>` : ""}${(Object.keys(E.aluRafN || {}).length || Object.keys(E.aluMulN || {}).length || Object.keys(E.aluRaf || {}).length) && ed ? `<button class="btn sm" id="alu-rafreset" style="margin-top:6px">서까래 구간·수직서가래 등분 되돌리기</button>` : ""}
       <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><button class="btn" data-eqxlsx="alu">산출서 엑셀</button></div></div>`;
   const tabs = `<div class="dz-tabs">${[["3d", "3D 보기"], ["plan", "평면 편집"], ["bom", "물량표"]].map(([k, l]) => `<button class="btn sm ${view === k ? "primary" : ""}" data-aluview="${k}">${l}</button>`).join("")}
       ${view === "3d" ? `<span class="note" style="margin:0 0 0 auto">끌기: 회전 · Shift+끌기: 이동 · 휠: 확대 · 철골은 흐리게</span>${[["iso", "등각"], ["front", "정면"], ["side", "측면"], ["top", "평면"]].map(([k, l]) => `<button class="btn sm" data-dzcam="${k}">${l}</button>`).join("")}` : ""}</div>`;
@@ -4834,11 +4867,12 @@ function dzAluTab(D, G, ed){
   else if(view === "plan") main = `${tabs}<div class="dz-tools">${ALU_CAT.map(([k, l]) => `<button data-alucat="${k}" class="${cat === k ? "on" : ""}">${l}</button>`).join("")}</div>
       <p class="note" style="margin:0 0 6px">${!ed ? "보기 전용" : ({ all: "분류를 고르면 그 분류 부재를 눌러서 빼거나 다시 넣을 수 있습니다 (뺀 것은 빨간 점선). 재료는 ‘피복’ 탭에서 바꿉니다.",
         ridge: "용마루·거터 선을 칸마다 눌러서 빼거나 다시 넣습니다.",
-        raf: "서까래(가로 선)·박공바를 지붕마다 눌러서 빼거나 넣습니다. 왼쪽 ‘n등분’을 누르면 그 칸(기둥 간격)의 서까래 등분 수를 바꿉니다 (칸 경계선마다 1개 + 칸 안을 n등분).",
+        raf: "서까래(가로 선)·박공바를 지붕마다 눌러서 빼거나 넣습니다. 위 ‘서까래 구간’ 표에서 끝 구간·가운데 구간의 길이·간격·배치(연속 간격 / 트러스 줄 맞춤)를 정하고, 동 왼쪽 색 띠를 누르면 그 구간 간격을 바로 바꿉니다.",
         wallh: "상부바(주황)·하부바(회색)를 따로 눌러서 (벽 선 양옆에 나눠 그림) 빼거나 넣습니다. 회색 점선(안쪽 격자선)을 누르면 그 자리에 상부바·하부바를 새로 넣습니다.",
         wallv: "측면도·정면도에서 수직서가래·코너바를 하나씩 눌러 빼거나 넣습니다. 벽 아래 점선 띠: 그 벽 구간 수직서가래 모두 · 그 아래 ‘n등분’: 그 구간 간격(등분 수) 바꾸기.",
         pipe: "동그라미(선홈통·상자홈통 자리)를 눌러서 빼거나 넣습니다. 기본: 복도가 재배실 한쪽 박공에 붙어 있으면 반대쪽 박공만, 가운데거나 없으면 양쪽 박공.",
         vent: "천창을 눌러서 알루미늄 물량에서 빼거나 넣습니다 (천창 배치 자체는 ‘천창’ 탭에서 정합니다)." })[cat]}</p>
+      ${cat === "raf" ? aluRafTable(D, G, ed) : ""}
       <div class="dz-zwrap"><div class="dz-zoom"><button data-dzzoom="in" title="확대">+</button><button data-dzzoom="out" title="축소">−</button><button data-dzzoom="fit" title="전체 보기">전체 보기</button><span class="note">휠: 확대·축소 · 오른쪽 버튼(또는 Shift)으로 끌기: 이동</span></div>${cat === "wallv" ? aluElevSvg(D, G, Gm, ed) : aluSvg(D, G, Gm, shown, ed)}</div>${legend}`;
   else main = `${tabs}<h3 style="font-size:13.5px;margin:10px 0 6px">알루미늄 바 중량</h3><div class="tbl-wrap"><table class="dzt"><thead><tr><th>품번</th><th>품명</th><th>규격</th><th class="r">길이 (m)</th><th class="r">kg/m</th><th class="r">중량 (kg)</th></tr></thead><tbody>
       ${barRows.map(r => { const kg = kgOf(r[7]), q = fxQty(r[3], "m"); return `<tr><td class="pn">${esc(r[8] || "")}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td class="r num">${fmtQty(q)}</td><td class="r">${ed ? `<input type="number" step="0.001" data-alukg="${esc(r[7])}" value="${kg}" style="width:5.5em;text-align:right">` : kg}</td><td class="r num">${wonM(Math.round(q * kg))}</td></tr>`; }).join("")}
@@ -4846,6 +4880,23 @@ function dzAluTab(D, G, ed){
       <p class="note">kg/m 기본값은 직영 시트(0104) 단중입니다. 칸을 고치면 이 프로젝트에 저장됩니다.</p>
       ${fxKeyTable(Mo.rows, "alu", ed, "알루미늄 수량산출", "직영 시트(0104 알루미늄공사) 기준입니다. 3D·평면과 같은 형상에서 길이를 셉니다. 관리동 판넬 마감바(용마루·거터·덮개바)와 가로대는 필요하면 산출식 칸에 직접 넣어 주세요.")}`;
   return `<div class="dz">${side}<div class="dz-main panel" style="padding:12px">${main}</div></div>`;
+}
+/* 서까래 구간 표 (동마다) */
+function aluRafTable(D, G, ed){
+  const E = D.equip || {}, bi = Math.min(G.blocks.length - 1, state.aluRafBlk || 0), zs = aluRafZ(E, bi, "glass", eqOf(D).alu), own = !!((E.aluRaf || {})[bi] || []).length, mi = zs.findIndex(z => z.L == null), ro = ed ? "" : "disabled";
+  const ZC = ["#7CB342", "#29B6F6", "#FFA726", "#AB47BC", "#26A69A", "#EF5350"];
+  const pos = i => mi < 0 ? `구간 ${i + 1}` : i < mi ? `앞 끝${mi > 1 ? " " + (i + 1) : ""}` : i === mi ? "가운데 (나머지)" : `뒤 끝${zs.length - mi - 1 > 1 ? " " + (i - mi) : ""}`;
+  return `<div class="dz-rz" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0 0 8px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><b style="font-size:13px">서까래 구간</b>${G.blocks.length > 1 ? `<select data-alurzblk>${G.blocks.map((b, k) => `<option value="${k}" ${k === bi ? "selected" : ""}>${esc(b.B.name || k + 1 + "동")}</option>`).join("")}</select>` : ""}
+      <span class="note" style="margin:0">${own ? "이 동만 따로 정함" : "기본값 (유리 지붕 기준 · 필름 지붕은 필름 간격 한 구간)"} · 끝 구간은 지붕이 끝나는 자리마다 붙습니다 · 박공 자리는 박공바</span></div>
+    <div class="tbl-wrap"><table class="dzt"><thead><tr><th></th><th>구간</th><th class="r">길이 (mm)</th><th class="r">간격 (mm)</th><th>배치</th><th>남는 길이</th><th></th></tr></thead><tbody>
+    ${zs.map((z, i) => `<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${ZC[i % ZC.length]}"></i></td><td>${pos(i)}</td>
+      <td class="r">${z.L == null ? `<span class="note">나머지</span>` : `<input type="number" step="1" min="0" data-alurz="${bi}|${i}|L" value="${num(z.L)}" ${ro} style="width:6em;text-align:right">`}</td>
+      <td class="r"><input type="number" step="0.5" min="100" data-alurz="${bi}|${i}|sp" value="${num(z.sp)}" ${ro} style="width:6em;text-align:right"></td>
+      <td><select data-alurz="${bi}|${i}|mode" ${ro}><option value="c" ${z.mode !== "t" ? "selected" : ""}>연속 간격</option><option value="t" ${z.mode === "t" ? "selected" : ""}>트러스 줄 맞춤</option></select></td>
+      <td>${z.mode === "t" ? `<span class="note">칸마다 등분</span>` : `<select data-alurz="${bi}|${i}|rem" ${ro}><option value="one" ${z.rem !== "even" ? "selected" : ""}>한 칸에 몰기</option><option value="even" ${z.rem === "even" ? "selected" : ""}>고르게 나누기</option></select>`}</td>
+      <td>${ed && i !== mi && zs.length > 1 ? `<button class="dz-x" data-alurzdel="${bi}|${i}" title="구간 지우기">×</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+    ${ed ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sm" data-alurzadd="${bi}|f">＋ 앞 끝 구간</button><button class="btn sm" data-alurzadd="${bi}|b">＋ 뒤 끝 구간</button>${own ? `<button class="btn sm" data-alurzdef="${bi}">기본값으로</button>` : ""}</div>` : ""}</div>`;
 }
 /* 알루미늄 평면: 철골 외곽 + 부재 (종류별 색) · 분류를 고르면 그 분류 부재를 눌러서 빼기/넣기 (뺀 것은 빨간 점선) */
 function aluSvg(D, G, Gm, shown, ed){
@@ -4874,9 +4925,12 @@ function aluSvg(D, G, Gm, shown, ed){
       else if(q.m.t === "vent") o += `<rect class="hit" data-alukey="${key}" x="${q.x0}" y="${q.y0}" width="${q.x1 - q.x0}" height="${q.y1 - q.y0}">${tip}</rect>`;
       else { const vert = q.x1 - q.x0 < q.y1 - q.y0, t = cs * (q.m.t === "raf" ? 0.45 : q.m.t === "top" || q.m.t === "bot" ? 0.6 : 0.9), sh = q.m.t === "top" ? cs * 1.2 : q.m.t === "bot" ? -cs * 1.2 : 0;   // 상부바·하부바는 그려진 자리(양쪽으로 비켜 그림)에
         o += `<rect class="hit" data-alukey="${key}" x="${vert ? q.x0 + sh - t : q.x0}" y="${vert ? q.y0 : q.y0 + sh - t}" width="${vert ? t * 2 : q.x1 - q.x0}" height="${vert ? q.y1 - q.y0 : t * 2}">${tip}</rect>`; } }); }
-  // 서가래: 칸마다 등분 수 (눌러서 바꿈)
-  if(cat === "raf") Gm.rafBays.forEach(r => { const fy = Math.min(cs * 2.2, (r.y1 - r.y0) * 0.3), sp = (r.y1 - r.y0) / r.n / 1000;
-    o += `<text x="${r.x - cs * 1.5}" y="${(r.y0 + r.y1) / 2 + fy * 0.35}" font-size="${fy}" text-anchor="end" font-weight="700" fill="${r.own ? "#C62828" : ALU_T.raf[1]}" ${ed ? `data-alurafn="${r.bi}|${r.j}" style="cursor:pointer"` : 'pointer-events="none"'}>${r.n}등분 @${fmtQty(Math.round(sp * 1000) / 1000)}m<title>${ed ? "눌러서 이 칸의 서까래 등분 수 입력 · " : ""}${r.own ? "이 칸만 따로 정함" : `기본 = ⌈칸 길이÷${r.sp}m⌉`}</title></text>`; });
+  // 서까래 구간 띠: 동마다 가장 긴 지붕 줄 기준, 동 왼쪽에 (눌러서 간격 입력)
+  if(cat === "raf"){ const ZC = ["#7CB342", "#29B6F6", "#FFA726", "#AB47BC", "#26A69A", "#EF5350"];
+    G.blocks.forEach(b => { const rs = Gm.rafRuns.filter(r => r.bi === b.bi); if(!rs.length) return; const r = rs.reduce((p, q) => q.y1 - q.y0 > p.y1 - p.y0 ? q : p), zs = aluRafZ(D.equip || {}, b.bi, "glass", eqOf(D).alu), bx = b.X[0] - cs * 7, bw = cs * 4.5;
+      r.segs.forEach(([a, c, zi]) => { const z = zs[zi] || {}, col = ZC[zi % ZC.length], fy = Math.min(cs * 3, (c - a) * 0.12);
+        o += `<rect x="${bx}" y="${a}" width="${bw}" height="${c - a}" fill="${col}" fill-opacity=".3" stroke="${col}" stroke-width="1" vector-effect="non-scaling-stroke" ${ed ? `data-alurzsp="${b.bi}|${zi}" style="cursor:pointer"` : ""}><title>${zi === zs.findIndex(q => q.L == null) ? "가운데(나머지)" : "끝 구간"} · ${z.mode === "t" ? "트러스 줄 맞춤" : "연속 간격"} @${fmtQty(num(z.sp))}mm${ed ? " · 눌러서 간격 입력" : ""}</title></rect>`;
+        if(fy > cs * 0.5) o += `<text x="${bx + bw / 2}" y="${(a + c) / 2}" font-size="${fy}" text-anchor="middle" dominant-baseline="middle" fill="#263238" font-weight="700" pointer-events="none" transform="rotate(-90 ${bx + bw / 2} ${(a + c) / 2})">@${fmtQty(num(z.sp))}${z.mode === "t" ? " 트러스" : ""}</text>`; }); }); }
   return o + `</svg>`;
 }
 /* 알루미늄 입면 (벽 바 · 수직): 측면도(기둥줄 벽, 가로축 = 길이 방향) · 정면도(박공 벽, 가로축 = 폭 방향). 수직서가래·코너바를 눌러서 빼기/넣기, 벽 아래 띠를 누르면 그 벽 구간 수직서가래 모두 */
